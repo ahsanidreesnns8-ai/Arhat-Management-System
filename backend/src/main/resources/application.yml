@@ -36,6 +36,13 @@ app:
     expiration-ms: 86400000
   company:
     name: Rehmani Trading Company
+  ai:
+    # Free key from https://aistudio.google.com/apikey — enables full conversational world AI
+    gemini-api-key: ${GEMINI_API_KEY:}
+    gemini-model: ${GEMINI_MODEL:gemini-2.0-flash}
+    openai-api-key: ${OPENAI_API_KEY:}
+    openai-base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    openai-model: ${OPENAI_MODEL:gpt-4o-mini}
 
 logging:
   level:

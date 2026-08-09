@@ -106,8 +106,15 @@ export const searchApi = {
 }
 
 export const aiApi = {
-  chat: (message: string) =>
-    api.post<ApiResponse<AiChatResponse>>('/ai/chat', { message }),
+  chat: (
+    message: string,
+    options?: { language?: string; history?: { role: string; content: string }[] },
+  ) =>
+    api.post<ApiResponse<AiChatResponse>>('/ai/chat', {
+      message,
+      language: options?.language || 'en',
+      history: options?.history || [],
+    }),
 }
 
 export const saleApi = {

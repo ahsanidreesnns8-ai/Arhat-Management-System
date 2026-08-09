@@ -47,7 +47,11 @@ export default function AiAssistantPanel() {
     setMessages((prev) => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
     try {
-      const res = await aiApi.chat(userMsg)
+      const history = messages
+        .filter((m) => m.content.trim())
+        .slice(-8)
+        .map((m) => ({ role: m.role, content: m.content }))
+      const res = await aiApi.chat(userMsg, { language: lang, history })
       const payload = res.data?.data
       const reply = payload?.reply?.trim()
       if (!reply) throw new Error('empty reply')
@@ -149,8 +153,10 @@ export default function AiAssistantPanel() {
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                   } ${isUrdu && msg.role === 'assistant' ? 'font-urdu' : ''}`}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                    {msg.source && msg.source !== 'system' && (
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {msg.content.replace(/\*\*(.+?)\*\*/g, '$1')}
+                    </p>
+                    {msg.source && msg.source !== 'system' && msg.source !== 'world_ai' && (
                       <p className="text-xs opacity-60 mt-1">Source: {msg.source}</p>
                     )}
                   </div>

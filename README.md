@@ -54,6 +54,28 @@ docker compose up -d --build
 ## Modules
 Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Queue · Sales (mixed-source) · Records · Reports (Excel/PDF/Print) · Settings · Owner Panel · AI Assistant · Global Search · Bills
 
+## AI Assistant
+Answers **business data** (stock, queue, sales, balances) and **general world questions** (science, history, geography, definitions, math, weather).
+
+Works out of the box via open knowledge sources (Wikipedia, DuckDuckGo, dictionary, restcountries, Open-Meteo).
+
+For full conversational AI on any topic, set a free Gemini key:
+
+```bash
+# Get a key: https://aistudio.google.com/apikey
+export GEMINI_API_KEY=your_key_here
+cd backend
+mvn spring-boot:run
+```
+
+Optional OpenAI-compatible providers:
+
+```bash
+export OPENAI_API_KEY=your_key
+# export OPENAI_BASE_URL=https://api.openai.com/v1
+# export OPENAI_MODEL=gpt-4o-mini
+```
+
 ## Project layout
 ```
 backend/     Spring Boot REST API
