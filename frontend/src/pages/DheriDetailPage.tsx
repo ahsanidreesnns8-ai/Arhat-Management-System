@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Wallet } from 'lucide-react'
+import { ArrowLeft, Pencil, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -20,6 +20,7 @@ export default function DheriDetailPage() {
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('')
   const [payOpen, setPayOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
 
   const load = useCallback(() => {
     if (!dheriId) return
@@ -119,6 +120,7 @@ export default function DheriDetailPage() {
                 <th className="px-4 py-2">Amount</th>
                 <th className="px-4 py-2">Method</th>
                 <th className="px-4 py-2">Notes</th>
+                <th className="px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -129,6 +131,15 @@ export default function DheriDetailPage() {
                   <td className="px-4 py-2 text-emerald-700 dark:text-emerald-300 font-semibold">{formatCurrency(p.amount)}</td>
                   <td className="px-4 py-2">{p.paymentMethod}</td>
                   <td className="px-4 py-2 text-gray-500">{p.notes || '—'}</td>
+                  <td className="px-4 py-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                      onClick={() => { setEditingPayment(p); setPayOpen(true) }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Update
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -138,13 +149,14 @@ export default function DheriDetailPage() {
 
       <PaymentModal
         open={payOpen}
-        onClose={() => setPayOpen(false)}
+        onClose={() => { setPayOpen(false); setEditingPayment(null) }}
         onSuccess={load}
-        type="FARMER"
-        partyId={dheri.farmerId}
-        partyName={dheri.farmerName}
+        type={editingPayment?.paymentType === 'BUYER' ? 'BUYER' : 'FARMER'}
+        partyId={editingPayment?.paymentType === 'BUYER' ? (editingPayment.buyerId || dheri.farmerId) : dheri.farmerId}
+        partyName={editingPayment?.paymentType === 'BUYER' ? (editingPayment.buyerName || dheri.farmerName) : dheri.farmerName}
         outstanding={farmerOutstanding}
         dheriId={dheri.id}
+        editingPayment={editingPayment}
       />
     </div>
   )

@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet } from 'lucide-react'
+import { Pencil, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import { TableSkeleton } from '../components/ui/Skeleton'
-import { paymentApi } from '../services/api'
+import PaymentModal from '../components/payments/PaymentModal'
+import { buyerApi, farmerApi, paymentApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
-import type { Payment } from '../types'
+import type { Payment, Sale } from '../types'
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
+  const [partyOutstanding, setPartyOutstanding] = useState(0)
+  const [partySales, setPartySales] = useState<Sale[]>([])
 
   const load = () => {
     setLoading(true)
@@ -25,11 +30,35 @@ export default function PaymentsPage() {
 
   useEffect(() => { load() }, [dateFilter])
 
+  const openEdit = async (p: Payment) => {
+    try {
+      if (p.paymentType === 'FARMER' && p.farmerId) {
+        const f = await farmerApi.getById(p.farmerId)
+        setPartyOutstanding(f.data.data.outstandingBalance || 0)
+        setPartySales([])
+      } else if (p.buyerId) {
+        const [b, s] = await Promise.all([
+          buyerApi.getById(p.buyerId),
+          buyerApi.getSales(p.buyerId).catch(() => ({ data: { data: [] as Sale[] } })),
+        ])
+        setPartyOutstanding(b.data.data.outstandingBalance || 0)
+        setPartySales(s.data.data || [])
+      } else {
+        toast.error('Payment has no linked farmer/buyer')
+        return
+      }
+      setEditingPayment(p)
+      setEditOpen(true)
+    } catch {
+      toast.error('Could not load party balance for update')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Payment Records"
-        description="All money paid to farmers and received from buyers — filter by date for day-wise settlement"
+        description="Pay farmers / receive from buyers — update any payment to re-settle remaining balances"
       />
 
       <div className="card-3d p-4 flex flex-wrap items-end gap-3">
@@ -71,6 +100,7 @@ export default function PaymentsPage() {
                   <th className="text-left p-4 font-semibold text-gray-600">Method</th>
                   <th className="text-left p-4 font-semibold text-gray-600">Invoice</th>
                   <th className="text-left p-4 font-semibold text-gray-600">Status</th>
+                  <th className="text-left p-4 font-semibold text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,6 +136,34 @@ export default function PaymentsPage() {
                       ) : '—'}
                     </td>
                     <td className="p-4">{p.status}</td>
+                    <td className="p-4">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                          onClick={() => openEdit(p)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Update
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                          onClick={async () => {
+                            if (!confirm('Delete this payment and restore party balance?')) return
+                            try {
+                              await paymentApi.delete(p.id)
+                              toast.success('Payment deleted — balance restored')
+                              load()
+                            } catch (err: unknown) {
+                              const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                              toast.error(msg || 'Failed to delete')
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -113,6 +171,21 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+
+      {editingPayment && (
+        <PaymentModal
+          open={editOpen}
+          onClose={() => { setEditOpen(false); setEditingPayment(null) }}
+          onSuccess={load}
+          type={editingPayment.paymentType}
+          partyId={(editingPayment.paymentType === 'FARMER' ? editingPayment.farmerId : editingPayment.buyerId) || 0}
+          partyName={(editingPayment.paymentType === 'FARMER' ? editingPayment.farmerName : editingPayment.buyerName) || 'Party'}
+          outstanding={partyOutstanding}
+          sales={partySales}
+          editingPayment={editingPayment}
+          dheriId={editingPayment.dheriId}
+        />
+      )}
     </div>
   )
 }

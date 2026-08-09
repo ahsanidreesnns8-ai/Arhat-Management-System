@@ -145,6 +145,160 @@ public class PaymentService {
         return toResponse(saved);
     }
 
+    /**
+     * Update an existing payment and re-settle farmer payable / buyer receivable accordingly.
+     * Reverses the old amount on outstanding (and sale paidAmount), then applies the new amount.
+     */
+    @Transactional
+    public PaymentResponse update(Long id, PaymentRequest request) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+
+        BigDecimal newAmount = request.getAmount();
+        if (newAmount == null || newAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Payment amount must be greater than zero");
+        }
+
+        String oldSnapshot = payment.getAmount().toPlainString();
+        reverseEffects(payment);
+
+        if (payment.getPaymentType() == PaymentType.FARMER) {
+            Farmer farmer = payment.getFarmer();
+            if (farmer == null) {
+                throw new RuntimeException("Farmer not linked to this payment");
+            }
+            farmer = farmerRepository.findByIdAndDeletedFalse(farmer.getId())
+                    .orElseThrow(() -> new RuntimeException("Farmer not found"));
+            BigDecimal outstanding = safe(farmer.getOutstandingBalance());
+            if (newAmount.compareTo(outstanding) > 0) {
+                throw new RuntimeException("Amount exceeds farmer remaining to pay of PKR " + outstanding
+                        + " (includes this payment after reverse)");
+            }
+            farmer.setOutstandingBalance(outstanding.subtract(newAmount));
+            farmerRepository.save(farmer);
+            payment.setFarmer(farmer);
+
+            if (request.getDheriId() != null) {
+                Dheri dheri = dheriRepository.findByIdAndDeletedFalse(request.getDheriId())
+                        .orElseThrow(() -> new RuntimeException("Dheri not found"));
+                payment.setDheri(dheri);
+            }
+        } else {
+            Buyer buyer = payment.getBuyer();
+            if (buyer == null) {
+                throw new RuntimeException("Buyer not linked to this payment");
+            }
+            buyer = buyerRepository.findByIdAndDeletedFalse(buyer.getId())
+                    .orElseThrow(() -> new RuntimeException("Buyer not found"));
+            BigDecimal outstanding = safe(buyer.getOutstandingBalance());
+            if (newAmount.compareTo(outstanding) > 0) {
+                throw new RuntimeException("Amount exceeds buyer remaining receivable of PKR " + outstanding
+                        + " (includes this payment after reverse)");
+            }
+            buyer.setOutstandingBalance(outstanding.subtract(newAmount));
+            buyerRepository.save(buyer);
+            payment.setBuyer(buyer);
+
+            // Clear previous sale link (already reversed in reverseEffects)
+            payment.setSale(null);
+            Long saleId = request.getSaleId();
+            if (saleId != null) {
+                Sale sale = saleRepository.findByIdAndDeletedFalse(saleId)
+                        .orElseThrow(() -> new RuntimeException("Sale not found"));
+                BigDecimal remaining = sale.getTotalAmount().subtract(safe(sale.getPaidAmount()));
+                if (newAmount.compareTo(remaining) > 0) {
+                    throw new RuntimeException("Amount exceeds sale remaining balance of PKR " + remaining);
+                }
+                BigDecimal newPaidAmount = safe(sale.getPaidAmount()).add(newAmount);
+                sale.setPaidAmount(newPaidAmount);
+                sale.setPaymentStatus(determinePaymentStatus(sale.getTotalAmount(), newPaidAmount));
+                saleRepository.save(sale);
+                payment.setSale(sale);
+            }
+            if (request.getDheriId() != null) {
+                Dheri dheri = dheriRepository.findByIdAndDeletedFalse(request.getDheriId())
+                        .orElseThrow(() -> new RuntimeException("Dheri not found"));
+                payment.setDheri(dheri);
+            }
+        }
+
+        payment.setAmount(newAmount);
+        payment.setPaymentMethod(parsePaymentMethod(request.getPaymentMethod()));
+        if (request.getPaymentDate() != null) {
+            payment.setPaymentDate(request.getPaymentDate());
+        }
+        if (request.getReferenceNumber() != null) {
+            payment.setReferenceNumber(request.getReferenceNumber());
+        }
+        if (request.getNotes() != null) {
+            payment.setNotes(request.getNotes());
+        }
+
+        Payment saved = paymentRepository.save(payment);
+        auditService.log(
+                resolveCurrentUser() != null ? resolveCurrentUser().getId() : null,
+                "UPDATE",
+                "Payment",
+                saved.getId(),
+                oldSnapshot,
+                saved.getAmount().toPlainString()
+        );
+        return toResponse(saved);
+    }
+
+    /** Delete a payment and restore farmer payable / buyer receivable. */
+    @Transactional
+    public void delete(Long id) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+        String oldSnapshot = payment.getAmount().toPlainString();
+        reverseEffects(payment);
+        paymentRepository.delete(payment);
+        auditService.log(
+                resolveCurrentUser() != null ? resolveCurrentUser().getId() : null,
+                "DELETE",
+                "Payment",
+                id,
+                oldSnapshot,
+                null
+        );
+    }
+
+    /** Undo balance impact of a payment (outstanding + optional sale paidAmount). */
+    private void reverseEffects(Payment payment) {
+        BigDecimal amount = safe(payment.getAmount());
+        if (payment.getPaymentType() == PaymentType.FARMER && payment.getFarmer() != null) {
+            Farmer farmer = farmerRepository.findByIdAndDeletedFalse(payment.getFarmer().getId())
+                    .orElseThrow(() -> new RuntimeException("Farmer not found"));
+            farmer.setOutstandingBalance(safe(farmer.getOutstandingBalance()).add(amount));
+            farmerRepository.save(farmer);
+            payment.setFarmer(farmer);
+        } else if (payment.getPaymentType() == PaymentType.BUYER && payment.getBuyer() != null) {
+            Buyer buyer = buyerRepository.findByIdAndDeletedFalse(payment.getBuyer().getId())
+                    .orElseThrow(() -> new RuntimeException("Buyer not found"));
+            buyer.setOutstandingBalance(safe(buyer.getOutstandingBalance()).add(amount));
+            buyerRepository.save(buyer);
+            payment.setBuyer(buyer);
+
+            if (payment.getSale() != null) {
+                Sale sale = saleRepository.findByIdAndDeletedFalse(payment.getSale().getId()).orElse(null);
+                if (sale != null) {
+                    BigDecimal newPaid = safe(sale.getPaidAmount()).subtract(amount);
+                    if (newPaid.compareTo(BigDecimal.ZERO) < 0) {
+                        newPaid = BigDecimal.ZERO;
+                    }
+                    sale.setPaidAmount(newPaid);
+                    sale.setPaymentStatus(determinePaymentStatus(sale.getTotalAmount(), newPaid));
+                    saleRepository.save(sale);
+                }
+            }
+        }
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
     private PaymentStatus determinePaymentStatus(BigDecimal totalAmount, BigDecimal paidAmount) {
         if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return PaymentStatus.PENDING;

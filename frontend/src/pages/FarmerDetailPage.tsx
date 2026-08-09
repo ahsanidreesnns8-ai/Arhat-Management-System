@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, Printer, Wallet } from 'lucide-react'
+import { ArrowLeft, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
-import { farmerApi } from '../services/api'
+import { farmerApi, paymentApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Payment, Truck } from '../types'
 
@@ -19,6 +19,7 @@ export default function FarmerDetailPage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [loading, setLoading] = useState(true)
   const [payOpen, setPayOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
 
   const load = useCallback(() => {
     if (!farmerId) return
@@ -77,8 +78,11 @@ export default function FarmerDetailPage() {
           description={`${farmer.farmerId} · Farmer payable & product settlement`}
           action={
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setPayOpen(true)} disabled={(farmer.outstandingBalance || 0) <= 0}>
-                <Wallet className="h-4 w-4" /> Pay farmer
+              <Button
+                onClick={() => { setEditingPayment(null); setPayOpen(true) }}
+                disabled={(farmer.outstandingBalance || 0) <= 0}
+              >
+                <Wallet className="h-4 w-4" /> Pay / Settle remaining
               </Button>
               <Button variant="secondary" onClick={openBill}><FileText className="h-4 w-4" /> Generate Bill</Button>
               <Button variant="secondary" onClick={openBill}><Printer className="h-4 w-4" /> Print</Button>
@@ -120,25 +124,54 @@ export default function FarmerDetailPage() {
         ))}
       </Section>
 
-      <Section title="Payments made to farmer" empty="No payments yet" headers={['Date', 'Amount paid', 'Method', 'Status']}>
+      <Section title="Payments made to farmer" empty="No payments yet" headers={['Date', 'Amount paid', 'Method', 'Status', 'Actions']}>
         {payments.map((p) => (
           <tr key={p.id}>
             <td className="px-4 py-2">{p.paymentDate}</td>
             <td className="px-4 py-2 font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(p.amount)}</td>
             <td className="px-4 py-2">{p.paymentMethod}</td>
             <td className="px-4 py-2">{p.status}</td>
+            <td className="px-4 py-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                  onClick={() => { setEditingPayment(p); setPayOpen(true) }}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Update
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                  onClick={async () => {
+                    if (!confirm('Delete this payment? Farmer remaining to pay will increase by this amount.')) return
+                    try {
+                      await paymentApi.delete(p.id)
+                      toast.success('Payment deleted — balance restored')
+                      load()
+                    } catch (err: unknown) {
+                      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                      toast.error(msg || 'Failed to delete payment')
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </button>
+              </div>
+            </td>
           </tr>
         ))}
       </Section>
 
       <PaymentModal
         open={payOpen}
-        onClose={() => setPayOpen(false)}
+        onClose={() => { setPayOpen(false); setEditingPayment(null) }}
         onSuccess={load}
         type="FARMER"
         partyId={farmer.id}
         partyName={farmer.name}
         outstanding={farmer.outstandingBalance || 0}
+        editingPayment={editingPayment}
       />
     </div>
   )

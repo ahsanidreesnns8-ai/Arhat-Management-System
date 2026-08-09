@@ -61,4 +61,18 @@ public class PaymentController {
     public ApiResponse<PaymentResponse> record(@Valid @RequestBody PaymentRequest request) {
         return ApiResponse.ok("Payment recorded", paymentService.record(request));
     }
+
+    @PutMapping("/{id}")
+    public ApiResponse<PaymentResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentRequest request
+    ) {
+        return ApiResponse.ok("Payment updated and balances settled", paymentService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        paymentService.delete(id);
+        return ApiResponse.ok("Payment deleted and balances restored", null);
+    }
 }

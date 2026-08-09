@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, Printer, Wallet } from 'lucide-react'
+import { ArrowLeft, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
-import { buyerApi } from '../services/api'
+import { buyerApi, paymentApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Buyer, Payment, Sale } from '../types'
 
@@ -18,6 +18,7 @@ export default function BuyerDetailPage() {
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
   const [payOpen, setPayOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
 
   const load = useCallback(() => {
     if (!buyerId) return
@@ -74,8 +75,11 @@ export default function BuyerDetailPage() {
           description={`${buyer.buyerId} · Buyer money & purchase ledger`}
           action={
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setPayOpen(true)} disabled={(buyer.outstandingBalance || 0) <= 0}>
-                <Wallet className="h-4 w-4" /> Receive payment
+              <Button
+                onClick={() => { setEditingPayment(null); setPayOpen(true) }}
+                disabled={(buyer.outstandingBalance || 0) <= 0}
+              >
+                <Wallet className="h-4 w-4" /> Receive / Settle remaining
               </Button>
               <Button variant="secondary" onClick={openBill}><FileText className="h-4 w-4" /> Generate Bill</Button>
               <Button variant="secondary" onClick={openBill}><Printer className="h-4 w-4" /> Print</Button>
@@ -98,7 +102,12 @@ export default function BuyerDetailPage() {
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex justify-between">
           <span>Purchase history (bills)</span>
-          <button onClick={() => setPayOpen(true)} className="text-sm text-primary font-medium">Settle bill</button>
+          <button
+            onClick={() => { setEditingPayment(null); setPayOpen(true) }}
+            className="text-sm text-primary font-medium"
+          >
+            Settle bill
+          </button>
         </div>
         {sales.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No purchases</p>
@@ -146,6 +155,7 @@ export default function BuyerDetailPage() {
                 <th className="px-4 py-2">Method</th>
                 <th className="px-4 py-2">Invoice</th>
                 <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -156,6 +166,34 @@ export default function BuyerDetailPage() {
                   <td className="px-4 py-2">{p.paymentMethod}</td>
                   <td className="px-4 py-2">{p.saleInvoiceNumber || p.invoiceNumber || '—'}</td>
                   <td className="px-4 py-2">{p.status}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                        onClick={() => { setEditingPayment(p); setPayOpen(true) }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Update
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                        onClick={async () => {
+                          if (!confirm('Delete this payment? Buyer remaining receivable will increase by this amount.')) return
+                          try {
+                            await paymentApi.delete(p.id)
+                            toast.success('Payment deleted — balance restored')
+                            load()
+                          } catch (err: unknown) {
+                            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                            toast.error(msg || 'Failed to delete payment')
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -165,13 +203,14 @@ export default function BuyerDetailPage() {
 
       <PaymentModal
         open={payOpen}
-        onClose={() => setPayOpen(false)}
+        onClose={() => { setPayOpen(false); setEditingPayment(null) }}
         onSuccess={load}
         type="BUYER"
         partyId={buyer.id}
         partyName={buyer.name}
         outstanding={buyer.outstandingBalance || 0}
         sales={sales}
+        editingPayment={editingPayment}
       />
     </div>
   )

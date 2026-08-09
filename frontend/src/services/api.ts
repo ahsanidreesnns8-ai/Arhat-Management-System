@@ -130,6 +130,9 @@ export const paymentApi = {
   getByDheri: (dheriId: number, date?: string) =>
     api.get<ApiResponse<Payment[]>>(`/payments/dheri/${dheriId}`, { params: date ? { date } : {} }),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Payment>>('/payments', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put<ApiResponse<Payment>>(`/payments/${id}`, data),
+  delete: (id: number) => api.delete<ApiResponse<void>>(`/payments/${id}`),
 }
 
 export const arhatApi = {
