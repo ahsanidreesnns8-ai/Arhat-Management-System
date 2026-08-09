@@ -216,23 +216,31 @@ public class SaleService {
     private void processFarmerItem(SaleItem item) {
         Farmer farmer = item.getFarmer();
         BigDecimal farmerAmount = item.getAmount();
+        boolean alreadyPosted = false;
 
         if (item.getDheri() != null) {
             Dheri dheri = item.getDheri();
             if (dheri.getFarmerReceivable() != null && dheri.getFarmerReceivable().compareTo(BigDecimal.ZERO) > 0) {
                 farmerAmount = dheri.getFarmerReceivable();
             }
+            alreadyPosted = Boolean.TRUE.equals(dheri.getPayablePosted());
 
             if (item.getTotalWeight().compareTo(dheri.getTotalWeight()) >= 0) {
                 dheri.setSellingStatus(SellingStatus.SOLD);
             } else {
                 dheri.setSellingStatus(SellingStatus.SELLING);
             }
+            if (!alreadyPosted && farmerAmount.compareTo(BigDecimal.ZERO) > 0) {
+                dheri.setPayablePosted(true);
+            }
             dheriRepository.save(dheri);
         }
 
-        farmer.setOutstandingBalance(farmer.getOutstandingBalance().add(farmerAmount));
-        farmerRepository.save(farmer);
+        // Avoid double-counting when Arhat settlement already posted farmer payable
+        if (!alreadyPosted) {
+            farmer.setOutstandingBalance(farmer.getOutstandingBalance().add(farmerAmount));
+            farmerRepository.save(farmer);
+        }
     }
 
     private void reverseFarmerItem(SaleItem item) {

@@ -20,6 +20,8 @@ public class PaymentResponse {
     private String buyerCode;
     private Long saleId;
     private String saleInvoiceNumber;
+    private Long dheriId;
+    private String dheriCode;
     private BigDecimal amount;
     private String paymentMethod;
     private LocalDate paymentDate;

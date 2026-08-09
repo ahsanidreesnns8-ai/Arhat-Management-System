@@ -19,6 +19,7 @@ import DheriesPage from './pages/DheriesPage'
 import DheriDetailPage from './pages/DheriDetailPage'
 import StockPage from './pages/StockPage'
 import PriceCalculatorPage from './pages/PriceCalculatorPage'
+import ArhatSalePage from './pages/ArhatSalePage'
 import QueuePage from './pages/QueuePage'
 import SalesPage from './pages/SalesPage'
 import SaleDetailPage from './pages/SaleDetailPage'
@@ -68,6 +69,7 @@ function AppRoutes() {
         <Route path="dheris/:id" element={<DheriDetailPage />} />
         <Route path="stock" element={<StockPage />} />
         <Route path="calculator" element={<PriceCalculatorPage />} />
+        <Route path="arhat-sale" element={<ArhatSalePage />} />
         <Route path="queue" element={<QueuePage />} />
         <Route path="sales" element={<SalesPage />} />
         <Route path="sales/:id" element={<SaleDetailPage />} />

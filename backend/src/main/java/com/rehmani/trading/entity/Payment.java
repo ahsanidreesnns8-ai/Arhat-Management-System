@@ -38,6 +38,10 @@ public class Payment {
     @JoinColumn(name = "sale_id")
     private Sale sale;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dheri_id")
+    private Dheri dheri;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 

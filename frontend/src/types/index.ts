@@ -129,6 +129,7 @@ export interface Dheri {
   laborShare: number
   arhatShare: number
   sellingStatus: string
+  payablePosted?: boolean
   notes?: string
 }
 
@@ -236,6 +237,8 @@ export interface Payment {
   saleId?: number
   invoiceNumber?: string
   saleInvoiceNumber?: string
+  dheriId?: number
+  dheriCode?: string
   amount: number
   paymentMethod: string
   paymentDate: string

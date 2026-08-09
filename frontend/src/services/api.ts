@@ -126,7 +126,28 @@ export const saleApi = {
 
 export const paymentApi = {
   getAll: () => api.get<ApiResponse<Payment[]>>('/payments'),
+  getByDate: (date: string) => api.get<ApiResponse<Payment[]>>('/payments/by-date', { params: { date } }),
+  getByDheri: (dheriId: number, date?: string) =>
+    api.get<ApiResponse<Payment[]>>(`/payments/dheri/${dheriId}`, { params: date ? { date } : {} }),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Payment>>('/payments', data),
+}
+
+export const arhatApi = {
+  settle: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      settlementType: string
+      dheriId?: number
+      dheriCode?: string
+      saleId?: number
+      invoiceNumber?: string
+      totalAmount: number
+      commission: number
+      farmerPayable?: number
+      buyerReceivable?: number
+      paymentNow?: number
+      partyOutstandingAfter?: number
+      message: string
+    }>>('/arhat/settle', data),
 }
 
 export const reportApi = {

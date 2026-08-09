@@ -31,5 +31,6 @@ public class DheriResponse {
     private BigDecimal laborShare;
     private BigDecimal arhatShare;
     private String sellingStatus;
+    private Boolean payablePosted;
     private String notes;
 }

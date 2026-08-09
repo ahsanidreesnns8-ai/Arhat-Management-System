@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
-  Calculator, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield
+  Calculator, Store, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -18,6 +18,7 @@ const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: Translatio
   { to: '/dheris', icon: Package, labelKey: 'dheris' },
   { to: '/stock', icon: Warehouse, labelKey: 'stock' },
   { to: '/calculator', icon: Calculator, labelKey: 'calculator' },
+  { to: '/arhat-sale', icon: Store, labelKey: 'arhatSale' },
   { to: '/queue', icon: ListOrdered, labelKey: 'queue' },
   { to: '/sales', icon: Receipt, labelKey: 'sales' },
   { to: '/payments', icon: Wallet, labelKey: 'payments' },

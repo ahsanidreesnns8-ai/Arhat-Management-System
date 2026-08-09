@@ -21,6 +21,7 @@ public class PaymentService {
     private final FarmerRepository farmerRepository;
     private final BuyerRepository buyerRepository;
     private final SaleRepository saleRepository;
+    private final DheriRepository dheriRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
 
@@ -36,6 +37,21 @@ public class PaymentService {
 
     public List<PaymentResponse> getByBuyer(Long buyerId) {
         return paymentRepository.findByBuyerIdOrderByPaymentDateDesc(buyerId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    public List<PaymentResponse> getByDheri(Long dheriId) {
+        return paymentRepository.findByDheriIdOrderByPaymentDateDescCreatedAtDesc(dheriId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    public List<PaymentResponse> getByDate(LocalDate date) {
+        return paymentRepository.findByPaymentDateOrderByCreatedAtDesc(date)
+                .stream().map(this::toResponse).toList();
+    }
+
+    public List<PaymentResponse> getByDheriAndDate(Long dheriId, LocalDate date) {
+        return paymentRepository.findByDheriIdAndPaymentDateOrderByCreatedAtDesc(dheriId, date)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -77,6 +93,11 @@ public class PaymentService {
             payment.setFarmer(farmer);
             farmer.setOutstandingBalance(outstanding.subtract(amount));
             farmerRepository.save(farmer);
+            if (request.getDheriId() != null) {
+                Dheri dheri = dheriRepository.findByIdAndDeletedFalse(request.getDheriId())
+                        .orElseThrow(() -> new RuntimeException("Dheri not found"));
+                payment.setDheri(dheri);
+            }
         } else {
             if (request.getBuyerId() == null) {
                 throw new RuntimeException("Buyer ID is required for buyer payments");
@@ -104,6 +125,11 @@ public class PaymentService {
                 sale.setPaymentStatus(determinePaymentStatus(sale.getTotalAmount(), newPaidAmount));
                 saleRepository.save(sale);
                 payment.setSale(sale);
+            }
+            if (request.getDheriId() != null) {
+                Dheri dheri = dheriRepository.findByIdAndDeletedFalse(request.getDheriId())
+                        .orElseThrow(() -> new RuntimeException("Dheri not found"));
+                payment.setDheri(dheri);
             }
         }
 
@@ -168,6 +194,8 @@ public class PaymentService {
                 .buyerCode(payment.getBuyer() != null ? payment.getBuyer().getBuyerId() : null)
                 .saleId(payment.getSale() != null ? payment.getSale().getId() : null)
                 .saleInvoiceNumber(payment.getSale() != null ? payment.getSale().getInvoiceNumber() : null)
+                .dheriId(payment.getDheri() != null ? payment.getDheri().getId() : null)
+                .dheriCode(payment.getDheri() != null ? payment.getDheri().getDheriId() : null)
                 .amount(payment.getAmount())
                 .paymentMethod(payment.getPaymentMethod().name())
                 .paymentDate(payment.getPaymentDate())

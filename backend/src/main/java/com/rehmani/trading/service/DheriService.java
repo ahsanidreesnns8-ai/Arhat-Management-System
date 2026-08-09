@@ -161,6 +161,7 @@ public class DheriService {
                 .laborShare(dheri.getLaborShare())
                 .arhatShare(dheri.getArhatShare())
                 .sellingStatus(dheri.getSellingStatus().name())
+                .payablePosted(Boolean.TRUE.equals(dheri.getPayablePosted()))
                 .notes(dheri.getNotes())
                 .build();
     }

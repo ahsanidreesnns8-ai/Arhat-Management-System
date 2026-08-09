@@ -72,5 +72,24 @@ Without a key, the assistant still uses Wikipedia/dictionary/weather/math and st
 ```
 backend/     Spring Boot REST API
 frontend/    React (Vite) SPA
+database/    MySQL schema pack + Workbench queries
 docker-compose.yml
 ```
+
+## Database / MySQL Workbench
+See [`database/README.md`](database/README.md) for:
+- Creating `rehmani_trading`
+- Flyway migrations under `database/migrations/`
+- Ready SQL queries for farmer payables, buyer receivables, dheri payments by day, and day cashbook
+
+```sql
+-- Quick connect after backend has run once
+USE rehmani_trading;
+SOURCE database/queries/01_overview_balances.sql;
+```
+
+## Arhat Sale
+Sidebar → **Arhat Sale**: calculator-style product settlement for
+- **Sell to Buyer** (receivable + optional cash now)
+- **Farmer Product Payable** (posts payable + optional pay now)
+Then open **Dheri detail** or **Payments** (date filter) for day-wise records.

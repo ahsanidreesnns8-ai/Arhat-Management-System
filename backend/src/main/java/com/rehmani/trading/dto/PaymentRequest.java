@@ -13,6 +13,7 @@ public class PaymentRequest {
     private Long farmerId;
     private Long buyerId;
     private Long saleId;
+    private Long dheriId;
     @NotNull
     private BigDecimal amount;
     private String paymentMethod;

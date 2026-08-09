@@ -17,10 +17,11 @@ interface PaymentModalProps {
   partyName: string
   outstanding: number
   sales?: Sale[]
+  dheriId?: number
 }
 
 export default function PaymentModal({
-  open, onClose, onSuccess, type, partyId, partyName, outstanding, sales = [],
+  open, onClose, onSuccess, type, partyId, partyName, outstanding, sales = [], dheriId,
 }: PaymentModalProps) {
   const unpaidSales = sales.filter((s) => (s.totalAmount || 0) - (s.paidAmount || 0) > 0.001)
   const [amount, setAmount] = useState('')
@@ -67,6 +68,7 @@ export default function PaymentModal({
         farmerId: type === 'FARMER' ? partyId : undefined,
         buyerId: type === 'BUYER' ? partyId : undefined,
         saleId: type === 'BUYER' && saleId ? Number(saleId) : undefined,
+        dheriId: dheriId || undefined,
         amount: value,
         paymentMethod: method,
         paymentDate: new Date().toISOString().slice(0, 10),

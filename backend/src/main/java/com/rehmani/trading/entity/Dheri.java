@@ -75,6 +75,11 @@ public class Dheri {
     @Builder.Default
     private BigDecimal farmerReceivable = BigDecimal.ZERO;
 
+    /** True when farmerReceivable was already added to farmer.outstandingBalance */
+    @Column(name = "payable_posted", nullable = false)
+    @Builder.Default
+    private Boolean payablePosted = false;
+
     @Column(name = "supervisor_share", nullable = false, precision = 15, scale = 2)
     @Builder.Default
     private BigDecimal supervisorShare = BigDecimal.ZERO;

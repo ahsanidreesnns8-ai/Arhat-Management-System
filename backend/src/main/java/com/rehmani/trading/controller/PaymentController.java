@@ -6,8 +6,10 @@ import com.rehmani.trading.dto.PaymentResponse;
 import com.rehmani.trading.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -22,9 +24,11 @@ public class PaymentController {
         return ApiResponse.ok(paymentService.getAll());
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<PaymentResponse> getById(@PathVariable Long id) {
-        return ApiResponse.ok(paymentService.getById(id));
+    @GetMapping("/by-date")
+    public ApiResponse<List<PaymentResponse>> getByDate(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ApiResponse.ok(paymentService.getByDate(date));
     }
 
     @GetMapping("/farmer/{farmerId}")
@@ -35,6 +39,22 @@ public class PaymentController {
     @GetMapping("/buyer/{buyerId}")
     public ApiResponse<List<PaymentResponse>> getByBuyer(@PathVariable Long buyerId) {
         return ApiResponse.ok(paymentService.getByBuyer(buyerId));
+    }
+
+    @GetMapping("/dheri/{dheriId}")
+    public ApiResponse<List<PaymentResponse>> getByDheri(
+            @PathVariable Long dheriId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        if (date != null) {
+            return ApiResponse.ok(paymentService.getByDheriAndDate(dheriId, date));
+        }
+        return ApiResponse.ok(paymentService.getByDheri(dheriId));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<PaymentResponse> getById(@PathVariable Long id) {
+        return ApiResponse.ok(paymentService.getById(id));
     }
 
     @PostMapping
