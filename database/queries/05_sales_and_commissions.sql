@@ -1,5 +1,6 @@
 -- ============================================================
 -- 05) SALES + COMMISSION SHARES
+-- Commission of TOTAL amount: Arhat 3% + Munshi 0.70% + Workers 0.30%
 -- ============================================================
 USE rehmani_trading;
 

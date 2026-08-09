@@ -54,6 +54,16 @@ public class SettingsService {
             }
         }
 
+        // Keep total commission in sync with share-of-total model
+        if (settings.getArhatSharePercentage() != null
+                && settings.getSupervisorSharePercentage() != null
+                && settings.getLaborSharePercentage() != null) {
+            settings.setDefaultCommissionPercentage(
+                    settings.getArhatSharePercentage()
+                            .add(settings.getSupervisorSharePercentage())
+                            .add(settings.getLaborSharePercentage()));
+        }
+
         return toResponse(settingsRepository.save(settings));
     }
 
