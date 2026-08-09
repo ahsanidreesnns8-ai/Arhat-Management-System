@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Building2, Percent, Languages } from 'lucide-react'
+import { Save, Building2, Percent, Languages, Bot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -15,12 +15,16 @@ export default function SettingsPage() {
   const { refresh } = useBusiness()
   const { t, lang, setLang, isUrdu } = useLanguage()
   const [settings, setSettings] = useState<BusinessSettings | null>(null)
+  const [geminiKeyInput, setGeminiKeyInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     settingsApi.get()
-      .then((res) => setSettings(res.data.data))
+      .then((res) => {
+        setSettings(res.data.data)
+        setGeminiKeyInput('')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -28,7 +32,13 @@ export default function SettingsPage() {
     if (!settings) return
     setSaving(true)
     try {
-      await settingsApi.update(settings)
+      const payload: Partial<BusinessSettings> = { ...settings }
+      if (geminiKeyInput.trim()) {
+        payload.geminiApiKey = geminiKeyInput.trim()
+      }
+      const res = await settingsApi.update(payload)
+      setSettings(res.data.data)
+      setGeminiKeyInput('')
       await refresh()
       toast.success(t('settingsSaved'))
     } catch {
@@ -61,7 +71,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t('settings')}
-        description={isUrdu ? 'کاروبار، کمیشن اور زبان کی ترتیبات' : 'Business, commission, and language configuration'}
+        description={isUrdu ? 'کاروبار، کمیشن، زبان اور اے آئی ترتیبات' : 'Business, commission, language, and AI configuration'}
         action={
           <Button onClick={handleSave} loading={saving}>
             <Save className="h-4 w-4" />
@@ -71,7 +81,7 @@ export default function SettingsPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6 lg:col-span-2">
+        <div className="card-3d p-6 lg:col-span-2">
           <div className="flex items-center gap-2 mb-2">
             <Languages className="h-5 w-5 text-primary" />
             <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('languageSettings')}</h3>
@@ -103,7 +113,30 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card-3d p-6 lg:col-span-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Bot className="h-5 w-5 text-primary" />
+            <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSettings')}</h3>
+          </div>
+          <p className={`text-sm text-gray-500 mb-4 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSettingsHint')}</p>
+          {settings?.geminiApiKeyConfigured && (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-3 font-medium">{t('geminiConfigured')}</p>
+          )}
+          <Input
+            label={t('geminiApiKey')}
+            type="password"
+            placeholder={settings?.geminiApiKeyConfigured ? '••••••••  (enter new key to replace)' : 'AIza...'}
+            value={geminiKeyInput}
+            onChange={(e) => setGeminiKeyInput(e.target.value)}
+          />
+          <p className="text-xs text-gray-400 mt-2">
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">
+              {t('geminiGetKey')}
+            </a>
+          </p>
+        </div>
+
+        <div className="card-3d p-6">
           <div className="flex items-center gap-2 mb-6">
             <Building2 className="h-5 w-5 text-primary" />
             <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('businessSettings')}</h3>
@@ -117,7 +150,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card-3d p-6">
           <div className="flex items-center gap-2 mb-6">
             <Percent className="h-5 w-5 text-primary" />
             <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('commissionSettings')}</h3>
@@ -131,7 +164,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="card p-6 lg:col-span-2">
+        <div className="card-3d p-6 lg:col-span-2">
           <h3 className={`text-lg font-semibold mb-4 ${isUrdu ? 'font-urdu' : ''}`}>{t('notificationSettings')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Backup Reminder (days)" type="number" value={settings?.backupReminderDays || 7} onChange={(e) => update('backupReminderDays', parseInt(e.target.value))} />

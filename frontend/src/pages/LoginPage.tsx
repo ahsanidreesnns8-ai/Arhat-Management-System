@@ -39,7 +39,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex overflow-hidden">
       <Toaster position="top-right" />
 
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-600 via-primary to-blue-800 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal-800 via-primary to-amber-700 relative overflow-hidden">
         <motion.div
           className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl opacity-10"
           animate={{ x: [0, 30, 0], y: [0, -20, 0] }}

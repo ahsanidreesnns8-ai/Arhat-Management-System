@@ -55,26 +55,18 @@ docker compose up -d --build
 Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Queue · Sales (mixed-source) · Records · Reports (Excel/PDF/Print) · Settings · Owner Panel · AI Assistant · Global Search · Bills
 
 ## AI Assistant
-Answers **business data** (stock, queue, sales, balances) and **general world questions** (science, history, geography, definitions, math, weather).
+Answers **business data** (stock, queue, sales, balances) and **general world questions**.
 
-Works out of the box via open knowledge sources (Wikipedia, DuckDuckGo, dictionary, restcountries, Open-Meteo).
+**Recommended (pro-level):** In the app go to **Settings → AI Assistant**, paste a free Gemini key from https://aistudio.google.com/apikey, and Save. Then ask anything (including mandi/market rates).
 
-For full conversational AI on any topic, set a free Gemini key:
+Or via environment:
 
 ```bash
-# Get a key: https://aistudio.google.com/apikey
 export GEMINI_API_KEY=your_key_here
-cd backend
-mvn spring-boot:run
+# optional: export GROQ_API_KEY=... / OPENAI_API_KEY=...
 ```
 
-Optional OpenAI-compatible providers:
-
-```bash
-export OPENAI_API_KEY=your_key
-# export OPENAI_BASE_URL=https://api.openai.com/v1
-# export OPENAI_MODEL=gpt-4o-mini
-```
+Without a key, the assistant still uses Wikipedia/dictionary/weather/math and structured market guidance (never echoes junk answers).
 
 ## Project layout
 ```

@@ -18,4 +18,5 @@ public class BusinessSettingsRequest {
     private BigDecimal lowStockThreshold;
     private Integer backupReminderDays;
     private Integer paymentReminderDays;
+    private String geminiApiKey;
 }

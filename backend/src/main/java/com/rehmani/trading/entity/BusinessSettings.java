@@ -60,6 +60,10 @@ public class BusinessSettings {
     @Builder.Default
     private Integer paymentReminderDays = 3;
 
+    /** Optional Gemini API key for pro-level AI assistant (owner-managed). */
+    @Column(name = "gemini_api_key")
+    private String geminiApiKey;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -10,7 +10,7 @@ const sections = [
   { to: '/sales', icon: Receipt, title: 'Sales Records', description: 'Invoices with mixed-source line items' },
   { to: '/stock', icon: Warehouse, title: 'Stock Records', description: 'Incoming, outgoing, adjustments, and history' },
   { to: '/reports', icon: Percent, title: 'Commission Records', description: 'Arhat, supervisor, and labor share reports' },
-  { to: '/sales', icon: Wallet, title: 'Payment Records', description: 'Paid amounts and outstanding sale balances' },
+  { to: '/payments', icon: Wallet, title: 'Payment Records', description: 'Farmer payouts, buyer receipts, and settlement history' },
 ]
 
 export default function RecordsPage() {

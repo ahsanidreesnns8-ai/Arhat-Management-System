@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -8,6 +9,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
 import { dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Product } from '../types'
@@ -34,6 +36,21 @@ export default function DheriesPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  const recentForFarmer = useMemo(() => {
+    if (!form.farmerId) return []
+    return dheris
+      .filter((d) => String(d.farmerId) === form.farmerId)
+      .slice(0, 5)
+      .map((d) => ({
+        id: d.id,
+        code: d.dheriId,
+        name: `${d.productName || 'Product'} · ${d.numberOfBags} bags`,
+        extra: d.sellingStatus,
+        link: `/dheris/${d.id}`,
+        reason: 'previous dheri for this farmer',
+      }))
+  }, [form.farmerId, dheris])
 
   const handleCreate = async () => {
     if (!form.farmerId || !form.productId) {
@@ -79,7 +96,7 @@ export default function DheriesPage() {
         action={<Button onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Add Dheri</Button>}
       />
 
-      <div className="card overflow-hidden">
+      <div className="card-3d overflow-hidden">
         {loading ? <div className="p-6"><TableSkeleton /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -96,8 +113,8 @@ export default function DheriesPage() {
               </thead>
               <tbody>
                 {dheris.map((d) => (
-                  <tr key={d.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                    <td className="p-4 font-mono text-primary">{d.dheriId}</td>
+                  <tr key={d.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-primary/5">
+                    <td className="p-4 font-mono text-primary"><Link to={`/dheris/${d.id}`}>{d.dheriId}</Link></td>
                     <td className="p-4">{d.farmerName}</td>
                     <td className="p-4">{d.productName}</td>
                     <td className="p-4 text-right">{d.numberOfBags}</td>
@@ -117,7 +134,9 @@ export default function DheriesPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Dheri">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <DuplicateSuggestions matches={recentForFarmer} entityLabel="dheri" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select label="Farmer *" value={form.farmerId} onChange={(e) => setForm({ ...form, farmerId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]} />
           <Select label="Product *" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}
@@ -126,6 +145,7 @@ export default function DheriesPage() {
           <Input label="Weight per Bag (kg)" type="number" value={form.weightPerBag} onChange={(e) => setForm({ ...form, weightPerBag: e.target.value })} />
           <Input label="Market Rate (per Mann)" type="number" value={form.marketRate} onChange={(e) => setForm({ ...form, marketRate: e.target.value })} />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>

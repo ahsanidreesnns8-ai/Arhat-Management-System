@@ -21,4 +21,6 @@ public class BusinessSettingsResponse {
     private BigDecimal lowStockThreshold;
     private Integer backupReminderDays;
     private Integer paymentReminderDays;
+    /** Masked indicator — never returns the raw key. */
+    private Boolean geminiApiKeyConfigured;
 }

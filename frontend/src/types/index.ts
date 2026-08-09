@@ -29,6 +29,8 @@ export interface BusinessSettings {
   lowStockThreshold: number
   backupReminderDays: number
   paymentReminderDays: number
+  geminiApiKeyConfigured?: boolean
+  geminiApiKey?: string
 }
 
 export interface DashboardStats {
@@ -60,6 +62,8 @@ export interface Farmer {
   address?: string
   city?: string
   outstandingBalance: number
+  totalBilled?: number
+  totalPaid?: number
   notes?: string
   active: boolean
 }
@@ -73,6 +77,8 @@ export interface Buyer {
   address?: string
   city?: string
   outstandingBalance: number
+  totalBilled?: number
+  totalPaid?: number
   notes?: string
   active: boolean
 }
@@ -229,6 +235,7 @@ export interface Payment {
   buyerName?: string
   saleId?: number
   invoiceNumber?: string
+  saleInvoiceNumber?: string
   amount: number
   paymentMethod: string
   paymentDate: string

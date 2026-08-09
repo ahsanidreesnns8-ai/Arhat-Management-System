@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, Printer } from 'lucide-react'
+import { ArrowLeft, FileText, Printer, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import PaymentModal from '../components/payments/PaymentModal'
 import { farmerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Payment, Truck } from '../types'
@@ -17,8 +18,9 @@ export default function FarmerDetailPage() {
   const [dheris, setDheris] = useState<Dheri[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [loading, setLoading] = useState(true)
+  const [payOpen, setPayOpen] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!farmerId) return
     setLoading(true)
     Promise.all([
@@ -36,6 +38,8 @@ export default function FarmerDetailPage() {
       .catch(() => toast.error('Failed to load farmer'))
       .finally(() => setLoading(false))
   }, [farmerId])
+
+  useEffect(() => { load() }, [load])
 
   const openBill = async () => {
     try {
@@ -61,45 +65,46 @@ export default function FarmerDetailPage() {
     )
   }
 
+  const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
+  const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link to="/farmers" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><ArrowLeft className="h-5 w-5" /></Link>
         <PageHeader
-          title={`${farmer.name}`}
-          description={`${farmer.farmerId} · ${farmer.city || farmer.phone || 'Farmer profile'}`}
+          title={farmer.name}
+          description={`${farmer.farmerId} · Farmer payable & product settlement`}
           action={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setPayOpen(true)} disabled={(farmer.outstandingBalance || 0) <= 0}>
+                <Wallet className="h-4 w-4" /> Pay farmer
+              </Button>
               <Button variant="secondary" onClick={openBill}><FileText className="h-4 w-4" /> Generate Bill</Button>
-              <Button onClick={openBill}><Printer className="h-4 w-4" /> Print</Button>
+              <Button variant="secondary" onClick={openBill}><Printer className="h-4 w-4" /> Print</Button>
             </div>
           }
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-5">
-          <p className="text-sm text-gray-500">Outstanding balance</p>
-          <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(farmer.outstandingBalance)}</p>
-        </div>
-        <div className="card p-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MoneyCard label="Total payable (products)" value={totalBilled} tone="neutral" />
+        <MoneyCard label="Amount paid to farmer" value={totalPaid} tone="good" />
+        <MoneyCard label="Remaining to pay" value={farmer.outstandingBalance} tone="warn" />
+        <div className="card-3d p-5">
           <p className="text-sm text-gray-500">Contact</p>
           <p className="mt-1 font-medium">{farmer.phone || '—'}</p>
-          <p className="text-sm text-gray-500">{farmer.cnic || ''}</p>
-        </div>
-        <div className="card p-5">
-          <p className="text-sm text-gray-500">Address</p>
-          <p className="mt-1 text-sm">{farmer.address || '—'}</p>
+          <p className="text-sm text-gray-500">{farmer.city || farmer.address || ''}</p>
         </div>
       </div>
 
-      <Section title="Dheri history" empty="No dheris">
+      <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', 'Bags', 'Farmer amount', 'Status']}>
         {dheris.map((d) => (
           <tr key={d.id}>
             <td className="px-4 py-2"><Link className="text-primary" to={`/dheris/${d.id}`}>{d.dheriId}</Link></td>
             <td className="px-4 py-2">{d.productName}</td>
             <td className="px-4 py-2">{d.numberOfBags}</td>
-            <td className="px-4 py-2">{formatCurrency(d.farmerReceivable)}</td>
+            <td className="px-4 py-2 font-medium">{formatCurrency(d.farmerReceivable)}</td>
             <td className="px-4 py-2">{d.sellingStatus}</td>
           </tr>
         ))}
@@ -115,16 +120,40 @@ export default function FarmerDetailPage() {
         ))}
       </Section>
 
-      <Section title="Payment history" empty="No payments" headers={['Date', 'Amount', 'Method', 'Status']}>
+      <Section title="Payments made to farmer" empty="No payments yet" headers={['Date', 'Amount paid', 'Method', 'Status']}>
         {payments.map((p) => (
           <tr key={p.id}>
             <td className="px-4 py-2">{p.paymentDate}</td>
-            <td className="px-4 py-2">{formatCurrency(p.amount)}</td>
+            <td className="px-4 py-2 font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(p.amount)}</td>
             <td className="px-4 py-2">{p.paymentMethod}</td>
             <td className="px-4 py-2">{p.status}</td>
           </tr>
         ))}
       </Section>
+
+      <PaymentModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        onSuccess={load}
+        type="FARMER"
+        partyId={farmer.id}
+        partyName={farmer.name}
+        outstanding={farmer.outstandingBalance || 0}
+      />
+    </div>
+  )
+}
+
+function MoneyCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'good' | 'warn' }) {
+  const toneClass = tone === 'good'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : tone === 'warn'
+      ? 'text-amber-700 dark:text-amber-300'
+      : 'text-gray-900 dark:text-white'
+  return (
+    <div className="card-3d p-5">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`text-2xl font-bold mt-1 ${toneClass}`}>{formatCurrency(value)}</p>
     </div>
   )
 }
@@ -140,7 +169,7 @@ function Section({
   const rows = Array.isArray(children) ? children : [children]
   const hasRows = rows.filter(Boolean).length > 0
   return (
-    <div className="card overflow-hidden">
+    <div className="card-3d overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">{title}</div>
       {!hasRows ? (
         <p className="p-6 text-sm text-gray-500">{empty}</p>

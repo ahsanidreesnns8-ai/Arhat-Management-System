@@ -23,8 +23,8 @@ export default function RhmaniLogo({ size = 'sm', showText = true, light = false
       <motion.div
         className={`${s.box} relative rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg`}
         style={{
-          background: 'linear-gradient(145deg, #3B82F6 0%, #1D4ED8 55%, #1E3A8A 100%)',
-          boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.2)',
+          background: 'linear-gradient(145deg, #2DD4BF 0%, #0F766E 55%, #115E59 100%)',
+          boxShadow: '0 8px 20px rgba(15, 118, 110, 0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.2)',
         }}
         whileHover={{ scale: 1.05, rotate: -2 }}
         whileTap={{ scale: 0.96 }}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
@@ -28,6 +29,19 @@ const chartData = [
   { name: 'Sun', sales: 45000, stock: 550 },
 ]
 
+const activityLink = (entityType?: string) => {
+  const t = (entityType || '').toUpperCase()
+  if (t.includes('FARMER')) return '/farmers'
+  if (t.includes('BUYER')) return '/buyers'
+  if (t.includes('SALE')) return '/sales'
+  if (t.includes('DHERI')) return '/dheris'
+  if (t.includes('TRUCK')) return '/trucks'
+  if (t.includes('STOCK')) return '/stock'
+  if (t.includes('PAYMENT')) return '/payments'
+  if (t.includes('QUEUE')) return '/queue'
+  return '/records'
+}
+
 export default function DashboardPage() {
   const { companyName } = useBusiness()
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -41,22 +55,22 @@ export default function DashboardPage() {
   }, [])
 
   const statCards = stats ? [
-    { title: "Today's Sales", value: formatCurrency(stats.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'blue' as const },
-    { title: 'Current Queue', value: stats.currentQueue, icon: <ListOrdered className="h-5 w-5" />, color: 'orange' as const },
-    { title: 'Total Farmers', value: stats.totalFarmers, icon: <Users className="h-5 w-5" />, color: 'green' as const },
-    { title: 'Total Buyers', value: stats.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'purple' as const },
-    { title: 'Total Dheris', value: stats.totalDheris, icon: <Package className="h-5 w-5" />, color: 'blue' as const },
-    { title: 'Current Stock', value: formatNumber(stats.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const },
-    { title: 'Pending Payments', value: formatCurrency(stats.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const },
-    { title: 'Revenue', value: formatCurrency(stats.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'blue' as const },
-    { title: 'Commission', value: formatCurrency(stats.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const },
+    { title: "Today's Sales", value: formatCurrency(stats.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
+    { title: 'Current Queue', value: stats.currentQueue, icon: <ListOrdered className="h-5 w-5" />, color: 'orange' as const, to: '/queue' },
+    { title: 'Total Farmers', value: stats.totalFarmers, icon: <Users className="h-5 w-5" />, color: 'green' as const, to: '/farmers' },
+    { title: 'Total Buyers', value: stats.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'blue' as const, to: '/buyers' },
+    { title: 'Total Dheris', value: stats.totalDheris, icon: <Package className="h-5 w-5" />, color: 'amber' as const, to: '/dheris' },
+    { title: 'Current Stock', value: formatNumber(stats.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock' },
+    { title: 'Pending Payments', value: formatCurrency(stats.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments' },
+    { title: 'Revenue', value: formatCurrency(stats.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
+    { title: 'Commission', value: formatCurrency(stats.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports' },
   ] : []
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`Welcome to ${companyName} — live business overview`}
+        description={`Welcome to ${companyName} — tap any card for full details`}
       />
 
       {loading ? (
@@ -74,14 +88,17 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div className="card p-6" variants={fadeUp} initial="hidden" animate="show">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Weekly Sales Trend</h3>
+        <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Sales Trend</h3>
+            <Link to="/sales" className="text-sm text-primary hover:underline">View sales</Link>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#0F766E" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#0F766E" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -91,7 +108,7 @@ export default function DashboardPage() {
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#2563EB"
+                stroke="#0F766E"
                 fill="url(#salesGrad)"
                 strokeWidth={2}
                 isAnimationActive
@@ -103,13 +120,16 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div
-          className="card p-6"
+          className="card-3d p-6"
           variants={fadeUp}
           initial="hidden"
           animate="show"
           transition={{ delay: 0.08 }}
         >
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Stock Levels</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stock Levels</h3>
+            <Link to="/stock" className="text-sm text-primary hover:underline">View stock</Link>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -118,8 +138,8 @@ export default function DashboardPage() {
               <Tooltip />
               <Bar
                 dataKey="stock"
-                fill="#3B82F6"
-                radius={[4, 4, 0, 0]}
+                fill="#D97706"
+                radius={[6, 6, 0, 0]}
                 isAnimationActive
                 animationDuration={900}
                 animationEasing="ease-out"
@@ -129,7 +149,7 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      <motion.div className="card p-6" variants={fadeUp} initial="hidden" animate="show">
+      <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
@@ -144,16 +164,18 @@ export default function DashboardPage() {
           <Stagger className="space-y-3">
             {stats.recentActivity.map((item, i) => (
               <StaggerItem key={i}>
-                <motion.div
-                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
-                  whileHover={{ x: 4, backgroundColor: 'rgba(37, 99, 235, 0.06)' }}
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{item.description}</p>
-                    <p className="text-xs text-gray-500">{item.entityType} · {item.action}</p>
-                  </div>
-                  <span className="text-xs text-gray-400">{formatDateTime(item.timestamp)}</span>
-                </motion.div>
+                <Link to={activityLink(item.entityType)}>
+                  <motion.div
+                    className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-teal-50/40 dark:from-gray-800/50 dark:to-teal-950/20"
+                    whileHover={{ x: 4, scale: 1.01 }}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{item.description}</p>
+                      <p className="text-xs text-gray-500">{item.entityType} · {item.action}</p>
+                    </div>
+                    <span className="text-xs text-gray-400">{formatDateTime(item.timestamp)}</span>
+                  </motion.div>
+                </Link>
               </StaggerItem>
             ))}
           </Stagger>

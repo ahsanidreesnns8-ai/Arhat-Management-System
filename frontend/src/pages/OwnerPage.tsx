@@ -101,7 +101,7 @@ export default function OwnerPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Your Role" value={user?.role || 'OWNER'} icon={<Shield className="h-5 w-5" />} color="purple" />
+        <StatCard title="Your Role" value={user?.role || 'OWNER'} icon={<Shield className="h-5 w-5" />} color="teal" />
         <StatCard title="Users" value={String(users.length)} icon={<Users className="h-5 w-5" />} color="blue" />
         <StatCard title="Database Backup" value="Ready" icon={<Database className="h-5 w-5" />} color="green" />
         <StatCard title="Audit events" value={String(logs.length)} icon={<Activity className="h-5 w-5" />} color="orange" />

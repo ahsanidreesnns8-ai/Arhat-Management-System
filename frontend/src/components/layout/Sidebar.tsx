@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
-  Calculator, ListOrdered, Receipt, FileText, BarChart3, Settings, Shield
+  Calculator, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -20,6 +20,7 @@ const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: Translatio
   { to: '/calculator', icon: Calculator, labelKey: 'calculator' },
   { to: '/queue', icon: ListOrdered, labelKey: 'queue' },
   { to: '/sales', icon: Receipt, labelKey: 'sales' },
+  { to: '/payments', icon: Wallet, labelKey: 'payments' },
   { to: '/records', icon: FileText, labelKey: 'records' },
   { to: '/reports', icon: BarChart3, labelKey: 'reports' },
   { to: '/settings', icon: Settings, labelKey: 'settings' },

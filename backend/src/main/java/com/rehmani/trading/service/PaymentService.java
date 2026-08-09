@@ -49,6 +49,9 @@ public class PaymentService {
     public PaymentResponse record(PaymentRequest request) {
         PaymentType paymentType = parsePaymentType(request.getPaymentType());
         BigDecimal amount = request.getAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Payment amount must be greater than zero");
+        }
 
         Payment payment = Payment.builder()
                 .paymentType(paymentType)
@@ -66,8 +69,13 @@ public class PaymentService {
             }
             Farmer farmer = farmerRepository.findByIdAndDeletedFalse(request.getFarmerId())
                     .orElseThrow(() -> new RuntimeException("Farmer not found"));
+            BigDecimal outstanding = farmer.getOutstandingBalance() != null
+                    ? farmer.getOutstandingBalance() : BigDecimal.ZERO;
+            if (amount.compareTo(outstanding) > 0) {
+                throw new RuntimeException("Amount exceeds farmer outstanding balance of PKR " + outstanding);
+            }
             payment.setFarmer(farmer);
-            farmer.setOutstandingBalance(farmer.getOutstandingBalance().subtract(amount));
+            farmer.setOutstandingBalance(outstanding.subtract(amount));
             farmerRepository.save(farmer);
         } else {
             if (request.getBuyerId() == null) {
@@ -75,13 +83,22 @@ public class PaymentService {
             }
             Buyer buyer = buyerRepository.findByIdAndDeletedFalse(request.getBuyerId())
                     .orElseThrow(() -> new RuntimeException("Buyer not found"));
+            BigDecimal outstanding = buyer.getOutstandingBalance() != null
+                    ? buyer.getOutstandingBalance() : BigDecimal.ZERO;
+            if (amount.compareTo(outstanding) > 0) {
+                throw new RuntimeException("Amount exceeds buyer outstanding balance of PKR " + outstanding);
+            }
             payment.setBuyer(buyer);
-            buyer.setOutstandingBalance(buyer.getOutstandingBalance().subtract(amount));
+            buyer.setOutstandingBalance(outstanding.subtract(amount));
             buyerRepository.save(buyer);
 
             if (request.getSaleId() != null) {
                 Sale sale = saleRepository.findByIdAndDeletedFalse(request.getSaleId())
                         .orElseThrow(() -> new RuntimeException("Sale not found"));
+                BigDecimal remaining = sale.getTotalAmount().subtract(sale.getPaidAmount());
+                if (amount.compareTo(remaining) > 0) {
+                    throw new RuntimeException("Amount exceeds sale remaining balance of PKR " + remaining);
+                }
                 BigDecimal newPaidAmount = sale.getPaidAmount().add(amount);
                 sale.setPaidAmount(newPaidAmount);
                 sale.setPaymentStatus(determinePaymentStatus(sale.getTotalAmount(), newPaidAmount));

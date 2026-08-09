@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -7,6 +8,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
 import { truckApi, farmerApi } from '../services/api'
 import type { Farmer, Truck } from '../types'
 
@@ -17,6 +19,22 @@ export default function TrucksPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ registrationNumber: '', driverName: '', driverPhone: '', farmerId: '', capacity: '', notes: '' })
   const [saving, setSaving] = useState(false)
+
+  const duplicates = useMemo(() => {
+    const reg = form.registrationNumber.trim().toLowerCase()
+    if (reg.length < 3) return []
+    return trucks
+      .filter((t) => t.registrationNumber?.toLowerCase() === reg || t.registrationNumber?.toLowerCase().includes(reg))
+      .map((t) => ({
+        id: t.id,
+        code: t.truckId,
+        name: t.registrationNumber,
+        phone: t.driverPhone,
+        extra: t.farmerName,
+        link: `/trucks/${t.id}`,
+        reason: 'registration already used',
+      }))
+  }, [form.registrationNumber, trucks])
 
   const load = () => {
     setLoading(true)
@@ -30,6 +48,10 @@ export default function TrucksPage() {
   const handleCreate = async () => {
     if (!form.registrationNumber || !form.farmerId) {
       toast.error('Registration number and farmer are required')
+      return
+    }
+    if (duplicates.some((d) => d.reason.includes('already'))) {
+      toast.error('This truck registration already exists — open the existing record instead')
       return
     }
     setSaving(true)
@@ -57,7 +79,7 @@ export default function TrucksPage() {
       <PageHeader title="Truck Management" description="Each truck is linked to exactly one farmer"
         action={<Button onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Add Truck</Button>} />
 
-      <div className="card overflow-hidden">
+      <div className="card-3d overflow-hidden">
         {loading ? <div className="p-6"><TableSkeleton /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -72,8 +94,8 @@ export default function TrucksPage() {
               </thead>
               <tbody>
                 {trucks.map((t) => (
-                  <tr key={t.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="p-4 font-mono text-primary">{t.truckId}</td>
+                  <tr key={t.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-primary/5">
+                    <td className="p-4 font-mono text-primary"><Link to={`/trucks/${t.id}`}>{t.truckId}</Link></td>
                     <td className="p-4 font-medium">{t.registrationNumber}</td>
                     <td className="p-4">{t.driverName || '—'}</td>
                     <td className="p-4">{t.farmerName} <span className="text-gray-400 text-xs">({t.farmerCode})</span></td>
@@ -87,7 +109,9 @@ export default function TrucksPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Truck">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <DuplicateSuggestions matches={duplicates} entityLabel="truck" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input label="Registration Number *" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} />
           <Select label="Farmer *" value={form.farmerId} onChange={(e) => setForm({ ...form, farmerId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...farmers.map((f) => ({ value: f.id, label: f.name }))]} />
@@ -95,6 +119,7 @@ export default function TrucksPage() {
           <Input label="Driver Phone" value={form.driverPhone} onChange={(e) => setForm({ ...form, driverPhone: e.target.value })} />
           <Input label="Capacity" type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>

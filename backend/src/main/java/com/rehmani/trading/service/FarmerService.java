@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -129,6 +130,14 @@ public class FarmerService {
     }
 
     FarmerResponse toResponse(Farmer farmer) {
+        BigDecimal totalBilled = dheriRepository.findByFarmerIdAndDeletedFalse(farmer.getId())
+                .stream()
+                .map(d -> d.getFarmerReceivable() != null ? d.getFarmerReceivable() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaid = paymentRepository.findByFarmerIdOrderByPaymentDateDesc(farmer.getId())
+                .stream()
+                .map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         return FarmerResponse.builder()
                 .id(farmer.getId())
                 .farmerId(farmer.getFarmerId())
@@ -138,6 +147,8 @@ public class FarmerService {
                 .address(farmer.getAddress())
                 .city(farmer.getCity())
                 .outstandingBalance(farmer.getOutstandingBalance())
+                .totalBilled(totalBilled)
+                .totalPaid(totalPaid)
                 .notes(farmer.getNotes())
                 .active(farmer.getActive())
                 .build();

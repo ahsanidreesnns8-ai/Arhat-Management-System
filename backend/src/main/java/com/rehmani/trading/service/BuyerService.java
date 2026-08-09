@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -119,6 +120,15 @@ public class BuyerService {
     }
 
     BuyerResponse toResponse(Buyer buyer) {
+        BigDecimal totalBilled = saleRepository
+                .findByBuyerIdAndDeletedFalseOrderBySaleDateDescCreatedAtDesc(buyer.getId())
+                .stream()
+                .map(s -> s.getTotalAmount() != null ? s.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaid = paymentRepository.findByBuyerIdOrderByPaymentDateDesc(buyer.getId())
+                .stream()
+                .map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         return BuyerResponse.builder()
                 .id(buyer.getId())
                 .buyerId(buyer.getBuyerId())
@@ -128,6 +138,8 @@ public class BuyerService {
                 .address(buyer.getAddress())
                 .city(buyer.getCity())
                 .outstandingBalance(buyer.getOutstandingBalance())
+                .totalBilled(totalBilled)
+                .totalPaid(totalPaid)
                 .notes(buyer.getNotes())
                 .active(buyer.getActive())
                 .build();

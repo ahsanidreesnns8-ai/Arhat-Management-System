@@ -16,6 +16,10 @@ public class FarmerResponse {
     private String address;
     private String city;
     private BigDecimal outstandingBalance;
+    /** Sum of farmer receivables from dheris / sales */
+    private BigDecimal totalBilled;
+    /** Sum of payments made to the farmer */
+    private BigDecimal totalPaid;
     private String notes;
     private Boolean active;
 }

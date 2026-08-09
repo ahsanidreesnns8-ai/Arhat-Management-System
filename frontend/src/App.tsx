@@ -23,6 +23,7 @@ import QueuePage from './pages/QueuePage'
 import SalesPage from './pages/SalesPage'
 import SaleDetailPage from './pages/SaleDetailPage'
 import RecordsPage from './pages/RecordsPage'
+import PaymentsPage from './pages/PaymentsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import OwnerPage from './pages/OwnerPage'
@@ -71,6 +72,7 @@ function AppRoutes() {
         <Route path="sales" element={<SalesPage />} />
         <Route path="sales/:id" element={<SaleDetailPage />} />
         <Route path="records" element={<RecordsPage />} />
+        <Route path="payments" element={<PaymentsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route
