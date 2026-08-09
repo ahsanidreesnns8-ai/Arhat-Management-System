@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
@@ -15,13 +16,15 @@ export default function Button({
   children,
   className,
   disabled,
+  type = 'button',
+  onClick,
   ...props
 }: ButtonProps) {
   const variants = {
     primary: 'btn-primary',
     secondary: 'btn-secondary',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
-    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200',
+    danger: 'bg-red-600 text-white hover:bg-red-700 transition-colors',
+    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 transition-colors',
   }
 
   const sizes = {
@@ -31,15 +34,20 @@ export default function Button({
   }
 
   return (
-    <button
+    <motion.button
+      type={type}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-lg font-medium disabled:opacity-50',
         variants[variant],
         sizes[size],
         className
       )}
       disabled={disabled || loading}
-      {...props}
+      onClick={onClick}
+      whileHover={disabled || loading ? undefined : { y: -1 }}
+      whileTap={disabled || loading ? undefined : { scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+      {...(props as Record<string, unknown>)}
     >
       {loading && (
         <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -48,6 +56,6 @@ export default function Button({
         </svg>
       )}
       {children}
-    </button>
+    </motion.button>
   )
 }

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Search, Loader2 } from 'lucide-react'
 import { searchApi } from '../../services/api'
 import type { SearchResult } from '../../types'
+import { easeOutExpo } from '../../utils/motion'
 
 export default function GlobalSearch() {
   const [query, setQuery] = useState('')
@@ -72,25 +74,37 @@ export default function GlobalSearch() {
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
       </div>
 
-      {open && results.length > 0 && (
-        <div className="absolute top-full mt-2 w-full bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 z-50 max-h-80 overflow-y-auto animate-fade-in">
-          {results.map((r, i) => (
-            <button
-              key={`${r.type}-${r.id}-${i}`}
-              onClick={() => handleSelect(r)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-b border-gray-50 dark:border-gray-800 last:border-0"
-            >
-              <span className={`text-xs font-medium px-2 py-0.5 rounded ${typeColors[r.type] || 'bg-gray-100 text-gray-600'}`}>
-                {r.type}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{r.title}</p>
-                <p className="text-xs text-gray-500 truncate">{r.subtitle}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && results.length > 0 && (
+          <motion.div
+            className="absolute top-full mt-2 w-full bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 z-50 max-h-80 overflow-y-auto origin-top"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: easeOutExpo }}
+          >
+            {results.map((r, i) => (
+              <motion.button
+                key={`${r.type}-${r.id}-${i}`}
+                onClick={() => handleSelect(r)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-b border-gray-50 dark:border-gray-800 last:border-0"
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.03, duration: 0.2 }}
+                whileHover={{ x: 3 }}
+              >
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${typeColors[r.type] || 'bg-gray-100 text-gray-600'}`}>
+                  {r.type}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{r.title}</p>
+                  <p className="text-xs text-gray-500 truncate">{r.subtitle}</p>
+                </div>
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

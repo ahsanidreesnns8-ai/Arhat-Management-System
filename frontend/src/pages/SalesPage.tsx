@@ -136,7 +136,7 @@ export default function SalesPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Sales Module"
         description="Mixed-source sales — farmer dheri stock + business stock in one invoice"

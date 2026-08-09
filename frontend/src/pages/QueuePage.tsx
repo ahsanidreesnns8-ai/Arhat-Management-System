@@ -110,7 +110,7 @@ export default function QueuePage() {
   )
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Queue Management"
         description="Each dheri gets its own independent queue number"

@@ -1,6 +1,8 @@
+import { AnimatePresence, motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { modalBackdrop, modalPanel } from '../../utils/motion'
 
 interface ModalProps {
   open: boolean
@@ -18,28 +20,44 @@ const sizes = {
 }
 
 export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={clsx(
-          'relative w-full card p-6 animate-fade-in max-h-[90vh] overflow-y-auto',
-          sizes[size]
-        )}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-          <button
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            variants={modalBackdrop}
+            initial="hidden"
+            animate="show"
+            exit="exit"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          />
+          <motion.div
+            className={clsx(
+              'relative w-full card p-6 max-h-[90vh] overflow-y-auto z-10',
+              sizes[size]
+            )}
+            variants={modalPanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
           >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+              <motion.button
+                type="button"
+                onClick={onClose}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                whileHover={{ rotate: 90 }}
+                whileTap={{ scale: 0.92 }}
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </motion.button>
+            </div>
+            {children}
+          </motion.div>
         </div>
-        {children}
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }

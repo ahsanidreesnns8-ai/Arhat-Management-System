@@ -11,10 +11,12 @@ import {
 import StatCard from '../components/ui/StatCard'
 import PageHeader from '../components/ui/PageHeader'
 import { StatCardSkeleton, Skeleton } from '../components/ui/Skeleton'
+import { Stagger, StaggerItem } from '../components/motion/Stagger'
 import { dashboardApi } from '../services/api'
 import { formatCurrency, formatDateTime } from '../utils/format'
 import type { DashboardStats } from '../types'
 import { useBusiness } from '../context/BusinessContext'
+import { fadeUp } from '../utils/motion'
 
 const chartData = [
   { name: 'Mon', sales: 42000, stock: 1200 },
@@ -51,29 +53,28 @@ export default function DashboardPage() {
   ] : []
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Dashboard"
         description={`Welcome to ${companyName} — live business overview`}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading
-          ? Array.from({ length: 9 }).map((_, i) => <StatCardSkeleton key={i} />)
-          : statCards.map((card, i) => (
-            <motion.div
-              key={card.title}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 9 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+      ) : (
+        <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {statCards.map((card) => (
+            <StaggerItem key={card.title}>
               <StatCard {...card} />
-            </motion.div>
+            </StaggerItem>
           ))}
-      </div>
+        </Stagger>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6">
+        <motion.div className="card p-6" variants={fadeUp} initial="hidden" animate="show">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Weekly Sales Trend</h3>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData}>
@@ -87,12 +88,27 @@ export default function DashboardPage() {
               <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
               <YAxis stroke="#9ca3af" fontSize={12} />
               <Tooltip />
-              <Area type="monotone" dataKey="sales" stroke="#2563EB" fill="url(#salesGrad)" strokeWidth={2} />
+              <Area
+                type="monotone"
+                dataKey="sales"
+                stroke="#2563EB"
+                fill="url(#salesGrad)"
+                strokeWidth={2}
+                isAnimationActive
+                animationDuration={900}
+                animationEasing="ease-out"
+              />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </motion.div>
 
-        <div className="card p-6">
+        <motion.div
+          className="card p-6"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          transition={{ delay: 0.08 }}
+        >
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Stock Levels</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
@@ -100,13 +116,20 @@ export default function DashboardPage() {
               <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
               <YAxis stroke="#9ca3af" fontSize={12} />
               <Tooltip />
-              <Bar dataKey="stock" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="stock"
+                fill="#3B82F6"
+                radius={[4, 4, 0, 0]}
+                isAnimationActive
+                animationDuration={900}
+                animationEasing="ease-out"
+              />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="card p-6">
+      <motion.div className="card p-6" variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
@@ -118,24 +141,26 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : stats?.recentActivity?.length ? (
-          <div className="space-y-3">
+          <Stagger className="space-y-3">
             {stats.recentActivity.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{item.description}</p>
-                  <p className="text-xs text-gray-500">{item.entityType} · {item.action}</p>
-                </div>
-                <span className="text-xs text-gray-400">{formatDateTime(item.timestamp)}</span>
-              </div>
+              <StaggerItem key={i}>
+                <motion.div
+                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
+                  whileHover={{ x: 4, backgroundColor: 'rgba(37, 99, 235, 0.06)' }}
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{item.description}</p>
+                    <p className="text-xs text-gray-500">{item.entityType} · {item.action}</p>
+                  </div>
+                  <span className="text-xs text-gray-400">{formatDateTime(item.timestamp)}</span>
+                </motion.div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         ) : (
           <p className="text-gray-500 text-sm">No recent activity yet.</p>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }

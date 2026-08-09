@@ -23,7 +23,7 @@ export default function TruckDetailPage() {
   if (!truck) return <p className="text-gray-500">Truck not found.</p>
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link to="/trucks" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><ArrowLeft className="h-5 w-5" /></Link>
         <PageHeader title={truck.truckId} description={truck.registrationNumber} />

@@ -78,7 +78,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Reports"
         description="Generate and export business reports as Excel or print"

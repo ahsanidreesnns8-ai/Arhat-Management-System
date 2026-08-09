@@ -72,7 +72,7 @@ export default function DheriesPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Dheri Management"
         description="Track dheris with queue numbers, weight details, and sale history"

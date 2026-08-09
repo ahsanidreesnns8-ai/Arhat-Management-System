@@ -53,7 +53,7 @@ export default function TrucksPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader title="Truck Management" description="Each truck is linked to exactly one farmer"
         action={<Button onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Add Truck</Button>} />
 

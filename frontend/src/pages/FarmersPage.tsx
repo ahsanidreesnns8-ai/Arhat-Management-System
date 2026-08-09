@@ -96,7 +96,7 @@ export default function FarmersPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Farmer Management"
         description="Add, edit, and manage farmer records with auto-generated IDs"

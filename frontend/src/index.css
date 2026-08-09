@@ -5,39 +5,94 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-gray-50 text-gray-900 dark:bg-surface-dark dark:text-gray-100 antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
   .card {
     @apply bg-white dark:bg-gray-900 rounded-xl shadow-card border border-gray-100 dark:border-gray-800;
+    transition: box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
   }
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white font-medium
-           hover:bg-primary-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50;
+           hover:bg-primary-700 shadow-sm hover:shadow-md disabled:opacity-50;
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-800
-           text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200;
+           text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-200 dark:hover:bg-gray-700;
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+  }
+
+  .btn-secondary:active:not(:disabled) {
+    transform: scale(0.98);
   }
 
   .input-field {
     @apply w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900
            text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30
-           focus:border-primary transition-all duration-200;
+           focus:border-primary;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   }
 
   .stat-card {
-    @apply card p-5 hover:shadow-card-hover transition-all duration-300;
+    @apply card p-5;
   }
 
   .skeleton {
-    @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded;
+    @apply rounded;
+    background: linear-gradient(
+      90deg,
+      rgb(229 231 235 / 0.9) 0%,
+      rgb(243 244 246) 50%,
+      rgb(229 231 235 / 0.9) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
   }
+
+  .dark .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(55 65 81 / 0.9) 0%,
+      rgb(75 85 99 / 0.7) 50%,
+      rgb(55 65 81 / 0.9) 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

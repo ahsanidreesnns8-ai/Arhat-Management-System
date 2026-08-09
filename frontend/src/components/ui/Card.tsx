@@ -11,7 +11,7 @@ interface CardProps {
 
 export default function Card({ children, className, title, subtitle, action }: CardProps) {
   return (
-    <div className={clsx('card animate-fade-in', className)}>
+    <div className={clsx('card', className)}>
       {(title || action) && (
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>

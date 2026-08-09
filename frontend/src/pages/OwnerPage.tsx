@@ -93,7 +93,7 @@ export default function OwnerPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Owner Panel"
         description="User management, backups, and audit controls"

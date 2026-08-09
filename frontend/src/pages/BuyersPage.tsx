@@ -96,7 +96,7 @@ export default function BuyersPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Buyer Management"
         description="Manage buyer records, purchase history, and outstanding balances"

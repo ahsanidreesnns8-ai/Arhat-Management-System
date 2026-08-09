@@ -59,7 +59,7 @@ export default function StockPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Stock Management"
         description="Live stock computed from ledger entries — never hardcoded"

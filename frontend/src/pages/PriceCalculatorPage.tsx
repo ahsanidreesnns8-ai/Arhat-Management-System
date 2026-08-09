@@ -111,7 +111,7 @@ export default function PriceCalculatorPage() {
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Price Calculator"
         description="Live calculation — all values update instantly as you type"
