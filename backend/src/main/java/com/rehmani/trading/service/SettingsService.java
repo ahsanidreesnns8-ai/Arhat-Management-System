@@ -44,15 +44,7 @@ public class SettingsService {
         if (request.getLowStockThreshold() != null) settings.setLowStockThreshold(request.getLowStockThreshold());
         if (request.getBackupReminderDays() != null) settings.setBackupReminderDays(request.getBackupReminderDays());
         if (request.getPaymentReminderDays() != null) settings.setPaymentReminderDays(request.getPaymentReminderDays());
-        if (request.getGeminiApiKey() != null) {
-            String key = request.getGeminiApiKey().trim();
-            // Empty string clears the key; ignore masked placeholder submissions
-            if (key.isEmpty()) {
-                settings.setGeminiApiKey(null);
-            } else if (!key.contains("•") && !key.equalsIgnoreCase("configured")) {
-                settings.setGeminiApiKey(key);
-            }
-        }
+        // Gemini/Groq keys are env-managed (GEMINI_API_KEY / GROQ_API_KEY). Ignore client updates.
 
         // Keep total commission in sync with share-of-total model
         if (settings.getArhatSharePercentage() != null
@@ -95,7 +87,8 @@ public class SettingsService {
                 .lowStockThreshold(settings.getLowStockThreshold())
                 .backupReminderDays(settings.getBackupReminderDays())
                 .paymentReminderDays(settings.getPaymentReminderDays())
-                .geminiApiKeyConfigured(settings.getGeminiApiKey() != null && !settings.getGeminiApiKey().isBlank())
+                // Never expose AI key status from DB; keys are env-managed
+                .geminiApiKeyConfigured(false)
                 .build();
     }
 }

@@ -37,7 +37,7 @@ app:
   company:
     name: Rehmani Trading Company
   ai:
-    # Free key from https://aistudio.google.com/apikey — or save it in Settings → AI Assistant
+    # Server-side only (not editable in Settings UI). Prefer GEMINI_API_KEY; GROQ_API_KEY is optional fallback.
     gemini-api-key: ${GEMINI_API_KEY:}
     gemini-model: ${GEMINI_MODEL:gemini-2.0-flash}
     openai-api-key: ${OPENAI_API_KEY:}

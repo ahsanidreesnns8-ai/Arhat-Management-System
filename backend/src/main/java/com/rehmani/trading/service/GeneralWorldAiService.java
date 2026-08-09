@@ -112,6 +112,7 @@ public class GeneralWorldAiService {
     }
 
     private String resolveGeminiKey() {
+        // Prefer server env; fall back to DB only if previously seeded by ops (not via Settings UI)
         if (hasText(geminiApiKeyEnv)) return geminiApiKeyEnv.trim();
         try {
             return settingsRepository.findAll().stream()
@@ -126,6 +127,7 @@ public class GeneralWorldAiService {
     }
 
     private Optional<String> tryLlm(String question, String language, List<AiChatMessage> history) {
+        // Prefer Gemini, then Groq (fast free-tier), then OpenAI-compatible
         String geminiKey = resolveGeminiKey();
         if (hasText(geminiKey)) {
             try {
@@ -167,19 +169,22 @@ public class GeneralWorldAiService {
         boolean urdu = "ur".equalsIgnoreCase(language);
         if (urdu) {
             return """
-                    آپ Rhmani Trading ERP کے پیشہ ور ذہین اسسٹنٹ ہیں۔
-                    کاروباری اور دنیا کے کسی بھی سوال کا درست، منظم اور تفصیلی جواب اردو میں دیں۔
-                    مارکیٹ/منڈی ریٹ کے سوالوں پر واضح کریں کہ ریٹ روزانہ بدلتے ہیں؛ جتنا معلوم ہو بتائیں اور عملی رہنمائی دیں۔
-                    نقصان دہ مشورہ نہ دیں۔
+                    آپ Rehmani Trading Company (آرھٹ) کے پیشہ ور AI اسسٹنٹ ہیں۔
+                    جواب ہمیشہ درست، واضح اور فوری طور پر مفید ہو۔ پہلے مختصر جواب، پھر ضروری تفصیل۔
+                    کاروبار: کسان قابل ادائیگی، خریدار قابل وصول، ڈھیری، فروخت، کمیشن 4% (آرھٹ 3% + منشی 0.70% + ورکرز 0.30%)، Price Calculator۔
+                    منڈی ریٹ: لائیو ریٹ بدلتے رہتے ہیں — عملی رہنمائی دیں اور مقامی منڈی سے تصدیق کی تلقین کریں۔
+                    مقام: گالا منڈی ننکانہ صاحب۔
+                    صارف کی زبان میں جواب دیں۔ نقص کی مشورہ نہ دیں۔
                     """;
         }
         return """
-                You are the professional Rhmani Trading ERP AI assistant.
-                Answer ANY question — business or general world topics — clearly, accurately, and thoroughly.
-                Structure: direct answer first, then explanation, then useful bullet points when helpful.
-                For mandi/market rate questions (e.g. rice per 40kg in a city), be honest that live rates change daily,
-                give the best contextual guidance you can, and suggest verifying with the local mandi / entering the rate in the ERP Price Calculator.
-                Match the user's language. Be professional. Refuse harmful/illegal advice.
+                You are the professional AI assistant for Rehmani Trading Company (arhat / commission agency ERP).
+                Always answer clearly and usefully: lead with the direct answer, then short supporting detail.
+                Business domain: farmer payables, buyer receivables, dheris, sales, payments, and commission of total amount
+                (Arhat 3% + Munshi 0.70% + Workers 0.30% = 4%). Guide users to Price Calculator / Farmer Product / Arhat Sale when relevant.
+                For mandi/market rates: rates change daily — give practical guidance and advise confirming with the local mandi.
+                Location context: Gala Mandi Nankana Sahib.
+                Match the user's language (English or Urdu). Be professional. Refuse harmful/illegal advice.
                 """;
     }
 
@@ -280,10 +285,8 @@ public class GeneralWorldAiService {
                     3. فروخت/کمیشن خود بخود درست حساب ہو جائے گا
 
                     نوٹ: پاکستان میں اناج عموماً **فی من (40 کلو)** یا **فی 40 کلو بورا** کے حساب سے ریٹ ہوتا ہے۔
-
+                    کمیشن ماڈل: کل رقم کا **4%%** (آرھٹ 3%% + منشی 0.70%% + ورکرز 0.30%%)۔
                     %s
-
-                    مکمل ذہین لائیو جوابات کے لیے Settings میں **Gemini API Key** لگائیں (مفت: aistudio.google.com/apikey)۔
                     """.formatted(commodity, location, location,
                     hasText(context) ? "\nپس منظر:\n" + context.replaceAll("\\*\\*", "") : ""));
         }
@@ -291,18 +294,14 @@ public class GeneralWorldAiService {
         return Optional.of("""
                 **Market rate guidance — %s in %s**
 
-                I couldn't fetch a live mandi feed for this exact quote right now (rates move through the day).
+                Live mandi quotes move through the day, so confirm today's figure locally.
 
                 Practical next steps:
-                1. Confirm today's rate per **40 kg bag / per mann** from the %s mandi / arhati
-                2. Enter that rate in Rhmani ERP **Price Calculator** or **Add Dheri → Market Rate**
-                3. Sales, farmer payable, and commission will calculate correctly from that rate
-
-                Context: In Pakistan grain trading, quotes are commonly given **per mann (≈40 kg)** or **per 40 kg bag**.
+                1. Confirm today's rate per **40 kg / per mann** from the %s mandi / arhati
+                2. Enter that rate in **Price Calculator**, **Farmer Product**, or **Arhat Sale**
+                3. Farmer payable uses **4%% commission** on total (Arhat 3%% + Munshi 0.70%% + Workers 0.30%%)
 
                 %s
-
-                For full conversational AI answers on any topic (including richer market explanations), add a free **Gemini API Key** in Settings → AI Assistant.
                 """.formatted(commodity, location, location,
                 hasText(context) ? "Background:\n" + context.replaceAll("\\*\\*", "") : ""));
     }
@@ -534,18 +533,17 @@ public class GeneralWorldAiService {
 
     private String fallbackMessage(String q, boolean urdu) {
         if (urdu) {
-            return "میں نے کھلے ذرائع سے اس سوال کی مکمل معلومات نہیں ڈھونڈ سکا۔\n\n"
-                    + "بہتر نتیجے کے لیے:\n"
-                    + "• سوال واضح لکھیں\n"
-                    + "• Settings → AI Assistant میں مفت Gemini API Key لگائیں\n"
-                    + "• کاروباری ڈیٹا: اسٹاک، فروخت، قطار، بقایا";
+            return "میں نے اس سوال کا مکمل جواب کھلے ذرائع سے نہیں ملا۔\n\n"
+                    + "آپ یہ آزما سکتے ہیں:\n"
+                    + "• سوال زیادہ واضح لکھیں / بولیں (مائیک)\n"
+                    + "• کاروباری ڈیٹا پوچھیں: اسٹاک، فروخت، قطار، کسان/خریدار بقایا، کمیشن\n"
+                    + "• موضوع کا نام سیدھا لکھیں (مثلاً: گندم، ننکانہ صاحب، کمیشن کیا ہے)";
         }
-        return "I couldn't find a complete answer from open sources for that question.\n\n"
-                + "For pro-level answers on any topic:\n"
-                + "1. Open **Settings → AI Assistant**\n"
-                + "2. Paste a free Gemini API key from https://aistudio.google.com/apikey\n"
-                + "3. Ask again — including market rates, science, history, and business questions.\n\n"
-                + "I can still answer ERP data questions (stock, sales, queue, balances) anytime.";
+        return "I couldn't find a complete answer from open sources for that.\n\n"
+                + "Try:\n"
+                + "• Rephrase clearly, or use the mic to speak\n"
+                + "• Ask business data: stock, sales, queue, farmer/buyer balances, commission\n"
+                + "• Ask a direct topic name (e.g. wheat, Nankana Sahib, what is commission)";
     }
 
     private String extractTopic(String q) {

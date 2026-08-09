@@ -71,9 +71,16 @@ public class AiAssistantService {
 
             if (containsAny(message, "help", "what can you", "options", "commands", "مدد", "کیا کر سکتے")) {
                 return reply(urdu
-                        ? "میں مدد کر سکتا ہوں:\n• کاروبار: اسٹاک، قطار، کسان/خریدار، بقایا، آج کی فروخت، کمپنی معلومات\n• عام علم: تاریخ، سائنس، جغرافیہ، تعریفیں، دارالحکومت، موسم، حساب\n• گفتگو کے لیے Gemini API کلید سیٹ کریں تاکہ ہر موضوع پر مکمل جواب ملے"
-                        : "I can help with:\n• Business: stock, queue, farmers/buyers, balances, today's sales, company info\n• World knowledge: history, science, geography, definitions, capitals, weather, math\n• For full conversational AI on any topic, set GEMINI_API_KEY in the backend",
+                        ? "میں مدد کر سکتا ہوں:\n• کاروبار: اسٹاک، قطار، کسان/خریدار، بقایا، آج کی فروخت، کمیشن 4%\n• عام علم: تاریخ، سائنس، جغرافیہ، تعریفیں، موسم، حساب\n• آواز: مائیک سے بولیں، جواب سن کر بھی سنائے جا سکتے ہیں"
+                        : "I can help with:\n• Business: stock, queue, farmers/buyers, balances, today's sales, 4% commission\n• World knowledge: history, science, geography, definitions, weather, math\n• Voice: tap the mic to speak; replies can be read aloud",
                         "system");
+            }
+
+            if (containsAny(message, "commission", "کمیشن", "arhat share", "munshi", "منشی")) {
+                return reply(urdu
+                        ? "کمیشن کل رقم کا **4%** ہے:\n• آرھٹ: 3%\n• منشی/نگران: 0.70%\n• ورکرز: 0.30%\n\nکسان کو قابل ادائیگی = کل رقم − 4% کمیشن۔ Price Calculator یا Farmer Product میں ریٹ درج کریں۔"
+                        : "Commission is **4% of total amount**:\n• Arhat: 3%\n• Munshi/Nigran: 0.70%\n• Workers: 0.30%\n\nFarmer payable = gross − 4% commission. Enter the rate in Price Calculator or Farmer Product.",
+                        "commission");
             }
 
             // Prefer live ERP answers when the question is clearly about business data

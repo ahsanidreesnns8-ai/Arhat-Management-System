@@ -55,18 +55,18 @@ docker compose up -d --build
 Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Queue · Sales (mixed-source) · Records · Reports (Excel/PDF/Print) · Settings · Owner Panel · AI Assistant · Global Search · Bills
 
 ## AI Assistant
-Answers **business data** (stock, queue, sales, balances) and **general world questions**.
+Answers **business data** (stock, queue, sales, balances, commission) and **general world questions**.
+Supports **voice** (mic + spoken replies) in the chat panel.
 
-**Recommended (pro-level):** In the app go to **Settings → AI Assistant**, paste a free Gemini key from https://aistudio.google.com/apikey, and Save. Then ask anything (including mandi/market rates).
-
-Or via environment:
+API keys are **server-side only** (not shown in Settings):
 
 ```bash
-export GEMINI_API_KEY=your_key_here
-# optional: export GROQ_API_KEY=... / OPENAI_API_KEY=...
+export GEMINI_API_KEY=your_key_here   # https://aistudio.google.com/apikey
+# optional fallback:
+export GROQ_API_KEY=your_groq_key
 ```
 
-Without a key, the assistant still uses Wikipedia/dictionary/weather/math and structured market guidance (never echoes junk answers).
+Without a cloud key, the assistant still answers using Wikipedia, dictionary, weather, math, and ERP data.
 
 ## Project layout
 ```

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Building2, Percent, Languages, Bot } from 'lucide-react'
+import { Save, Building2, Percent, Languages } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -15,16 +15,12 @@ export default function SettingsPage() {
   const { refresh } = useBusiness()
   const { t, lang, setLang, isUrdu } = useLanguage()
   const [settings, setSettings] = useState<BusinessSettings | null>(null)
-  const [geminiKeyInput, setGeminiKeyInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     settingsApi.get()
-      .then((res) => {
-        setSettings(res.data.data)
-        setGeminiKeyInput('')
-      })
+      .then((res) => setSettings(res.data.data))
       .finally(() => setLoading(false))
   }, [])
 
@@ -39,12 +35,10 @@ export default function SettingsPage() {
         ...settings,
         defaultCommissionPercentage: shareSum,
       }
-      if (geminiKeyInput.trim()) {
-        payload.geminiApiKey = geminiKeyInput.trim()
-      }
+      // AI key is server-managed (GEMINI_API_KEY) — never accept from Settings UI
+      delete payload.geminiApiKey
       const res = await settingsApi.update(payload)
       setSettings(res.data.data)
-      setGeminiKeyInput('')
       await refresh()
       toast.success(t('settingsSaved'))
     } catch {
@@ -77,7 +71,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t('settings')}
-        description={isUrdu ? 'کاروبار، کمیشن، زبان اور اے آئی ترتیبات' : 'Business, commission, language, and AI configuration'}
+        description={isUrdu ? 'کاروبار، کمیشن اور زبان کی ترتیبات' : 'Business, commission, and language settings'}
         action={
           <Button onClick={handleSave} loading={saving}>
             <Save className="h-4 w-4" />
@@ -117,29 +111,6 @@ export default function SettingsPage() {
               {t('urdu')}
             </button>
           </div>
-        </div>
-
-        <div className="card-3d p-6 lg:col-span-2">
-          <div className="flex items-center gap-2 mb-2">
-            <Bot className="h-5 w-5 text-primary" />
-            <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSettings')}</h3>
-          </div>
-          <p className={`text-sm text-gray-500 mb-4 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSettingsHint')}</p>
-          {settings?.geminiApiKeyConfigured && (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-3 font-medium">{t('geminiConfigured')}</p>
-          )}
-          <Input
-            label={t('geminiApiKey')}
-            type="password"
-            placeholder={settings?.geminiApiKeyConfigured ? '••••••••  (enter new key to replace)' : 'AIza...'}
-            value={geminiKeyInput}
-            onChange={(e) => setGeminiKeyInput(e.target.value)}
-          />
-          <p className="text-xs text-gray-400 mt-2">
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">
-              {t('geminiGetKey')}
-            </a>
-          </p>
         </div>
 
         <div className="card-3d p-6">
