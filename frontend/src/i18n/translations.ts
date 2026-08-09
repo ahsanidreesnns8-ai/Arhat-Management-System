@@ -2,8 +2,8 @@ export type Lang = 'en' | 'ur'
 
 export const translations = {
   en: {
-    brandName: 'Rhmani',
-    brandTagline: 'Grain Trading ERP',
+    brandName: 'REHMANI',
+    brandTagline: 'Trading Company',
     companyFallback: 'Rehmani Trading Company',
     dashboard: 'Dashboard',
     farmers: 'Farmers',
@@ -61,7 +61,7 @@ export const translations = {
   },
   ur: {
     brandName: 'رحمانی',
-    brandTagline: 'اناج تجارت ای آر پی',
+    brandTagline: 'ٹریڈنگ کمپنی',
     companyFallback: 'رحمانی ٹریڈنگ کمپنی',
     dashboard: 'ڈیش بورڈ',
     farmers: 'کسان',

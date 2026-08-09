@@ -39,33 +39,34 @@ export default function LoginPage() {
     <div className="min-h-screen flex overflow-hidden">
       <Toaster position="top-right" />
 
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal-800 via-primary to-amber-700 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#001a3d] via-[#002D62] to-[#0A3A75] relative overflow-hidden">
         <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl opacity-10"
+          className="absolute top-20 left-20 w-72 h-72 bg-[#C5A059] rounded-full blur-3xl opacity-20"
           animate={{ x: [0, 30, 0], y: [0, -20, 0] }}
           transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute bottom-20 right-20 w-96 h-96 bg-blue-300 rounded-full blur-3xl opacity-10"
+          className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl opacity-10"
           animate={{ x: [0, -40, 0], y: [0, 25, 0] }}
           transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
+        <div className="relative z-10 flex flex-col justify-center items-center px-12 w-full">
           <motion.div
+            className="bg-white rounded-3xl px-10 py-8 shadow-2xl"
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: easeOutExpo }}
           >
-            <RhmaniLogo size="lg" light className="mb-8" />
-            <motion.p
-              className={`text-lg text-blue-100 leading-relaxed max-w-md ${isUrdu ? 'font-urdu' : ''}`}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-            >
-              {t('loginHero')}
-            </motion.p>
+            <RhmaniLogo variant="full" size="hero" />
           </motion.div>
+          <motion.p
+            className={`mt-8 text-lg text-[#E8C87A] leading-relaxed max-w-md text-center ${isUrdu ? 'font-urdu' : ''}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            {t('loginHero')}
+          </motion.p>
         </div>
       </div>
 
@@ -98,7 +99,7 @@ export default function LoginPage() {
           className="w-full max-w-md"
         >
           <div className="lg:hidden flex justify-center mb-8">
-            <RhmaniLogo size="md" />
+            <RhmaniLogo variant="full" size="lg" />
           </div>
 
           <motion.div

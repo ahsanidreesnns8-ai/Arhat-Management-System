@@ -15,15 +15,15 @@
   body {
     @apply text-gray-900 dark:text-gray-100 antialiased;
     background:
-      radial-gradient(1200px 600px at 10% -10%, rgba(20, 184, 166, 0.12), transparent 55%),
-      radial-gradient(900px 500px at 100% 0%, rgba(217, 119, 6, 0.08), transparent 50%),
-      #F7FBF9;
+      radial-gradient(1200px 600px at 10% -10%, rgba(0, 45, 98, 0.08), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, rgba(197, 160, 89, 0.12), transparent 50%),
+      #F7F8FA;
   }
 
   .dark body {
     background:
-      radial-gradient(1000px 500px at 0% 0%, rgba(20, 184, 166, 0.12), transparent 50%),
-      radial-gradient(800px 400px at 100% 0%, rgba(245, 158, 11, 0.08), transparent 45%),
+      radial-gradient(1000px 500px at 0% 0%, rgba(10, 58, 117, 0.35), transparent 50%),
+      radial-gradient(800px 400px at 100% 0%, rgba(197, 160, 89, 0.1), transparent 45%),
       #0B1220;
   }
 
@@ -46,7 +46,7 @@
 
 @layer components {
   .card {
-    @apply bg-white/90 dark:bg-gray-900/80 rounded-2xl shadow-card border border-teal-900/5 dark:border-white/10 backdrop-blur-sm;
+    @apply bg-white/90 dark:bg-gray-900/80 rounded-2xl shadow-card border border-primary/5 dark:border-white/10 backdrop-blur-sm;
     transition: box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -59,7 +59,7 @@
     box-shadow:
       0 12px 28px rgba(15, 23, 42, 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      0 1px 0 rgba(15, 118, 110, 0.06);
+      0 1px 0 rgba(0, 45, 98, 0.06);
     transform-style: preserve-3d;
   }
 
@@ -67,13 +67,13 @@
     box-shadow:
       0 16px 36px rgba(0, 0, 0, 0.35),
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px rgba(20, 184, 166, 0.08);
+      0 0 0 1px rgba(197, 160, 89, 0.12);
   }
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white font-medium
            hover:bg-primary-700 shadow-sm hover:shadow-md disabled:opacity-50;
-    background-image: linear-gradient(145deg, #14B8A6, #0F766E 55%, #0D5C56);
+    background-image: linear-gradient(145deg, #0A3A75, #002D62 55%, #001F45);
     transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, background-color 0.2s ease;
   }
 
@@ -86,8 +86,8 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-teal-50 dark:bg-gray-800
-           text-teal-900 dark:text-gray-200 font-medium hover:bg-teal-100 dark:hover:bg-gray-700;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/5 dark:bg-gray-800
+           text-primary dark:text-gray-200 font-medium hover:bg-primary/10 dark:hover:bg-gray-700;
     transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
   }
 
@@ -96,7 +96,7 @@
   }
 
   .input-field {
-    @apply w-full px-4 py-2.5 rounded-xl border border-teal-900/10 dark:border-gray-700 bg-white dark:bg-gray-900
+    @apply w-full px-4 py-2.5 rounded-xl border border-primary/10 dark:border-gray-700 bg-white dark:bg-gray-900
            text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30
            focus:border-primary;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -130,7 +130,7 @@
 
   .sidebar-3d {
     background:
-      linear-gradient(165deg, #042f2e 0%, #0f766e 42%, #0d9488 72%, #115e59 100%);
+      linear-gradient(165deg, #001a3d 0%, #002D62 42%, #0A3A75 72%, #001F45 100%);
     box-shadow:
       8px 0 28px rgba(15, 23, 42, 0.28),
       inset -1px 0 0 rgba(255, 255, 255, 0.08),
@@ -147,11 +147,11 @@
   .sidebar-3d-inner {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, transparent 28%),
-      radial-gradient(120% 60% at 0% 0%, rgba(251, 191, 36, 0.12), transparent 55%);
+      radial-gradient(120% 60% at 0% 0%, rgba(197, 160, 89, 0.18), transparent 55%);
   }
 
   .sidebar-link {
-    color: rgba(204, 251, 241, 0.9);
+    color: rgba(232, 200, 122, 0.88);
     text-shadow: 0 1px 0 rgba(15, 23, 42, 0.2);
     transition: transform 0.18s ease, color 0.18s ease, background-color 0.18s ease;
   }
@@ -172,12 +172,12 @@
 
   .sidebar-link-active-bg {
     background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(251, 191, 36, 0.12));
+      linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(197, 160, 89, 0.18));
     box-shadow:
       0 8px 18px rgba(15, 23, 42, 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.35),
       inset 0 -2px 6px rgba(15, 23, 42, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(232, 200, 122, 0.28);
   }
 }
 

@@ -6,33 +6,34 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['"Fraunces"', 'Georgia', 'serif'],
+        display: ['Georgia', 'Fraunces', 'serif'],
         urdu: ['"Noto Nastaliq Urdu"', 'serif'],
       },
       colors: {
+        // Brand: Rehmani navy + metallic gold
         primary: {
-          DEFAULT: '#0F766E',
-          dark: '#14B8A6',
-          50: '#F0FDFA',
-          100: '#CCFBF1',
-          500: '#14B8A6',
-          600: '#0F766E',
-          700: '#0D5C56',
+          DEFAULT: '#002D62',
+          dark: '#3B6FA8',
+          50: '#EEF4FB',
+          100: '#D9E6F5',
+          500: '#0A3A75',
+          600: '#002D62',
+          700: '#001F45',
         },
         accent: {
-          DEFAULT: '#D97706',
-          50: '#FFFBEB',
-          500: '#F59E0B',
-          600: '#D97706',
+          DEFAULT: '#C5A059',
+          50: '#FBF6EA',
+          500: '#E8C87A',
+          600: '#C5A059',
         },
         surface: {
-          light: '#F7FBF9',
+          light: '#F7F8FA',
           dark: '#0B1220',
         },
       },
       boxShadow: {
-        card: '0 8px 24px -12px rgb(15 118 110 / 0.22), 0 2px 8px -4px rgb(15 23 42 / 0.08)',
-        'card-hover': '0 18px 40px -16px rgb(15 118 110 / 0.35), 0 8px 16px -8px rgb(15 23 42 / 0.12)',
+        card: '0 8px 24px -12px rgb(0 45 98 / 0.18), 0 2px 8px -4px rgb(15 23 42 / 0.08)',
+        'card-hover': '0 18px 40px -16px rgb(0 45 98 / 0.28), 0 8px 16px -8px rgb(15 23 42 / 0.12)',
         '3d': '0 12px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.55)',
       },
       animation: {

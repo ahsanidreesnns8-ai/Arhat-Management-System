@@ -2,52 +2,86 @@ import { motion } from 'framer-motion'
 import { useLanguage } from '../../context/LanguageContext'
 
 interface RhmaniLogoProps {
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'hero'
   showText?: boolean
   light?: boolean
+  /** Full crest (emblem + wordmark) vs compact mark + text */
+  variant?: 'mark' | 'full'
   className?: string
 }
 
 const sizeMap = {
-  sm: { box: 'w-9 h-9', text: 'text-sm', tag: 'text-[10px]', mark: 'text-sm' },
-  md: { box: 'w-11 h-11', text: 'text-base', tag: 'text-xs', mark: 'text-base' },
-  lg: { box: 'w-16 h-16', text: 'text-2xl', tag: 'text-sm', mark: 'text-xl' },
+  sm: { mark: 'w-10 h-10', full: 'w-28', text: 'text-sm', tag: 'text-[10px]', gap: 'gap-2.5' },
+  md: { mark: 'w-12 h-12', full: 'w-36', text: 'text-base', tag: 'text-xs', gap: 'gap-3' },
+  lg: { mark: 'w-16 h-16', full: 'w-48', text: 'text-xl', tag: 'text-sm', gap: 'gap-3.5' },
+  hero: { mark: 'w-24 h-24', full: 'w-64', text: 'text-3xl', tag: 'text-sm', gap: 'gap-4' },
 }
 
-export default function RhmaniLogo({ size = 'sm', showText = true, light = false, className = '' }: RhmaniLogoProps) {
-  const { t, isUrdu } = useLanguage()
+export default function RhmaniLogo({
+  size = 'sm',
+  showText = true,
+  light = false,
+  variant = 'mark',
+  className = '',
+}: RhmaniLogoProps) {
+  const { isUrdu } = useLanguage()
   const s = sizeMap[size]
 
-  return (
-    <div className={`flex items-center gap-3 ${className}`}>
+  if (variant === 'full') {
+    return (
       <motion.div
-        className={`${s.box} relative rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg`}
+        className={`flex flex-col items-center ${className}`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.985 }}
+      >
+        <img
+          src="/rehmani-logo.svg"
+          alt={isUrdu ? 'رحمانی ٹریڈنگ کمپنی' : 'Rehmani Trading Company'}
+          className={`${s.full} h-auto drop-shadow-lg`}
+          draggable={false}
+        />
+        {isUrdu && (
+          <p className="mt-2 font-urdu text-lg font-bold tracking-wide" style={{ color: light ? '#F8E7B0' : '#002D62' }}>
+            رحمانی ٹریڈنگ کمپنی
+          </p>
+        )}
+      </motion.div>
+    )
+  }
+
+  return (
+    <div className={`flex items-center ${s.gap} ${className}`}>
+      <motion.div
+        className={`${s.mark} relative flex-shrink-0 rounded-xl overflow-hidden bg-white`}
         style={{
-          background: 'linear-gradient(145deg, #2DD4BF 0%, #0F766E 55%, #115E59 100%)',
-          boxShadow: '0 8px 20px rgba(15, 118, 110, 0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.2)',
+          boxShadow: light
+            ? '0 8px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)'
+            : '0 8px 20px rgba(0, 45, 98, 0.22), inset 0 1px 0 rgba(255,255,255,0.65)',
         }}
         whileHover={{ scale: 1.05, rotate: -2 }}
         whileTap={{ scale: 0.96 }}
       >
-        <span
-          className={`${s.mark} font-bold text-white relative z-10 ${isUrdu ? 'font-urdu' : 'tracking-tight'}`}
-          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
-        >
-          {isUrdu ? 'ر' : 'R'}
-        </span>
-        <span className="absolute inset-0 rounded-xl bg-gradient-to-t from-transparent to-white/20 pointer-events-none" />
+        <img
+          src="/rehmani-mark.svg"
+          alt="RTC"
+          className="w-full h-full object-cover"
+          draggable={false}
+        />
       </motion.div>
+
       {showText && (
         <div className="overflow-hidden min-w-0">
           <h1
-            className={`${s.text} font-bold leading-tight truncate ${
-              light ? 'text-white' : 'text-gray-900 dark:text-white'
-            } ${isUrdu ? 'font-urdu' : 'tracking-tight'}`}
+            className={`${s.text} font-bold leading-tight truncate ${isUrdu ? 'font-urdu' : 'tracking-[0.04em]'}`}
+            style={{ color: light ? '#FFFFFF' : '#002D62' }}
           >
-            {t('brandName')}
+            {isUrdu ? 'رحمانی' : 'REHMANI'}
           </h1>
-          <p className={`${s.tag} ${light ? 'text-blue-100' : 'text-gray-500'} ${isUrdu ? 'font-urdu' : ''}`}>
-            {t('brandTagline')}
+          <p
+            className={`${s.tag} font-semibold uppercase truncate ${isUrdu ? 'font-urdu normal-case' : 'tracking-[0.18em]'}`}
+            style={{ color: light ? '#E8C87A' : '#C5A059' }}
+          >
+            {isUrdu ? 'ٹریڈنگ کمپنی' : 'Trading Company'}
           </p>
         </div>
       )}
