@@ -187,6 +187,9 @@ public class ArhatSettlementService {
                 .partialBagWeight(defaultBd(request.getPartialBagWeight(), BigDecimal.ZERO))
                 .marketRate(request.getMarketRate())
                 .commissionPercentage(request.getCommissionPercentage())
+                .arhatSharePercentage(request.getArhatSharePercentage())
+                .munshiNigranSharePercentage(request.getMunshiNigranSharePercentage())
+                .workersSharePercentage(request.getWorkersSharePercentage())
                 .build();
     }
 

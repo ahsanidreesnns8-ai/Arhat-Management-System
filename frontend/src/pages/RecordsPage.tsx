@@ -5,13 +5,14 @@ import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 
 const sections = [
-  { to: '/arhat-sale', icon: Receipt, title: 'Arhat Sale / Settlement', description: 'Sell products with calculator pattern — farmer payable & buyer receivable' },
+  { to: '/farmer-product', icon: Receipt, title: 'Farmer Product Entry', description: 'Enter farmer product like Price Calculator — bags, weight, rate, commission' },
+  { to: '/arhat-sale', icon: Receipt, title: 'Arhat Sale / Settlement', description: 'Sell to buyer — (bags×kg)÷40×rate · Arhat 3% + Munshi 0.70% + Workers 0.30%' },
   { to: '/farmers', icon: Users, title: 'Farmer Records', description: 'Registration, dheris, trucks, payments, and ledgers' },
   { to: '/buyers', icon: ShoppingBag, title: 'Buyer Records', description: 'Purchases, payments, and outstanding balances' },
   { to: '/sales', icon: Receipt, title: 'Sales Records', description: 'Invoices with mixed-source line items' },
   { to: '/dheris', icon: Warehouse, title: 'Dheri Records', description: 'Product lots with day-wise payment history' },
   { to: '/stock', icon: Warehouse, title: 'Stock Records', description: 'Incoming, outgoing, adjustments, and history' },
-  { to: '/reports', icon: Percent, title: 'Commission Records', description: 'Arhat, supervisor, and labor share reports' },
+  { to: '/reports', icon: Percent, title: 'Commission Records', description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% of total' },
   { to: '/payments', icon: Wallet, title: 'Payment Records', description: 'Farmer payouts, buyer receipts, filter by date' },
 ]
 

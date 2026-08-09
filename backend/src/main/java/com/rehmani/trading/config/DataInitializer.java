@@ -46,6 +46,9 @@ public class DataInitializer {
                         .phone("+92-300-0000000")
                         .email("info@rehmanitrading.com")
                         .defaultCommissionPercentage(new BigDecimal("4.00"))
+                        .arhatSharePercentage(new BigDecimal("3.00"))
+                        .supervisorSharePercentage(new BigDecimal("0.70"))
+                        .laborSharePercentage(new BigDecimal("0.30"))
                         .build());
             }
 

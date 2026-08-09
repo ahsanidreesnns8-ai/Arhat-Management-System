@@ -29,6 +29,10 @@ public class ArhatSettlementRequest {
     @NotNull
     private BigDecimal marketRate;
     private BigDecimal commissionPercentage;
+    /** % of TOTAL amount (defaults: Arhat 3, Munshi 0.70, Workers 0.30) */
+    private BigDecimal arhatSharePercentage;
+    private BigDecimal munshiNigranSharePercentage;
+    private BigDecimal workersSharePercentage;
 
     /** Cash paid to farmer now / received from buyer now (optional) */
     private BigDecimal paymentNow;

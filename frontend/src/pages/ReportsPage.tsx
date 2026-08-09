@@ -12,7 +12,7 @@ type ReportKey = 'sales' | 'commission' | 'stock' | 'profit'
 
 const reports: { key: ReportKey; title: string; description: string; hasRange?: boolean }[] = [
   { key: 'sales', title: 'Sales Report', description: 'Sales totals and invoice lines', hasRange: true },
-  { key: 'commission', title: 'Commission Report', description: 'Arhat, supervisor, and labor shares', hasRange: true },
+  { key: 'commission', title: 'Commission Report', description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% of total', hasRange: true },
   { key: 'stock', title: 'Stock Report', description: 'Product-wise stock remaining and alerts' },
   { key: 'profit', title: 'Profit Report', description: 'Revenue vs commission summary', hasRange: true },
 ]

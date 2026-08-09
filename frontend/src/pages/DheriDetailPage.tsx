@@ -84,7 +84,7 @@ export default function DheriDetailPage() {
         </div>
         <div>
           <p className="text-gray-500">Shares</p>
-          <p className="font-medium">Arhat {formatCurrency(dheri.arhatShare)} · Supervisor {formatCurrency(dheri.supervisorShare)} · Labor {formatCurrency(dheri.laborShare)}</p>
+          <p className="font-medium">Arhat {formatCurrency(dheri.arhatShare)} · Munshi {formatCurrency(dheri.supervisorShare)} · Workers {formatCurrency(dheri.laborShare)}</p>
         </div>
       </div>
 

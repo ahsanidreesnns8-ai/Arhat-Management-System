@@ -61,7 +61,7 @@ public class Dheri {
 
     @Column(name = "commission_percentage", nullable = false, precision = 5, scale = 2)
     @Builder.Default
-    private BigDecimal commissionPercentage = new BigDecimal("2.00");
+    private BigDecimal commissionPercentage = new BigDecimal("4.00");
 
     @Column(name = "total_price", nullable = false, precision = 15, scale = 2)
     @Builder.Default

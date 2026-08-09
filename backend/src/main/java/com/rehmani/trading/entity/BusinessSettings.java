@@ -32,21 +32,25 @@ public class BusinessSettings {
     private String phone;
     private String email;
 
+    /** Total commission % of amount (Arhat + Munshi + Workers). */
     @Column(name = "default_commission_percentage", nullable = false, precision = 5, scale = 2)
     @Builder.Default
-    private BigDecimal defaultCommissionPercentage = new BigDecimal("2.00");
+    private BigDecimal defaultCommissionPercentage = new BigDecimal("4.00");
 
+    /** Munshi/Nigran share as % of TOTAL amount (default 0.70). */
     @Column(name = "supervisor_share_percentage", nullable = false, precision = 5, scale = 2)
     @Builder.Default
-    private BigDecimal supervisorSharePercentage = new BigDecimal("40.00");
+    private BigDecimal supervisorSharePercentage = new BigDecimal("0.70");
 
+    /** Workers share as % of TOTAL amount (default 0.30). */
     @Column(name = "labor_share_percentage", nullable = false, precision = 5, scale = 2)
     @Builder.Default
-    private BigDecimal laborSharePercentage = new BigDecimal("30.00");
+    private BigDecimal laborSharePercentage = new BigDecimal("0.30");
 
+    /** Arhat share as % of TOTAL amount (default 3.00). */
     @Column(name = "arhat_share_percentage", nullable = false, precision = 5, scale = 2)
     @Builder.Default
-    private BigDecimal arhatSharePercentage = new BigDecimal("30.00");
+    private BigDecimal arhatSharePercentage = new BigDecimal("3.00");
 
     @Column(name = "low_stock_threshold", nullable = false, precision = 12, scale = 2)
     @Builder.Default

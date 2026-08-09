@@ -27,7 +27,7 @@ If the database does not exist yet:
 SOURCE database/schema/01_create_database.sql;
 ```
 
-Then start the backend once so Flyway applies `migrations/V1` … `V5` automatically:
+Then start the backend once so Flyway applies `migrations/V1` … `V6` automatically:
 
 ```bash
 cd backend

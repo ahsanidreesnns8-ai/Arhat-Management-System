@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calculator, RotateCcw, Save, Store } from 'lucide-react'
+import { Calculator, PackagePlus, RotateCcw, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
-import { arhatApi, buyerApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
+import { arhatApi, calculatorApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
-import type { Buyer, Dheri, Farmer, PriceCalculationResult, Product } from '../types'
+import type { Farmer, PriceCalculationResult, Product } from '../types'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -25,18 +25,16 @@ const emptyResult: PriceCalculationResult = {
   workersSharePercentage: 0.3,
 }
 
-type Mode = 'FARMER_PAYABLE' | 'BUYER_SALE'
-
-export default function ArhatSalePage() {
-  const [mode, setMode] = useState<Mode>('BUYER_SALE')
+/**
+ * Enter farmer product — same pattern as Price Calculator.
+ * Amount = (bags × weightPerBag + partial) / 40 × marketRate
+ * Commission of total: Arhat 3% + Munshi 0.70% + Workers 0.30%
+ */
+export default function FarmerProductPage() {
   const [farmers, setFarmers] = useState<Farmer[]>([])
-  const [buyers, setBuyers] = useState<Buyer[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [dheris, setDheris] = useState<Dheri[]>([])
   const [farmerId, setFarmerId] = useState('')
-  const [buyerId, setBuyerId] = useState('')
   const [productId, setProductId] = useState('')
-  const [dheriId, setDheriId] = useState('')
   const [numberOfBags, setNumberOfBags] = useState('0')
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
@@ -53,31 +51,20 @@ export default function ArhatSalePage() {
   const [lastMessage, setLastMessage] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      farmerApi.getAll(),
-      buyerApi.getAll(),
-      settingsApi.getProducts(),
-      dheriApi.getAll(),
-      settingsApi.get(),
-    ]).then(([f, b, p, d, s]) => {
-      setFarmers(f.data.data)
-      setBuyers(b.data.data)
-      setProducts(p.data.data)
-      setDheris(d.data.data)
-      if (p.data.data[0]) setProductId(String(p.data.data[0].id))
-      const st = s.data.data
-      if (st) {
-        setArhatPct(String(st.arhatSharePercentage ?? 3))
-        setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
-        setWorkersPct(String(st.laborSharePercentage ?? 0.3))
-      }
-    }).catch(() => {})
+    Promise.all([farmerApi.getAll(), settingsApi.getProducts(), settingsApi.get()])
+      .then(([f, p, s]) => {
+        setFarmers(f.data.data)
+        setProducts(p.data.data)
+        if (p.data.data[0]) setProductId(String(p.data.data[0].id))
+        const st = s.data.data
+        if (st) {
+          setArhatPct(String(st.arhatSharePercentage ?? 3))
+          setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
+          setWorkersPct(String(st.laborSharePercentage ?? 0.3))
+        }
+      })
+      .catch(() => {})
   }, [])
-
-  const farmerDheris = useMemo(
-    () => dheris.filter((d) => !farmerId || String(d.farmerId) === farmerId),
-    [dheris, farmerId],
-  )
 
   const payload = useMemo(() => ({
     numberOfBags: parseInt(numberOfBags) || 0,
@@ -103,20 +90,7 @@ export default function ArhatSalePage() {
     return () => clearTimeout(t)
   }, [runCalculation])
 
-  const loadDheri = (id: string) => {
-    setDheriId(id)
-    const d = dheris.find((x) => String(x.id) === id)
-    if (!d) return
-    setFarmerId(String(d.farmerId))
-    setProductId(String(d.productId))
-    setNumberOfBags(String(d.numberOfBags))
-    setWeightPerBag(String(d.weightPerBag))
-    setPartialBagWeight(String(d.partialBagWeight || 0))
-    setMarketRate(String(d.marketRate))
-  }
-
   const reset = () => {
-    setDheriId('')
     setNumberOfBags('0')
     setWeightPerBag('40')
     setPartialBagWeight('0')
@@ -131,16 +105,12 @@ export default function ArhatSalePage() {
   }
 
   const handleSave = async () => {
-    if (mode === 'FARMER_PAYABLE' && !farmerId) {
+    if (!farmerId) {
       toast.error('Select a farmer')
       return
     }
-    if (mode === 'BUYER_SALE' && !buyerId) {
-      toast.error('Select a buyer')
-      return
-    }
-    if (!productId && !dheriId) {
-      toast.error('Select a product (or existing dheri)')
+    if (!productId) {
+      toast.error('Select a product')
       return
     }
     if ((parseInt(numberOfBags) || 0) <= 0) {
@@ -155,11 +125,9 @@ export default function ArhatSalePage() {
     setSaving(true)
     try {
       const res = await arhatApi.settle({
-        settlementType: mode,
-        farmerId: farmerId ? Number(farmerId) : undefined,
-        buyerId: mode === 'BUYER_SALE' && buyerId ? Number(buyerId) : undefined,
-        productId: productId ? Number(productId) : undefined,
-        dheriId: dheriId ? Number(dheriId) : undefined,
+        settlementType: 'FARMER_PAYABLE',
+        farmerId: Number(farmerId),
+        productId: Number(productId),
         ...payload,
         paymentNow: parseFloat(paymentNow) || 0,
         paymentMethod,
@@ -168,13 +136,11 @@ export default function ArhatSalePage() {
       })
       const data = res.data.data
       setLastMessage(data.message || 'Saved')
-      toast.success(data.message || 'Settlement saved')
-      dheriApi.getAll().then((r) => setDheris(r.data.data))
+      toast.success(data.message || 'Farmer product saved')
       farmerApi.getAll().then((r) => setFarmers(r.data.data))
-      buyerApi.getAll().then((r) => setBuyers(r.data.data))
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Failed to save settlement')
+      toast.error(msg || 'Failed to save farmer product')
     } finally {
       setSaving(false)
     }
@@ -195,92 +161,36 @@ export default function ArhatSalePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Arhat Product Sale / Settlement"
-        description="Sell to buyer or post farmer payable — amount = (bags × weight) ÷ 40 × rate · Commission: Arhat 3% + Munshi 0.70% + Workers 0.30%"
+        title="Farmer Product Entry"
+        description="Same pattern as Price Calculator — enter bags, weight, and market rate; post farmer payable"
       />
-
-      <div className="card-3d p-2 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setMode('BUYER_SALE')}
-          className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${
-            mode === 'BUYER_SALE' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800'
-          }`}
-        >
-          Sell to Buyer (Receivable)
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('FARMER_PAYABLE')}
-          className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${
-            mode === 'FARMER_PAYABLE' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800'
-          }`}
-        >
-          Farmer Product Payable
-        </button>
-      </div>
 
       <div className="card-3d p-6 lg:p-8">
         <div className="flex items-center gap-2 mb-6">
-          <Store className="h-6 w-6 text-primary" />
-          <h2 className="text-lg font-semibold">
-            {mode === 'BUYER_SALE' ? 'Buyer sale — product details' : 'Farmer payable — product details'}
-          </h2>
+          <PackagePlus className="h-6 w-6 text-primary" />
+          <h2 className="text-lg font-semibold">Enter farmer product</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Ask & fill all fields</h3>
-
-            {mode === 'BUYER_SALE' ? (
-              <Select
-                label="Buyer *"
-                value={buyerId}
-                onChange={(e) => setBuyerId(e.target.value)}
-                options={[{ value: '', label: 'Select buyer' }, ...buyers.map((b) => ({ value: b.id, label: `${b.buyerId} — ${b.name}` }))]}
-              />
-            ) : (
-              <Select
-                label="Farmer *"
-                value={farmerId}
-                onChange={(e) => setFarmerId(e.target.value)}
-                options={[{ value: '', label: 'Select farmer' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
-              />
-            )}
-
-            {mode === 'BUYER_SALE' && (
-              <Select
-                label="Farmer source (optional — leave empty for business stock)"
-                value={farmerId}
-                onChange={(e) => setFarmerId(e.target.value)}
-                options={[{ value: '', label: 'Business stock' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
-              />
-            )}
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Inputs</h3>
 
             <Select
-              label="Existing dheri (optional — loads bags/rate)"
-              value={dheriId}
-              onChange={(e) => loadDheri(e.target.value)}
-              options={[
-                { value: '', label: '— New product entry —' },
-                ...farmerDheris.map((d) => ({
-                  value: d.id,
-                  label: `${d.dheriId} — ${d.productName} · ${d.farmerName}`,
-                })),
-              ]}
+              label="Farmer *"
+              value={farmerId}
+              onChange={(e) => setFarmerId(e.target.value)}
+              options={[{ value: '', label: 'Select farmer' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
             />
-
             <Select
               label="Product *"
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
             />
-
             <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
             <Input label="Weight of One Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input label="Partial Bag / Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
-            <Input label="Price per 1 Mann / 40kg (PKR) *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
+            <Input label="Market Rate per 1 Mann / 40kg (PKR) *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
 
             <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800/40 p-4 space-y-3">
               <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Commission of total amount</p>
@@ -292,16 +202,8 @@ export default function ArhatSalePage() {
             <Input label="Transaction date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
 
             <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-3">
-              <p className="text-sm font-semibold text-primary">
-                {mode === 'BUYER_SALE' ? 'Receive payment now (optional)' : 'Pay farmer now (optional)'}
-              </p>
-              <Input
-                label={mode === 'BUYER_SALE' ? 'Cash received now (PKR)' : 'Cash paid to farmer now (PKR)'}
-                type="number"
-                step="0.01"
-                value={paymentNow}
-                onChange={(e) => setPaymentNow(e.target.value)}
-              />
+              <p className="text-sm font-semibold text-primary">Pay farmer now (optional)</p>
+              <Input label="Cash paid now (PKR)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />
               <Select
                 label="Payment method"
                 value={paymentMethod}
@@ -313,14 +215,8 @@ export default function ArhatSalePage() {
                   { value: 'OTHER', label: 'Other' },
                 ]}
               />
-              <button
-                type="button"
-                className="text-xs text-primary underline"
-                onClick={() => setPaymentNow(
-                  String(mode === 'BUYER_SALE' ? result.totalAmount : result.farmerFinalBalance),
-                )}
-              >
-                Fill full amount from calculation
+              <button type="button" className="text-xs text-primary underline" onClick={() => setPaymentNow(String(result.farmerFinalBalance))}>
+                Fill full farmer payable
               </button>
             </div>
 
@@ -329,18 +225,19 @@ export default function ArhatSalePage() {
             <div className="flex flex-wrap gap-3 pt-2">
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
               <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Recalculate</Button>
-              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save settlement</Button>
+              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save farmer product</Button>
             </div>
 
             {lastMessage && (
               <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 text-sm text-emerald-800 dark:text-emerald-200">
-                {lastMessage}
+                {lastMessage}{' '}
+                <Link className="underline text-primary" to="/payments">View payments</Link>
               </div>
             )}
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Live calculation (same as Price Calculator)</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Live calculation</h3>
             {resultRows.map((row) => (
               <div
                 key={row.label}
@@ -356,11 +253,6 @@ export default function ArhatSalePage() {
                 <span className={`text-lg font-bold ${row.highlight ? 'text-primary' : ''}`}>{row.value}</span>
               </div>
             ))}
-            <p className="text-xs text-gray-500 pt-2">
-              After save, open{' '}
-              <Link className="text-primary underline" to="/payments">Payments</Link>
-              {' '}or the dheri/farmer/buyer detail page to pay/receive remaining balance by date.
-            </p>
           </div>
         </div>
       </div>

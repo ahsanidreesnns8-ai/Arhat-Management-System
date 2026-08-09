@@ -54,20 +54,17 @@ public class DheriService {
                     .orElseThrow(() -> new RuntimeException("Truck not found"));
         }
 
-        var settings = settingsRepository.findAll().stream().findFirst().orElse(null);
-        var commissionPct = settings != null ? settings.getDefaultCommissionPercentage() : new java.math.BigDecimal("4.00");
-
         int bags = request.getNumberOfBags() != null ? request.getNumberOfBags() : 0;
         var weightPerBag = request.getWeightPerBag() != null ? request.getWeightPerBag() : new java.math.BigDecimal("40");
         var partial = request.getPartialBagWeight() != null ? request.getPartialBagWeight() : java.math.BigDecimal.ZERO;
         var marketRate = request.getMarketRate() != null ? request.getMarketRate() : java.math.BigDecimal.ZERO;
 
+        // Uses site commission model: Arhat 3% + Munshi 0.70% + Workers 0.30% of total
         PriceCalculationResult calc = priceCalculatorService.calculate(PriceCalculationRequest.builder()
                 .numberOfBags(bags)
                 .weightPerBag(weightPerBag)
                 .partialBagWeight(partial)
                 .marketRate(marketRate)
-                .commissionPercentage(commissionPct)
                 .build());
 
         Dheri dheri = Dheri.builder()

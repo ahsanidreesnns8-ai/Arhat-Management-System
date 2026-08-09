@@ -32,7 +32,13 @@ export default function SettingsPage() {
     if (!settings) return
     setSaving(true)
     try {
-      const payload: Partial<BusinessSettings> = { ...settings }
+      const shareSum = Number(((settings.arhatSharePercentage || 0)
+        + (settings.supervisorSharePercentage || 0)
+        + (settings.laborSharePercentage || 0)).toFixed(2))
+      const payload: Partial<BusinessSettings> = {
+        ...settings,
+        defaultCommissionPercentage: shareSum,
+      }
       if (geminiKeyInput.trim()) {
         payload.geminiApiKey = geminiKeyInput.trim()
       }
@@ -156,10 +162,21 @@ export default function SettingsPage() {
             <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('commissionSettings')}</h3>
           </div>
           <div className="space-y-4">
-            <Input label="Default Commission %" type="number" step="0.01" value={settings?.defaultCommissionPercentage || 4} onChange={(e) => update('defaultCommissionPercentage', parseFloat(e.target.value))} />
-            <Input label="Arhat Share %" type="number" step="0.01" value={settings?.arhatSharePercentage || 30} onChange={(e) => update('arhatSharePercentage', parseFloat(e.target.value))} />
-            <Input label="Munshi/Nigran Share %" type="number" step="0.01" value={settings?.supervisorSharePercentage || 40} onChange={(e) => update('supervisorSharePercentage', parseFloat(e.target.value))} />
-            <Input label="Workers Share %" type="number" step="0.01" value={settings?.laborSharePercentage || 30} onChange={(e) => update('laborSharePercentage', parseFloat(e.target.value))} />
+            <p className="text-xs text-gray-500 -mt-1 mb-1">
+              Shares are % of total amount. Default: Arhat 3% + Munshi 0.70% + Workers 0.30% = 4%
+            </p>
+            <Input label="Arhat % of total" type="number" step="0.01" value={settings?.arhatSharePercentage ?? 3} onChange={(e) => update('arhatSharePercentage', parseFloat(e.target.value))} />
+            <Input label="Munshi/Nigran % of total" type="number" step="0.01" value={settings?.supervisorSharePercentage ?? 0.7} onChange={(e) => update('supervisorSharePercentage', parseFloat(e.target.value))} />
+            <Input label="Workers % of total" type="number" step="0.01" value={settings?.laborSharePercentage ?? 0.3} onChange={(e) => update('laborSharePercentage', parseFloat(e.target.value))} />
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
+              <span className="text-gray-500">Total commission of amount: </span>
+              <span className="font-semibold text-primary">
+                {settings
+                  ? Number(((settings.arhatSharePercentage || 0) + (settings.supervisorSharePercentage || 0) + (settings.laborSharePercentage || 0)).toFixed(2))
+                  : 4}
+                %
+              </span>
+            </div>
             <Input label="Low Stock Threshold" type="number" value={settings?.lowStockThreshold || 100} onChange={(e) => update('lowStockThreshold', parseFloat(e.target.value))} />
           </div>
         </div>

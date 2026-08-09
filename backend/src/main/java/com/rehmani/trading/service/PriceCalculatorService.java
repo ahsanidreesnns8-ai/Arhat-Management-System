@@ -13,11 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+/**
+ * Price formula: (bags × weightPerBag + partialKg) / 40 × marketRatePer40kg
+ *
+ * Commission of TOTAL amount (site-wide):
+ *   Arhat 3% + Munshi/Nigran 0.70% + Workers 0.30% = 4%
+ */
 @Service
 @RequiredArgsConstructor
 public class PriceCalculatorService {
 
     private static final BigDecimal MANN_WEIGHT = new BigDecimal("40");
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final BusinessSettingsRepository settingsRepository;
     private final DheriRepository dheriRepository;
@@ -30,9 +37,36 @@ public class PriceCalculatorService {
         BigDecimal partialBagWeight = defaultIfNull(request.getPartialBagWeight(), BigDecimal.ZERO);
         BigDecimal pricePerMann = defaultIfNull(request.getMarketRate(), BigDecimal.ZERO);
 
+        // Shares are percentages of TOTAL AMOUNT
+        BigDecimal arhatPct = defaultIfNull(request.getArhatSharePercentage(),
+                defaultIfNull(settings.getArhatSharePercentage(), new BigDecimal("3.00")));
+        BigDecimal munshiPct = defaultIfNull(request.getMunshiNigranSharePercentage(),
+                defaultIfNull(settings.getSupervisorSharePercentage(), new BigDecimal("0.70")));
+        BigDecimal workersPct = defaultIfNull(request.getWorkersSharePercentage(),
+                defaultIfNull(settings.getLaborSharePercentage(), new BigDecimal("0.30")));
+
+        BigDecimal shareSum = arhatPct.add(munshiPct).add(workersPct);
         BigDecimal commissionPct = request.getCommissionPercentage();
         if (commissionPct == null) {
-            commissionPct = settings.getDefaultCommissionPercentage();
+            commissionPct = shareSum.compareTo(BigDecimal.ZERO) > 0
+                    ? shareSum
+                    : defaultIfNull(settings.getDefaultCommissionPercentage(), new BigDecimal("4.00"));
+        }
+
+        // If only total commission % was overridden, scale the three shares proportionally
+        if (shareSum.compareTo(BigDecimal.ZERO) > 0
+                && commissionPct.compareTo(shareSum) != 0
+                && request.getArhatSharePercentage() == null
+                && request.getMunshiNigranSharePercentage() == null
+                && request.getWorkersSharePercentage() == null
+                && request.getCommissionPercentage() != null) {
+            BigDecimal factor = commissionPct.divide(shareSum, 8, RoundingMode.HALF_UP);
+            arhatPct = arhatPct.multiply(factor).setScale(4, RoundingMode.HALF_UP);
+            munshiPct = munshiPct.multiply(factor).setScale(4, RoundingMode.HALF_UP);
+            workersPct = workersPct.multiply(factor).setScale(4, RoundingMode.HALF_UP);
+            shareSum = arhatPct.add(munshiPct).add(workersPct);
+        } else if (request.getCommissionPercentage() == null) {
+            commissionPct = shareSum;
         }
 
         BigDecimal totalWeight = weightPerBag.multiply(BigDecimal.valueOf(bags))
@@ -50,23 +84,11 @@ public class PriceCalculatorService {
         BigDecimal totalMann = totalWeight.divide(MANN_WEIGHT, 4, RoundingMode.HALF_UP);
         BigDecimal totalAmount = totalMann.multiply(pricePerMann).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal commission = totalAmount.multiply(commissionPct)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal arhatShare = percentOf(totalAmount, arhatPct);
+        BigDecimal munshiShare = percentOf(totalAmount, munshiPct);
+        BigDecimal workersShare = percentOf(totalAmount, workersPct);
+        BigDecimal commission = arhatShare.add(munshiShare).add(workersShare);
         BigDecimal farmerFinalBalance = totalAmount.subtract(commission);
-
-        BigDecimal arhatPct = request.getArhatSharePercentage() != null
-                ? request.getArhatSharePercentage() : settings.getArhatSharePercentage();
-        BigDecimal munshiPct = request.getMunshiNigranSharePercentage() != null
-                ? request.getMunshiNigranSharePercentage() : settings.getSupervisorSharePercentage();
-        BigDecimal workersPct = request.getWorkersSharePercentage() != null
-                ? request.getWorkersSharePercentage() : settings.getLaborSharePercentage();
-
-        BigDecimal arhatShare = commission.multiply(arhatPct)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-        BigDecimal munshiShare = commission.multiply(munshiPct)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-        BigDecimal workersShare = commission.multiply(workersPct)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
 
         return PriceCalculationResult.builder()
                 .totalWeight(totalWeight)
@@ -74,15 +96,15 @@ public class PriceCalculatorService {
                 .remainderKg(remainderKg)
                 .totalMann(totalMann.setScale(2, RoundingMode.HALF_UP))
                 .totalAmount(totalAmount)
-                .commissionPercentage(commissionPct)
+                .commissionPercentage(commissionPct.setScale(2, RoundingMode.HALF_UP))
                 .commission(commission)
                 .farmerFinalBalance(farmerFinalBalance)
                 .arhatShare(arhatShare)
                 .munshiNigranShare(munshiShare)
                 .workersShare(workersShare)
-                .arhatSharePercentage(arhatPct)
-                .munshiNigranSharePercentage(munshiPct)
-                .workersSharePercentage(workersPct)
+                .arhatSharePercentage(arhatPct.setScale(2, RoundingMode.HALF_UP))
+                .munshiNigranSharePercentage(munshiPct.setScale(2, RoundingMode.HALF_UP))
+                .workersSharePercentage(workersPct.setScale(2, RoundingMode.HALF_UP))
                 .build();
     }
 
@@ -109,10 +131,19 @@ public class PriceCalculatorService {
         return dheriRepository.save(dheri);
     }
 
+    private BigDecimal percentOf(BigDecimal amount, BigDecimal pct) {
+        return amount.multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+    }
+
     private BusinessSettings getSettings() {
         return settingsRepository.findAll().stream()
                 .findFirst()
-                .orElse(BusinessSettings.builder().build());
+                .orElse(BusinessSettings.builder()
+                        .defaultCommissionPercentage(new BigDecimal("4.00"))
+                        .arhatSharePercentage(new BigDecimal("3.00"))
+                        .supervisorSharePercentage(new BigDecimal("0.70"))
+                        .laborSharePercentage(new BigDecimal("0.30"))
+                        .build());
     }
 
     private BigDecimal defaultIfNull(BigDecimal value, BigDecimal defaultValue) {

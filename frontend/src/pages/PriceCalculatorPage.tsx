@@ -5,7 +5,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
-import { calculatorApi, dheriApi } from '../services/api'
+import { calculatorApi, dheriApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, PriceCalculationResult } from '../types'
 
@@ -19,9 +19,9 @@ const emptyResult: PriceCalculationResult = {
   arhatShare: 0,
   munshiNigranShare: 0,
   workersShare: 0,
-  arhatSharePercentage: 30,
-  munshiNigranSharePercentage: 40,
-  workersSharePercentage: 30,
+  arhatSharePercentage: 3,
+  munshiNigranSharePercentage: 0.7,
+  workersSharePercentage: 0.3,
 }
 
 export default function PriceCalculatorPage() {
@@ -31,12 +31,21 @@ export default function PriceCalculatorPage() {
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
   const [pricePerMann, setPricePerMann] = useState('0')
-  const [commissionPercentage, setCommissionPercentage] = useState('4')
+  const [arhatPct, setArhatPct] = useState('3')
+  const [munshiPct, setMunshiPct] = useState('0.70')
+  const [workersPct, setWorkersPct] = useState('0.30')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     dheriApi.getAll().then((res) => setDheris(res.data.data)).catch(() => {})
+    settingsApi.get().then((res) => {
+      const st = res.data.data
+      if (!st) return
+      setArhatPct(String(st.arhatSharePercentage ?? 3))
+      setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
+      setWorkersPct(String(st.laborSharePercentage ?? 0.3))
+    }).catch(() => {})
   }, [])
 
   const payload = useMemo(() => ({
@@ -44,8 +53,10 @@ export default function PriceCalculatorPage() {
     weightPerBag: parseFloat(weightPerBag) || 40,
     partialBagWeight: parseFloat(partialBagWeight) || 0,
     marketRate: parseFloat(pricePerMann) || 0,
-    commissionPercentage: parseFloat(commissionPercentage) || 4,
-  }), [numberOfBags, weightPerBag, partialBagWeight, pricePerMann, commissionPercentage])
+    arhatSharePercentage: parseFloat(arhatPct) || 3,
+    munshiNigranSharePercentage: parseFloat(munshiPct) || 0.7,
+    workersSharePercentage: parseFloat(workersPct) || 0.3,
+  }), [numberOfBags, weightPerBag, partialBagWeight, pricePerMann, arhatPct, munshiPct, workersPct])
 
   const runCalculation = useCallback(async () => {
     try {
@@ -69,7 +80,6 @@ export default function PriceCalculatorPage() {
       setWeightPerBag(String(dheri.weightPerBag))
       setPartialBagWeight(String(dheri.partialBagWeight || 0))
       setPricePerMann(String(dheri.marketRate))
-      setCommissionPercentage(String(dheri.commissionPercentage || 4))
     }
   }
 
@@ -79,7 +89,9 @@ export default function PriceCalculatorPage() {
     setWeightPerBag('40')
     setPartialBagWeight('0')
     setPricePerMann('0')
-    setCommissionPercentage('4')
+    setArhatPct('3')
+    setMunshiPct('0.70')
+    setWorkersPct('0.30')
     setResult(emptyResult)
   }
 
@@ -100,21 +112,22 @@ export default function PriceCalculatorPage() {
   }
 
   const resultRows = [
+    { label: 'Formula', value: '(bags × kg) ÷ 40 × rate' },
     { label: 'Total Weight (kg)', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Mann (40kg units)', value: formatNumber(result.totalMann, 4) },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: `Commission (${result.commissionPercentage}%)`, value: formatCurrency(result.commission), accent: 'orange' },
+    { label: `Arhat (${result.arhatSharePercentage}% of total)`, value: formatCurrency(result.arhatShare) },
+    { label: `Munshi/Nigran (${result.munshiNigranSharePercentage}% of total)`, value: formatCurrency(result.munshiNigranShare) },
+    { label: `Workers (${result.workersSharePercentage}% of total)`, value: formatCurrency(result.workersShare) },
+    { label: `Total Commission (${result.commissionPercentage}%)`, value: formatCurrency(result.commission), accent: 'orange' as const },
     { label: 'Farmer Final Balance', value: formatCurrency(result.farmerFinalBalance), highlight: true },
-    { label: `Arhat Share (${result.arhatSharePercentage}%)`, value: formatCurrency(result.arhatShare) },
-    { label: `Munshi/Nigran Share (${result.munshiNigranSharePercentage}%)`, value: formatCurrency(result.munshiNigranShare) },
-    { label: `Workers Share (${result.workersSharePercentage}%)`, value: formatCurrency(result.workersShare) },
   ]
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Price Calculator"
-        description="Live calculation — all values update instantly as you type"
+        description="Amount = (bags × weight) ÷ 40 × market rate · Commission: Arhat 3% + Munshi 0.70% + Workers 0.30%"
       />
 
       <div className="card p-6 lg:p-8">
@@ -124,7 +137,6 @@ export default function PriceCalculatorPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Inputs */}
           <div className="space-y-5">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Inputs</h3>
             <Select
@@ -139,45 +151,17 @@ export default function PriceCalculatorPage() {
                 })),
               ]}
             />
-            <Input
-              label="Number of Bags"
-              type="number"
-              min="0"
-              value={numberOfBags}
-              onChange={(e) => setNumberOfBags(e.target.value)}
-            />
-            <Input
-              label="Weight of One Bag (kg)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={weightPerBag}
-              onChange={(e) => setWeightPerBag(e.target.value)}
-            />
-            <Input
-              label="Partial Bag / Extra KG"
-              type="number"
-              min="0"
-              step="0.01"
-              value={partialBagWeight}
-              onChange={(e) => setPartialBagWeight(e.target.value)}
-            />
-            <Input
-              label="Price per 1 Mann / 40kg (PKR)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={pricePerMann}
-              onChange={(e) => setPricePerMann(e.target.value)}
-            />
-            <Input
-              label="Commission %"
-              type="number"
-              min="0"
-              step="0.01"
-              value={commissionPercentage}
-              onChange={(e) => setCommissionPercentage(e.target.value)}
-            />
+            <Input label="Number of Bags" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+            <Input label="Weight of One Bag (kg)" type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label="Partial Bag / Extra KG" type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            <Input label="Price per 1 Mann / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
+
+            <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800/40 p-4 space-y-3">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Commission of total amount</p>
+              <Input label="Arhat % of total" type="number" min="0" step="0.01" value={arhatPct} onChange={(e) => setArhatPct(e.target.value)} />
+              <Input label="Munshi/Nigran % of total" type="number" min="0" step="0.01" value={munshiPct} onChange={(e) => setMunshiPct(e.target.value)} />
+              <Input label="Workers % of total" type="number" min="0" step="0.01" value={workersPct} onChange={(e) => setWorkersPct(e.target.value)} />
+            </div>
 
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={handleReset}>
@@ -195,7 +179,6 @@ export default function PriceCalculatorPage() {
             </div>
           </div>
 
-          {/* Results — all visible simultaneously */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Results</h3>
             <div className="space-y-2">
