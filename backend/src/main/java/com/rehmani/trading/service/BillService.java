@@ -9,146 +9,291 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class BillService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
+    private static final String LOCATION_EN = "Gala Mandi Nankana Sahib";
+    private static final String LOCATION_UR = "گالا منڈی ننکانہ صاحب";
 
     private final FarmerRepository farmerRepository;
     private final BuyerRepository buyerRepository;
     private final DheriRepository dheriRepository;
     private final SaleRepository saleRepository;
+    private final PaymentRepository paymentRepository;
     private final BusinessSettingsRepository settingsRepository;
 
-    public String generateFarmerBillHtml(Long farmerId) {
+    public String generateFarmerBillHtml(Long farmerId, String lang) {
+        boolean urdu = isUrdu(lang);
         Farmer farmer = farmerRepository.findByIdAndDeletedFalse(farmerId)
                 .orElseThrow(() -> new RuntimeException("Farmer not found"));
         List<Dheri> dheris = dheriRepository.findByFarmerIdWithDetails(farmerId);
         BusinessSettings settings = getSettings();
+        Map<String, String> t = labels(urdu);
 
+        BigDecimal totalGross = BigDecimal.ZERO;
+        BigDecimal totalCommission = BigDecimal.ZERO;
+        BigDecimal totalPayable = BigDecimal.ZERO;
         StringBuilder rows = new StringBuilder();
-        BigDecimal totalReceivable = BigDecimal.ZERO;
+
         for (Dheri d : dheris) {
-            totalReceivable = totalReceivable.add(d.getFarmerReceivable());
+            BigDecimal gross = safe(d.getTotalPrice());
+            BigDecimal commission = safe(d.getCommissionAmount());
+            BigDecimal payable = safe(d.getFarmerReceivable());
+            totalGross = totalGross.add(gross);
+            totalCommission = totalCommission.add(commission);
+            totalPayable = totalPayable.add(payable);
+
+            String dateStr = d.getCreatedAt() != null
+                    ? d.getCreatedAt().toLocalDate().format(DATE_FMT)
+                    : LocalDate.now().format(DATE_FMT);
+
             rows.append("<tr>")
-                    .append("<td>").append(escape(d.getDheriId())).append("</td>")
-                    .append("<td>").append(escape(d.getProduct().getName())).append("</td>")
-                    .append("<td>").append(d.getNumberOfBags()).append("</td>")
-                    .append("<td>").append(d.getTotalWeight()).append("</td>")
-                    .append("<td>").append(d.getMarketRate()).append("</td>")
-                    .append("<td>").append(d.getCommissionAmount()).append("</td>")
-                    .append("<td>").append(d.getFarmerReceivable()).append("</td>")
+                    .append(td(dateStr))
+                    .append(td(d.getDheriId()))
+                    .append(td(d.getProduct() != null ? d.getProduct().getName() : ""))
+                    .append(td(String.valueOf(d.getNumberOfBags())))
+                    .append(td(money(d.getTotalWeight())))
+                    .append(td(money(d.getMarketRate())))
+                    .append(td(money(gross)))
+                    .append(td(money(commission) + " (" + money(d.getCommissionPercentage()) + "%)"))
+                    .append(td(money(payable)))
                     .append("</tr>");
         }
 
-        return buildHtml(settings, "Farmer Bill",
-                "Farmer: " + farmer.getName() + " (" + farmer.getFarmerId() + ")",
-                "<table><thead><tr><th>Dheri</th><th>Product</th><th>Bags</th><th>Weight</th><th>Rate</th><th>Commission</th><th>Receivable</th></tr></thead><tbody>"
-                        + rows + "</tbody><tfoot><tr><td colspan='6'><strong>Total Receivable</strong></td><td><strong>"
-                        + totalReceivable + "</strong></td></tr></tfoot></table>");
+        BigDecimal paid = sumFarmerPayments(farmerId);
+        BigDecimal remaining = safe(farmer.getOutstandingBalance());
+
+        String partyBlock = partyBlock(
+                t.get("farmer"),
+                farmer.getName(),
+                farmer.getFarmerId(),
+                farmer.getPhone(),
+                farmer.getCity() != null ? farmer.getCity() : farmer.getAddress(),
+                urdu
+        );
+
+        String body = partyBlock
+                + "<table><thead><tr>"
+                + th(t.get("date")) + th(t.get("dheri")) + th(t.get("product"))
+                + th(t.get("bags")) + th(t.get("weight")) + th(t.get("rate"))
+                + th(t.get("gross")) + th(t.get("commission4")) + th(t.get("payable"))
+                + "</tr></thead><tbody>" + rows + "</tbody>"
+                + "<tfoot>"
+                + "<tr><td colspan='6'><strong>" + t.get("totals") + "</strong></td>"
+                + "<td><strong>" + money(totalGross) + "</strong></td>"
+                + "<td><strong>" + money(totalCommission) + "</strong></td>"
+                + "<td><strong>" + money(totalPayable) + "</strong></td></tr>"
+                + "<tr><td colspan='8'>" + t.get("paid") + "</td><td><strong>" + money(paid) + "</strong></td></tr>"
+                + "<tr><td colspan='8'>" + t.get("remaining") + "</td><td><strong>" + money(remaining) + "</strong></td></tr>"
+                + "</tfoot></table>"
+                + "<p class='note'>" + t.get("commissionNote") + "</p>";
+
+        return buildReceiptHtml(settings, t.get("farmerBill"), body, urdu);
     }
 
-    public String generateBuyerBillHtml(Long buyerId) {
+    public String generateBuyerBillHtml(Long buyerId, String lang) {
+        boolean urdu = isUrdu(lang);
         Buyer buyer = buyerRepository.findByIdAndDeletedFalse(buyerId)
                 .orElseThrow(() -> new RuntimeException("Buyer not found"));
-        List<Sale> sales = saleRepository.findByBuyerId(buyerId);
+        List<Sale> sales = saleRepository.findByBuyerIdWithItems(buyerId);
         BusinessSettings settings = getSettings();
+        Map<String, String> t = labels(urdu);
 
-        StringBuilder rows = new StringBuilder();
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalPaid = BigDecimal.ZERO;
-        for (Sale s : sales) {
-            totalAmount = totalAmount.add(s.getTotalAmount());
-            totalPaid = totalPaid.add(s.getPaidAmount());
-            rows.append("<tr>")
-                    .append("<td>").append(escape(s.getInvoiceNumber())).append("</td>")
-                    .append("<td>").append(s.getSaleDate().format(DATE_FMT)).append("</td>")
-                    .append("<td>").append(s.getTotalBags()).append("</td>")
-                    .append("<td>").append(s.getTotalWeight()).append("</td>")
-                    .append("<td>").append(s.getTotalAmount()).append("</td>")
-                    .append("<td>").append(s.getPaidAmount()).append("</td>")
-                    .append("<td>").append(s.getPaymentStatus()).append("</td>")
-                    .append("</tr>");
-        }
-
-        return buildHtml(settings, "Buyer Bill",
-                "Buyer: " + buyer.getName() + " (" + buyer.getBuyerId() + ")",
-                "<table><thead><tr><th>Invoice</th><th>Date</th><th>Bags</th><th>Weight</th><th>Amount</th><th>Paid</th><th>Status</th></tr></thead><tbody>"
-                        + rows + "</tbody><tfoot><tr><td colspan='4'><strong>Totals</strong></td><td><strong>"
-                        + totalAmount + "</strong></td><td><strong>" + totalPaid + "</strong></td><td></td></tr></tfoot></table>");
-    }
-
-    public String generateSaleFarmerBillHtml(Long saleId) {
-        Sale sale = findSale(saleId);
-        BusinessSettings settings = getSettings();
-
         StringBuilder rows = new StringBuilder();
-        for (SaleItem item : sale.getItems()) {
-            if (item.getSourceType() != SaleSourceType.FARMER || item.getFarmer() == null) {
+
+        for (Sale s : sales) {
+            totalAmount = totalAmount.add(safe(s.getTotalAmount()));
+            totalPaid = totalPaid.add(safe(s.getPaidAmount()));
+            String saleDate = s.getSaleDate() != null ? s.getSaleDate().format(DATE_FMT) : "";
+
+            if (s.getItems() == null || s.getItems().isEmpty()) {
+                rows.append("<tr>")
+                        .append(td(saleDate))
+                        .append(td(s.getInvoiceNumber()))
+                        .append(td("—"))
+                        .append(td("—"))
+                        .append(td(String.valueOf(s.getTotalBags())))
+                        .append(td(money(s.getTotalWeight())))
+                        .append(td("—"))
+                        .append(td(money(s.getTotalAmount())))
+                        .append("</tr>");
                 continue;
             }
+
+            for (SaleItem item : s.getItems()) {
+                String dheriCode = item.getDheri() != null ? item.getDheri().getDheriId() : "—";
+                String productName = item.getProduct() != null ? item.getProduct().getName() : "—";
+                rows.append("<tr>")
+                        .append(td(saleDate))
+                        .append(td(s.getInvoiceNumber()))
+                        .append(td(productName))
+                        .append(td(dheriCode))
+                        .append(td(String.valueOf(item.getNumberOfBags())))
+                        .append(td(money(item.getTotalWeight())))
+                        .append(td(money(item.getRate())))
+                        .append(td(money(item.getAmount())))
+                        .append("</tr>");
+            }
+        }
+
+        BigDecimal remaining = safe(buyer.getOutstandingBalance());
+
+        String partyBlock = partyBlock(
+                t.get("buyer"),
+                buyer.getName(),
+                buyer.getBuyerId(),
+                buyer.getPhone(),
+                buyer.getCity() != null ? buyer.getCity() : buyer.getAddress(),
+                urdu
+        );
+
+        String body = partyBlock
+                + "<p class='sub'>" + t.get("buyerTxnNote") + "</p>"
+                + "<table><thead><tr>"
+                + th(t.get("date")) + th(t.get("invoice")) + th(t.get("product")) + th(t.get("dheri"))
+                + th(t.get("bags")) + th(t.get("weight")) + th(t.get("rate")) + th(t.get("amount"))
+                + "</tr></thead><tbody>" + rows + "</tbody>"
+                + "<tfoot>"
+                + "<tr><td colspan='7'><strong>" + t.get("totalBilled") + "</strong></td><td><strong>" + money(totalAmount) + "</strong></td></tr>"
+                + "<tr><td colspan='7'><strong>" + t.get("paid") + "</strong></td><td><strong>" + money(totalPaid) + "</strong></td></tr>"
+                + "<tr><td colspan='7'><strong>" + t.get("remaining") + "</strong></td><td><strong>" + money(remaining) + "</strong></td></tr>"
+                + "</tfoot></table>";
+
+        return buildReceiptHtml(settings, t.get("buyerBill"), body, urdu);
+    }
+
+    public String generateSaleFarmerBillHtml(Long saleId, String lang) {
+        boolean urdu = isUrdu(lang);
+        Sale sale = findSale(saleId);
+        BusinessSettings settings = getSettings();
+        Map<String, String> t = labels(urdu);
+        String saleDate = sale.getSaleDate() != null ? sale.getSaleDate().format(DATE_FMT) : "";
+
+        StringBuilder rows = new StringBuilder();
+        BigDecimal total = BigDecimal.ZERO;
+        for (SaleItem item : sale.getItems()) {
+            if (item.getSourceType() != SaleSourceType.FARMER || item.getFarmer() == null) continue;
+            total = total.add(safe(item.getAmount()));
             rows.append("<tr>")
-                    .append("<td>").append(escape(item.getFarmer().getName())).append("</td>")
-                    .append("<td>").append(escape(item.getProduct().getName())).append("</td>")
-                    .append("<td>").append(item.getNumberOfBags()).append("</td>")
-                    .append("<td>").append(item.getTotalWeight()).append("</td>")
-                    .append("<td>").append(item.getRate()).append("</td>")
-                    .append("<td>").append(item.getAmount()).append("</td>")
+                    .append(td(saleDate))
+                    .append(td(item.getFarmer().getName()))
+                    .append(td(item.getProduct() != null ? item.getProduct().getName() : ""))
+                    .append(td(item.getDheri() != null ? item.getDheri().getDheriId() : "—"))
+                    .append(td(String.valueOf(item.getNumberOfBags())))
+                    .append(td(money(item.getTotalWeight())))
+                    .append(td(money(item.getRate())))
+                    .append(td(money(item.getAmount())))
                     .append("</tr>");
         }
 
-        return buildHtml(settings, "Sale Farmer Bill",
-                "Invoice: " + sale.getInvoiceNumber() + " | Date: " + sale.getSaleDate().format(DATE_FMT),
-                "<table><thead><tr><th>Farmer</th><th>Product</th><th>Bags</th><th>Weight</th><th>Rate</th><th>Amount</th></tr></thead><tbody>"
-                        + rows + "</tbody></table>");
+        String body = "<p><strong>" + t.get("invoice") + ":</strong> " + escape(sale.getInvoiceNumber()) + "</p>"
+                + "<table><thead><tr>"
+                + th(t.get("date")) + th(t.get("farmer")) + th(t.get("product")) + th(t.get("dheri"))
+                + th(t.get("bags")) + th(t.get("weight")) + th(t.get("rate")) + th(t.get("amount"))
+                + "</tr></thead><tbody>" + rows + "</tbody>"
+                + "<tfoot><tr><td colspan='7'><strong>" + t.get("totals") + "</strong></td>"
+                + "<td><strong>" + money(total) + "</strong></td></tr></tfoot></table>";
+
+        return buildReceiptHtml(settings, t.get("farmerBill"), body, urdu);
     }
 
-    public String generateSaleBuyerBillHtml(Long saleId) {
+    public String generateSaleBuyerBillHtml(Long saleId, String lang) {
+        boolean urdu = isUrdu(lang);
         Sale sale = findSale(saleId);
         BusinessSettings settings = getSettings();
+        Map<String, String> t = labels(urdu);
         Buyer buyer = sale.getBuyer();
 
         StringBuilder rows = new StringBuilder();
+        String saleDate = sale.getSaleDate() != null ? sale.getSaleDate().format(DATE_FMT) : "";
         for (SaleItem item : sale.getItems()) {
             rows.append("<tr>")
-                    .append("<td>").append(escape(item.getProduct().getName())).append("</td>")
-                    .append("<td>").append(item.getNumberOfBags()).append("</td>")
-                    .append("<td>").append(item.getTotalWeight()).append("</td>")
-                    .append("<td>").append(item.getRate()).append("</td>")
-                    .append("<td>").append(item.getAmount()).append("</td>")
+                    .append(td(saleDate))
+                    .append(td(item.getProduct() != null ? item.getProduct().getName() : ""))
+                    .append(td(item.getDheri() != null ? item.getDheri().getDheriId() : "—"))
+                    .append(td(String.valueOf(item.getNumberOfBags())))
+                    .append(td(money(item.getTotalWeight())))
+                    .append(td(money(item.getRate())))
+                    .append(td(money(item.getAmount())))
                     .append("</tr>");
         }
 
-        return buildHtml(settings, "Sale Invoice",
-                "Buyer: " + buyer.getName() + " (" + buyer.getBuyerId() + ") | Invoice: " + sale.getInvoiceNumber(),
-                "<table><thead><tr><th>Product</th><th>Bags</th><th>Weight</th><th>Rate</th><th>Amount</th></tr></thead><tbody>"
-                        + rows + "</tbody><tfoot><tr><td colspan='4'><strong>Total</strong></td><td><strong>"
-                        + sale.getTotalAmount() + "</strong></td></tr><tr><td colspan='4'><strong>Paid</strong></td><td><strong>"
-                        + sale.getPaidAmount() + "</strong></td></tr></tfoot></table>");
+        String partyBlock = partyBlock(
+                t.get("buyer"),
+                buyer.getName(),
+                buyer.getBuyerId(),
+                buyer.getPhone(),
+                buyer.getCity(),
+                urdu
+        );
+
+        String body = partyBlock
+                + "<p><strong>" + t.get("invoice") + ":</strong> " + escape(sale.getInvoiceNumber()) + "</p>"
+                + "<table><thead><tr>"
+                + th(t.get("date")) + th(t.get("product")) + th(t.get("dheri"))
+                + th(t.get("bags")) + th(t.get("weight")) + th(t.get("rate")) + th(t.get("amount"))
+                + "</tr></thead><tbody>" + rows + "</tbody>"
+                + "<tfoot>"
+                + "<tr><td colspan='6'><strong>" + t.get("totalBilled") + "</strong></td><td><strong>" + money(sale.getTotalAmount()) + "</strong></td></tr>"
+                + "<tr><td colspan='6'><strong>" + t.get("paid") + "</strong></td><td><strong>" + money(sale.getPaidAmount()) + "</strong></td></tr>"
+                + "</tfoot></table>";
+
+        return buildReceiptHtml(settings, t.get("buyerBill"), body, urdu);
+    }
+
+    public String generateFarmerBillHtml(Long farmerId) {
+        return generateFarmerBillHtml(farmerId, "en");
+    }
+
+    public String generateBuyerBillHtml(Long buyerId) {
+        return generateBuyerBillHtml(buyerId, "en");
+    }
+
+    public String generateSaleFarmerBillHtml(Long saleId) {
+        return generateSaleFarmerBillHtml(saleId, "en");
+    }
+
+    public String generateSaleBuyerBillHtml(Long saleId) {
+        return generateSaleBuyerBillHtml(saleId, "en");
     }
 
     public byte[] generateFarmerBillPdf(Long farmerId) {
         Farmer farmer = farmerRepository.findByIdAndDeletedFalse(farmerId)
                 .orElseThrow(() -> new RuntimeException("Farmer not found"));
-        String html = generateFarmerBillHtml(farmerId);
+        String html = generateFarmerBillHtml(farmerId, "en");
         return htmlToPdf("Farmer Bill - " + farmer.getName(), html);
     }
 
     public byte[] generateBuyerBillPdf(Long buyerId) {
         Buyer buyer = buyerRepository.findByIdAndDeletedFalse(buyerId)
                 .orElseThrow(() -> new RuntimeException("Buyer not found"));
-        String html = generateBuyerBillHtml(buyerId);
+        String html = generateBuyerBillHtml(buyerId, "en");
         return htmlToPdf("Buyer Bill - " + buyer.getName(), html);
+    }
+
+    private BigDecimal sumFarmerPayments(Long farmerId) {
+        return paymentRepository.findByFarmerIdOrderByPaymentDateDesc(farmerId).stream()
+                .map(p -> safe(p.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private Sale findSale(Long saleId) {
@@ -162,21 +307,151 @@ public class BillService {
                 .orElse(BusinessSettings.builder().build());
     }
 
-    private String buildHtml(BusinessSettings settings, String title, String subtitle, String body) {
-        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>" + escape(title) + "</title>"
-                + "<style>body{font-family:Arial,sans-serif;margin:40px;color:#222}"
-                + ".header{border-bottom:3px solid #1a5f2a;padding-bottom:16px;margin-bottom:24px}"
-                + "h1{color:#1a5f2a;margin:0}h2{font-weight:normal;color:#555;margin:8px 0 0}"
-                + "table{width:100%;border-collapse:collapse;margin-top:20px}"
-                + "th,td{border:1px solid #ccc;padding:8px;text-align:left}"
-                + "th{background:#f0f7f1}</style></head><body>"
-                + "<div class='header'><h1>" + escape(settings.getCompanyName()) + "</h1>"
-                + "<h2>" + escape(title) + "</h2>"
-                + (settings.getAddress() != null ? "<p>" + escape(settings.getAddress()) + "</p>" : "")
-                + (settings.getPhone() != null ? "<p>Phone: " + escape(settings.getPhone()) + "</p>" : "")
-                + "</div><p><strong>" + escape(subtitle) + "</strong></p>"
-                + "<p>Date: " + LocalDate.now().format(DATE_FMT) + "</p>"
-                + body + "</body></html>";
+    private String buildReceiptHtml(BusinessSettings settings, String title, String body, boolean urdu) {
+        String company = settings.getCompanyName() != null ? settings.getCompanyName() : "Rehmani Trading Company";
+        String logoDataUri = logoDataUri(settings);
+        String dir = urdu ? "rtl" : "ltr";
+        String font = urdu
+                ? "'Noto Nastaliq Urdu', 'Segoe UI', Tahoma, sans-serif"
+                : "'Segoe UI', Arial, sans-serif";
+        String location = urdu ? LOCATION_UR : LOCATION_EN;
+
+        return "<!DOCTYPE html><html lang='" + (urdu ? "ur" : "en") + "' dir='" + dir + "'><head>"
+                + "<meta charset='UTF-8'><title>" + escape(title) + "</title>"
+                + "<link href='https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap' rel='stylesheet'>"
+                + "<style>"
+                + "body{font-family:" + font + ";margin:0;padding:32px;color:#0f172a;background:#fff}"
+                + ".sheet{max-width:860px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;padding:28px 32px;"
+                + "box-shadow:0 8px 30px rgba(0,45,98,0.08)}"
+                + ".brand{text-align:center;border-bottom:3px solid #002D62;padding-bottom:18px;margin-bottom:22px}"
+                + ".brand img{max-height:110px;width:auto;display:block;margin:0 auto 10px}"
+                + ".brand h1{margin:0;color:#002D62;font-size:26px;letter-spacing:0.04em}"
+                + ".brand .title{margin-top:6px;color:#C5A059;font-weight:700;font-size:15px}"
+                + ".meta{color:#64748b;font-size:13px;margin-top:8px}"
+                + ".party{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:18px}"
+                + ".party h3{margin:0 0 8px;color:#002D62;font-size:16px}"
+                + ".party p{margin:3px 0;font-size:14px}"
+                + ".sub{color:#64748b;font-size:13px;margin:0 0 12px}"
+                + "table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}"
+                + "th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:" + (urdu ? "right" : "left") + "}"
+                + "th{background:#002D62;color:#fff;font-weight:600}"
+                + "tfoot td{background:#f1f5f9}"
+                + ".note{margin-top:14px;font-size:12px;color:#64748b}"
+                + ".footer{margin-top:28px;padding-top:14px;border-top:2px solid #C5A059;text-align:center}"
+                + ".footer .loc{font-size:15px;font-weight:700;color:#002D62}"
+                + ".footer .phone{font-size:13px;color:#64748b;margin-top:4px}"
+                + "@media print{body{padding:0}.sheet{box-shadow:none;border:none}}"
+                + "</style></head><body><div class='sheet'>"
+                + "<div class='brand'>"
+                + (logoDataUri != null ? "<img src='" + logoDataUri + "' alt='Logo'/>" : "")
+                + "<h1>" + escape(company) + "</h1>"
+                + "<div class='title'>" + escape(title) + "</div>"
+                + "<div class='meta'>" + (urdu ? "تاریخ" : "Date") + ": " + LocalDate.now().format(DATE_FMT) + "</div>"
+                + "</div>"
+                + body
+                + "<div class='footer'>"
+                + "<div class='loc'>" + escape(location) + "</div>"
+                + (settings.getPhone() != null ? "<div class='phone'>" + (urdu ? "فون" : "Phone") + ": "
+                + escape(settings.getPhone()) + "</div>" : "")
+                + "</div></div></body></html>";
+    }
+
+    private String partyBlock(String roleLabel, String name, String code, String phone, String city, boolean urdu) {
+        return "<div class='party'><h3>" + escape(roleLabel) + "</h3>"
+                + "<p><strong>" + (urdu ? "نام" : "Name") + ":</strong> " + escape(name) + "</p>"
+                + "<p><strong>" + (urdu ? "آئی ڈی" : "ID") + ":</strong> " + escape(code) + "</p>"
+                + (phone != null && !phone.isBlank() ? "<p><strong>" + (urdu ? "فون" : "Phone") + ":</strong> "
+                + escape(phone) + "</p>" : "")
+                + (city != null && !city.isBlank() ? "<p><strong>" + (urdu ? "شہر" : "City") + ":</strong> "
+                + escape(city) + "</p>" : "")
+                + "</div>";
+    }
+
+    private Map<String, String> labels(boolean urdu) {
+        Map<String, String> m = new HashMap<>();
+        if (urdu) {
+            m.put("farmerBill", "کسان بل / ادائیگی رسید");
+            m.put("buyerBill", "خریدار بل / ادائیگی رسید");
+            m.put("farmer", "کسان کی تفصیل");
+            m.put("buyer", "خریدار کی تفصیل");
+            m.put("date", "تاریخ");
+            m.put("dheri", "ڈھیری");
+            m.put("product", "پروڈکٹ");
+            m.put("bags", "بوریاں");
+            m.put("weight", "وزن (کلو)");
+            m.put("rate", "ریٹ / 40 کلو");
+            m.put("gross", "کل رقم");
+            m.put("commission4", "کمیشن 4%");
+            m.put("payable", "قابل ادائیگی");
+            m.put("amount", "رقم");
+            m.put("invoice", "انوائس");
+            m.put("totals", "کل");
+            m.put("totalBilled", "کل بل");
+            m.put("paid", "ادا شدہ");
+            m.put("remaining", "باقی رقم");
+            m.put("commissionNote", "کسان بل میں کل رقم سے 4% کمیشن کاٹا گیا ہے۔");
+            m.put("buyerTxnNote", "ہر خریداری کی تاریخ اور ریٹ الگ درج ہیں۔ مختلف ریٹ ممکن ہیں۔");
+        } else {
+            m.put("farmerBill", "Farmer Bill / Payment Receipt");
+            m.put("buyerBill", "Buyer Bill / Payment Receipt");
+            m.put("farmer", "Farmer Details");
+            m.put("buyer", "Buyer Details");
+            m.put("date", "Date");
+            m.put("dheri", "Dheri");
+            m.put("product", "Product");
+            m.put("bags", "Bags");
+            m.put("weight", "Weight (kg)");
+            m.put("rate", "Rate / 40kg");
+            m.put("gross", "Gross Amount");
+            m.put("commission4", "Commission 4%");
+            m.put("payable", "Payable");
+            m.put("amount", "Amount");
+            m.put("invoice", "Invoice");
+            m.put("totals", "Totals");
+            m.put("totalBilled", "Total Billed");
+            m.put("paid", "Paid");
+            m.put("remaining", "Remaining");
+            m.put("commissionNote", "Farmer bill deducts 4% commission from the gross amount.");
+            m.put("buyerTxnNote", "Each purchase is listed with its own date and rate. Rates may differ per transaction.");
+        }
+        return m;
+    }
+
+    private String logoDataUri(BusinessSettings settings) {
+        try {
+            ClassPathResource resource = new ClassPathResource("static/rehmani-logo.svg");
+            if (resource.exists()) {
+                byte[] bytes = StreamUtils.copyToByteArray(resource.getInputStream());
+                return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(bytes);
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        String url = settings.getCompanyLogoUrl();
+        if (url != null && !url.isBlank()) {
+            return escape(url);
+        }
+        return null;
+    }
+
+    private boolean isUrdu(String lang) {
+        return lang != null && (lang.equalsIgnoreCase("ur") || lang.equalsIgnoreCase("urdu"));
+    }
+
+    private String th(String text) {
+        return "<th>" + escape(text) + "</th>";
+    }
+
+    private String td(String text) {
+        return "<td>" + escape(text) + "</td>";
+    }
+
+    private String money(BigDecimal value) {
+        return safe(value).setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private byte[] htmlToPdf(String title, String html) {

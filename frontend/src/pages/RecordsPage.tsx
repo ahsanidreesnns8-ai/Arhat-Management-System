@@ -5,8 +5,8 @@ import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 
 const sections = [
-  { to: '/farmer-product', icon: Receipt, title: 'Farmer Product Entry', description: 'Enter farmer product like Price Calculator — bags, weight, rate, commission' },
-  { to: '/arhat-sale', icon: Receipt, title: 'Arhat Sale / Settlement', description: 'Sell to buyer — (bags×kg)÷40×rate · Arhat 3% + Munshi 0.70% + Workers 0.30%' },
+  { to: '/farmer-product', icon: Receipt, title: 'Farmer Product', description: 'Farmer product records and new product entry' },
+  { to: '/arhat-sale', icon: Receipt, title: 'Arhat Sale', description: 'Sell to buyer or post farmer payable' },
   { to: '/farmers', icon: Users, title: 'Farmer Records', description: 'Registration, dheris, trucks, payments, and ledgers' },
   { to: '/buyers', icon: ShoppingBag, title: 'Buyer Records', description: 'Purchases, payments, and outstanding balances' },
   { to: '/sales', icon: Receipt, title: 'Sales Records', description: 'Invoices with mixed-source line items' },

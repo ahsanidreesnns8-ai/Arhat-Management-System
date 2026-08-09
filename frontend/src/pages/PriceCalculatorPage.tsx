@@ -5,7 +5,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
-import { calculatorApi, dheriApi, settingsApi } from '../services/api'
+import { calculatorApi, dheriApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, PriceCalculationResult } from '../types'
 
@@ -31,21 +31,11 @@ export default function PriceCalculatorPage() {
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
   const [pricePerMann, setPricePerMann] = useState('0')
-  const [arhatPct, setArhatPct] = useState('3')
-  const [munshiPct, setMunshiPct] = useState('0.70')
-  const [workersPct, setWorkersPct] = useState('0.30')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     dheriApi.getAll().then((res) => setDheris(res.data.data)).catch(() => {})
-    settingsApi.get().then((res) => {
-      const st = res.data.data
-      if (!st) return
-      setArhatPct(String(st.arhatSharePercentage ?? 3))
-      setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
-      setWorkersPct(String(st.laborSharePercentage ?? 0.3))
-    }).catch(() => {})
   }, [])
 
   const payload = useMemo(() => ({
@@ -53,10 +43,7 @@ export default function PriceCalculatorPage() {
     weightPerBag: parseFloat(weightPerBag) || 40,
     partialBagWeight: parseFloat(partialBagWeight) || 0,
     marketRate: parseFloat(pricePerMann) || 0,
-    arhatSharePercentage: parseFloat(arhatPct) || 3,
-    munshiNigranSharePercentage: parseFloat(munshiPct) || 0.7,
-    workersSharePercentage: parseFloat(workersPct) || 0.3,
-  }), [numberOfBags, weightPerBag, partialBagWeight, pricePerMann, arhatPct, munshiPct, workersPct])
+  }), [numberOfBags, weightPerBag, partialBagWeight, pricePerMann])
 
   const runCalculation = useCallback(async () => {
     try {
@@ -89,62 +76,50 @@ export default function PriceCalculatorPage() {
     setWeightPerBag('40')
     setPartialBagWeight('0')
     setPricePerMann('0')
-    setArhatPct('3')
-    setMunshiPct('0.70')
-    setWorkersPct('0.30')
     setResult(emptyResult)
   }
 
   const handleSave = async () => {
     if (!selectedDheriId) {
-      toast.error('Please select a dheri to save')
+      toast.error('Select a dheri to save')
       return
     }
     setSaving(true)
     try {
       await calculatorApi.saveToDheri(parseInt(selectedDheriId), payload)
-      toast.success('Calculation saved to dheri record')
+      toast.success('Saved to dheri')
     } catch {
-      toast.error('Failed to save calculation')
+      toast.error('Failed to save')
     } finally {
       setSaving(false)
     }
   }
 
   const resultRows = [
-    { label: 'Formula', value: '(bags × kg) ÷ 40 × rate' },
-    { label: 'Total Weight (kg)', value: `${formatNumber(result.totalWeight)} kg` },
-    { label: 'Total Mann (40kg units)', value: formatNumber(result.totalMann, 4) },
+    { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: `Arhat (${result.arhatSharePercentage}% of total)`, value: formatCurrency(result.arhatShare) },
-    { label: `Munshi/Nigran (${result.munshiNigranSharePercentage}% of total)`, value: formatCurrency(result.munshiNigranShare) },
-    { label: `Workers (${result.workersSharePercentage}% of total)`, value: formatCurrency(result.workersShare) },
-    { label: `Total Commission (${result.commissionPercentage}%)`, value: formatCurrency(result.commission), accent: 'orange' as const },
-    { label: 'Farmer Final Balance', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+    { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: 'orange' as const },
+    { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Price Calculator"
-        description="Amount = (bags × weight) ÷ 40 × market rate · Commission: Arhat 3% + Munshi 0.70% + Workers 0.30%"
-      />
+      <PageHeader title="Price Calculator" description="Calculate product amount and farmer payable" />
 
       <div className="card p-6 lg:p-8">
         <div className="flex items-center gap-2 mb-6">
           <Calculator className="h-6 w-6 text-primary" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Interactive Calculator</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Calculator</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-5">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Inputs</h3>
             <Select
-              label="Select Dheri"
+              label="Dheri"
               value={selectedDheriId}
               onChange={(e) => handleDheriSelect(e.target.value)}
               options={[
-                { value: '', label: '— Select or enter manually —' },
+                { value: '', label: 'Select or enter manually' },
                 ...dheris.map((d) => ({
                   value: d.id,
                   label: `${d.dheriId} — ${d.farmerName} (${d.productName})`,
@@ -152,16 +127,9 @@ export default function PriceCalculatorPage() {
               ]}
             />
             <Input label="Number of Bags" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight of One Bag (kg)" type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input label="Partial Bag / Extra KG" type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
-            <Input label="Price per 1 Mann / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
-
-            <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800/40 p-4 space-y-3">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Commission of total amount</p>
-              <Input label="Arhat % of total" type="number" min="0" step="0.01" value={arhatPct} onChange={(e) => setArhatPct(e.target.value)} />
-              <Input label="Munshi/Nigran % of total" type="number" min="0" step="0.01" value={munshiPct} onChange={(e) => setMunshiPct(e.target.value)} />
-              <Input label="Workers % of total" type="number" min="0" step="0.01" value={workersPct} onChange={(e) => setWorkersPct(e.target.value)} />
-            </div>
+            <Input label="Weight per Bag (kg)" type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label="Extra KG" type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            <Input label="Rate / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
 
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={handleReset}>
@@ -170,7 +138,7 @@ export default function PriceCalculatorPage() {
               </Button>
               <Button onClick={runCalculation}>
                 <Calculator className="h-4 w-4" />
-                Recalculate
+                Calculate
               </Button>
               <Button onClick={handleSave} loading={saving}>
                 <Save className="h-4 w-4" />
@@ -180,12 +148,12 @@ export default function PriceCalculatorPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Results</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Summary</h3>
             <div className="space-y-2">
               {resultRows.map((row) => (
                 <div
                   key={row.label}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-200 ${
+                  className={`flex items-center justify-between p-4 rounded-lg border ${
                     row.highlight
                       ? 'bg-primary/5 border-primary/20 dark:bg-primary/10'
                       : row.accent === 'orange'

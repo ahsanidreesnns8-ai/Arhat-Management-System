@@ -41,16 +41,12 @@ export default function ArhatSalePage() {
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
   const [marketRate, setMarketRate] = useState('0')
-  const [arhatPct, setArhatPct] = useState('3')
-  const [munshiPct, setMunshiPct] = useState('0.70')
-  const [workersPct, setWorkersPct] = useState('0.30')
   const [paymentNow, setPaymentNow] = useState('0')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
-  const [lastMessage, setLastMessage] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -58,19 +54,12 @@ export default function ArhatSalePage() {
       buyerApi.getAll(),
       settingsApi.getProducts(),
       dheriApi.getAll(),
-      settingsApi.get(),
-    ]).then(([f, b, p, d, s]) => {
+    ]).then(([f, b, p, d]) => {
       setFarmers(f.data.data)
       setBuyers(b.data.data)
       setProducts(p.data.data)
       setDheris(d.data.data)
       if (p.data.data[0]) setProductId(String(p.data.data[0].id))
-      const st = s.data.data
-      if (st) {
-        setArhatPct(String(st.arhatSharePercentage ?? 3))
-        setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
-        setWorkersPct(String(st.laborSharePercentage ?? 0.3))
-      }
     }).catch(() => {})
   }, [])
 
@@ -84,10 +73,7 @@ export default function ArhatSalePage() {
     weightPerBag: parseFloat(weightPerBag) || 40,
     partialBagWeight: parseFloat(partialBagWeight) || 0,
     marketRate: parseFloat(marketRate) || 0,
-    arhatSharePercentage: parseFloat(arhatPct) || 3,
-    munshiNigranSharePercentage: parseFloat(munshiPct) || 0.7,
-    workersSharePercentage: parseFloat(workersPct) || 0.3,
-  }), [numberOfBags, weightPerBag, partialBagWeight, marketRate, arhatPct, munshiPct, workersPct])
+  }), [numberOfBags, weightPerBag, partialBagWeight, marketRate])
 
   const runCalculation = useCallback(async () => {
     try {
@@ -121,12 +107,8 @@ export default function ArhatSalePage() {
     setWeightPerBag('40')
     setPartialBagWeight('0')
     setMarketRate('0')
-    setArhatPct('3')
-    setMunshiPct('0.70')
-    setWorkersPct('0.30')
     setPaymentNow('0')
     setNotes('')
-    setLastMessage('')
     setResult(emptyResult)
   }
 
@@ -140,7 +122,7 @@ export default function ArhatSalePage() {
       return
     }
     if (!productId && !dheriId) {
-      toast.error('Select a product (or existing dheri)')
+      toast.error('Select a product')
       return
     }
     if ((parseInt(numberOfBags) || 0) <= 0) {
@@ -148,7 +130,7 @@ export default function ArhatSalePage() {
       return
     }
     if ((parseFloat(marketRate) || 0) <= 0) {
-      toast.error('Enter market rate per 40kg / mann')
+      toast.error('Enter market rate')
       return
     }
 
@@ -166,38 +148,29 @@ export default function ArhatSalePage() {
         transactionDate,
         notes: notes || undefined,
       })
-      const data = res.data.data
-      setLastMessage(data.message || 'Saved')
-      toast.success(data.message || 'Settlement saved')
+      toast.success(res.data.data.message || 'Saved')
+      reset()
       dheriApi.getAll().then((r) => setDheris(r.data.data))
       farmerApi.getAll().then((r) => setFarmers(r.data.data))
       buyerApi.getAll().then((r) => setBuyers(r.data.data))
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Failed to save settlement')
+      toast.error(msg || 'Failed to save')
     } finally {
       setSaving(false)
     }
   }
 
   const resultRows = [
-    { label: 'Formula', value: '(bags × kg) ÷ 40 × rate' },
-    { label: 'Total Weight (kg)', value: `${formatNumber(result.totalWeight)} kg` },
-    { label: 'Total Mann (40kg)', value: formatNumber(result.totalMann, 4) },
+    { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: `Arhat (${result.arhatSharePercentage}% of total)`, value: formatCurrency(result.arhatShare) },
-    { label: `Munshi/Nigran (${result.munshiNigranSharePercentage}% of total)`, value: formatCurrency(result.munshiNigranShare) },
-    { label: `Workers (${result.workersSharePercentage}% of total)`, value: formatCurrency(result.workersShare) },
-    { label: `Total Commission (${result.commissionPercentage}%)`, value: formatCurrency(result.commission), accent: true },
-    { label: 'Farmer Payable (after commission)', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+    { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: true },
+    { label: mode === 'BUYER_SALE' ? 'Buyer Amount' : 'Farmer Payable', value: formatCurrency(mode === 'BUYER_SALE' ? result.totalAmount : result.farmerFinalBalance), highlight: true },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Arhat Product Sale / Settlement"
-        description="Sell to buyer or post farmer payable — amount = (bags × weight) ÷ 40 × rate · Commission: Arhat 3% + Munshi 0.70% + Workers 0.30%"
-      />
+      <PageHeader title="Arhat Sale" description="Sell to buyer or post farmer payable" />
 
       <div className="card-3d p-2 flex flex-wrap gap-2">
         <button
@@ -207,7 +180,7 @@ export default function ArhatSalePage() {
             mode === 'BUYER_SALE' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800'
           }`}
         >
-          Sell to Buyer (Receivable)
+          Sell to Buyer
         </button>
         <button
           type="button"
@@ -216,7 +189,7 @@ export default function ArhatSalePage() {
             mode === 'FARMER_PAYABLE' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800'
           }`}
         >
-          Farmer Product Payable
+          Farmer Payable
         </button>
       </div>
 
@@ -224,14 +197,12 @@ export default function ArhatSalePage() {
         <div className="flex items-center gap-2 mb-6">
           <Store className="h-6 w-6 text-primary" />
           <h2 className="text-lg font-semibold">
-            {mode === 'BUYER_SALE' ? 'Buyer sale — product details' : 'Farmer payable — product details'}
+            {mode === 'BUYER_SALE' ? 'Buyer sale' : 'Farmer payable'}
           </h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Ask & fill all fields</h3>
-
             {mode === 'BUYER_SALE' ? (
               <Select
                 label="Buyer *"
@@ -250,7 +221,7 @@ export default function ArhatSalePage() {
 
             {mode === 'BUYER_SALE' && (
               <Select
-                label="Farmer source (optional — leave empty for business stock)"
+                label="Farmer source"
                 value={farmerId}
                 onChange={(e) => setFarmerId(e.target.value)}
                 options={[{ value: '', label: 'Business stock' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
@@ -258,11 +229,11 @@ export default function ArhatSalePage() {
             )}
 
             <Select
-              label="Existing dheri (optional — loads bags/rate)"
+              label="Existing dheri"
               value={dheriId}
               onChange={(e) => loadDheri(e.target.value)}
               options={[
-                { value: '', label: '— New product entry —' },
+                { value: '', label: 'New entry' },
                 ...farmerDheris.map((d) => ({
                   value: d.id,
                   label: `${d.dheriId} — ${d.productName} · ${d.farmerName}`,
@@ -278,69 +249,39 @@ export default function ArhatSalePage() {
             />
 
             <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight of One Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input label="Partial Bag / Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
-            <Input label="Price per 1 Mann / 40kg (PKR) *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
-
-            <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800/40 p-4 space-y-3">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Commission of total amount</p>
-              <Input label="Arhat % of total" type="number" step="0.01" value={arhatPct} onChange={(e) => setArhatPct(e.target.value)} />
-              <Input label="Munshi/Nigran % of total" type="number" step="0.01" value={munshiPct} onChange={(e) => setMunshiPct(e.target.value)} />
-              <Input label="Workers % of total" type="number" step="0.01" value={workersPct} onChange={(e) => setWorkersPct(e.target.value)} />
-            </div>
-
-            <Input label="Transaction date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
-
-            <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-3">
-              <p className="text-sm font-semibold text-primary">
-                {mode === 'BUYER_SALE' ? 'Receive payment now (optional)' : 'Pay farmer now (optional)'}
-              </p>
-              <Input
-                label={mode === 'BUYER_SALE' ? 'Cash received now (PKR)' : 'Cash paid to farmer now (PKR)'}
-                type="number"
-                step="0.01"
-                value={paymentNow}
-                onChange={(e) => setPaymentNow(e.target.value)}
-              />
-              <Select
-                label="Payment method"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                options={[
-                  { value: 'CASH', label: 'Cash' },
-                  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
-                  { value: 'CHEQUE', label: 'Cheque' },
-                  { value: 'OTHER', label: 'Other' },
-                ]}
-              />
-              <button
-                type="button"
-                className="text-xs text-primary underline"
-                onClick={() => setPaymentNow(
-                  String(mode === 'BUYER_SALE' ? result.totalAmount : result.farmerFinalBalance),
-                )}
-              >
-                Fill full amount from calculation
-              </button>
-            </div>
-
+            <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label="Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            <Input label="Market Rate / 40kg *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
+            <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
+            <Input
+              label={mode === 'BUYER_SALE' ? 'Cash received now' : 'Cash paid now'}
+              type="number"
+              step="0.01"
+              value={paymentNow}
+              onChange={(e) => setPaymentNow(e.target.value)}
+            />
+            <Select
+              label="Payment method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              options={[
+                { value: 'CASH', label: 'Cash' },
+                { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+                { value: 'CHEQUE', label: 'Cheque' },
+                { value: 'OTHER', label: 'Other' },
+              ]}
+            />
             <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
 
             <div className="flex flex-wrap gap-3 pt-2">
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
-              <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Recalculate</Button>
-              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save settlement</Button>
+              <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Calculate</Button>
+              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save</Button>
             </div>
-
-            {lastMessage && (
-              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 text-sm text-emerald-800 dark:text-emerald-200">
-                {lastMessage}
-              </div>
-            )}
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Live calculation (same as Price Calculator)</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Summary</h3>
             {resultRows.map((row) => (
               <div
                 key={row.label}
@@ -357,9 +298,11 @@ export default function ArhatSalePage() {
               </div>
             ))}
             <p className="text-xs text-gray-500 pt-2">
-              After save, open{' '}
               <Link className="text-primary underline" to="/payments">Payments</Link>
-              {' '}or the dheri/farmer/buyer detail page to pay/receive remaining balance by date.
+              {' · '}
+              <Link className="text-primary underline" to="/farmers">Farmers</Link>
+              {' · '}
+              <Link className="text-primary underline" to="/buyers">Buyers</Link>
             </p>
           </div>
         </div>

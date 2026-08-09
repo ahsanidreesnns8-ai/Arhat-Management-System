@@ -42,9 +42,9 @@ export default function FarmerDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  const openBill = async () => {
+  const openBill = async (lang: 'en' | 'ur' = 'en') => {
     try {
-      const res = await farmerApi.getBillHtml(farmerId)
+      const res = await farmerApi.getBillHtml(farmerId, lang)
       const html = typeof res.data === 'string' ? res.data : String(res.data)
       const win = window.open('', '_blank')
       if (win) {
@@ -75,7 +75,7 @@ export default function FarmerDetailPage() {
         <Link to="/farmers" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><ArrowLeft className="h-5 w-5" /></Link>
         <PageHeader
           title={farmer.name}
-          description={`${farmer.farmerId} · Farmer payable & product settlement`}
+          description={farmer.farmerId}
           action={
             <div className="flex flex-wrap gap-2">
               <Button
@@ -84,8 +84,9 @@ export default function FarmerDetailPage() {
               >
                 <Wallet className="h-4 w-4" /> Pay / Settle remaining
               </Button>
-              <Button variant="secondary" onClick={openBill}><FileText className="h-4 w-4" /> Generate Bill</Button>
-              <Button variant="secondary" onClick={openBill}><Printer className="h-4 w-4" /> Print</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Bill (EN)</Button>
+              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> بل (UR)</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
             </div>
           }
         />

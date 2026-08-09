@@ -23,9 +23,12 @@ export default function SaleDetailPage() {
       .finally(() => setLoading(false))
   }, [saleId])
 
-  const openBill = async (party: 'farmer' | 'buyer') => {
+  const openBill = async (party: 'farmer' | 'buyer', lang: 'en' | 'ur' = 'en') => {
     try {
-      const res = await api.get(`/bills/sale/${saleId}/${party}`, { responseType: 'text' as never })
+      const res = await api.get(`/bills/sale/${saleId}/${party}`, {
+        params: { lang },
+        responseType: 'text' as never,
+      })
       const html = typeof res.data === 'string' ? res.data : String(res.data)
       const win = window.open('', '_blank')
       if (win) {
@@ -48,9 +51,11 @@ export default function SaleDetailPage() {
           title={sale.invoiceNumber}
           description={`${sale.buyerName} · ${sale.saleDate}`}
           action={
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => openBill('buyer')}><FileText className="h-4 w-4" /> Buyer Bill</Button>
-              <Button variant="secondary" onClick={() => openBill('farmer')}><FileText className="h-4 w-4" /> Farmer Bill</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => openBill('buyer', 'en')}><FileText className="h-4 w-4" /> Buyer Bill (EN)</Button>
+              <Button variant="secondary" onClick={() => openBill('buyer', 'ur')}><FileText className="h-4 w-4" /> خریدار بل</Button>
+              <Button variant="secondary" onClick={() => openBill('farmer', 'en')}><FileText className="h-4 w-4" /> Farmer Bill (EN)</Button>
+              <Button variant="secondary" onClick={() => openBill('farmer', 'ur')}><FileText className="h-4 w-4" /> کسان بل</Button>
             </div>
           }
         />

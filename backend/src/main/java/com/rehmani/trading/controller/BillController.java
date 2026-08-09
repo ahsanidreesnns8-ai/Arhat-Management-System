@@ -15,23 +15,35 @@ public class BillController {
     private final BillService billService;
 
     @GetMapping(value = "/farmer/{farmerId}", produces = MediaType.TEXT_HTML_VALUE)
-    public String farmerBill(@PathVariable Long farmerId) {
-        return billService.generateFarmerBillHtml(farmerId);
+    public String farmerBill(
+            @PathVariable Long farmerId,
+            @RequestParam(defaultValue = "en") String lang
+    ) {
+        return billService.generateFarmerBillHtml(farmerId, lang);
     }
 
     @GetMapping(value = "/buyer/{buyerId}", produces = MediaType.TEXT_HTML_VALUE)
-    public String buyerBill(@PathVariable Long buyerId) {
-        return billService.generateBuyerBillHtml(buyerId);
+    public String buyerBill(
+            @PathVariable Long buyerId,
+            @RequestParam(defaultValue = "en") String lang
+    ) {
+        return billService.generateBuyerBillHtml(buyerId, lang);
     }
 
     @GetMapping(value = "/sale/{saleId}/farmer", produces = MediaType.TEXT_HTML_VALUE)
-    public String saleFarmerBill(@PathVariable Long saleId) {
-        return billService.generateSaleFarmerBillHtml(saleId);
+    public String saleFarmerBill(
+            @PathVariable Long saleId,
+            @RequestParam(defaultValue = "en") String lang
+    ) {
+        return billService.generateSaleFarmerBillHtml(saleId, lang);
     }
 
     @GetMapping(value = "/sale/{saleId}/buyer", produces = MediaType.TEXT_HTML_VALUE)
-    public String saleBuyerBill(@PathVariable Long saleId) {
-        return billService.generateSaleBuyerBillHtml(saleId);
+    public String saleBuyerBill(
+            @PathVariable Long saleId,
+            @RequestParam(defaultValue = "en") String lang
+    ) {
+        return billService.generateSaleBuyerBillHtml(saleId, lang);
     }
 
     @GetMapping(value = "/farmer/{farmerId}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)

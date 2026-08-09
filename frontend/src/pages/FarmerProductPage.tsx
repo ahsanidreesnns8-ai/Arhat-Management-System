@@ -6,9 +6,9 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
-import { arhatApi, calculatorApi, farmerApi, settingsApi } from '../services/api'
+import { arhatApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
-import type { Farmer, PriceCalculationResult, Product } from '../types'
+import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -25,56 +25,47 @@ const emptyResult: PriceCalculationResult = {
   workersSharePercentage: 0.3,
 }
 
-/**
- * Enter farmer product — same pattern as Price Calculator.
- * Amount = (bags × weightPerBag + partial) / 40 × marketRate
- * Commission of total: Arhat 3% + Munshi 0.70% + Workers 0.30%
- */
 export default function FarmerProductPage() {
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [dheris, setDheris] = useState<Dheri[]>([])
   const [farmerId, setFarmerId] = useState('')
   const [productId, setProductId] = useState('')
   const [numberOfBags, setNumberOfBags] = useState('0')
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
   const [marketRate, setMarketRate] = useState('0')
-  const [arhatPct, setArhatPct] = useState('3')
-  const [munshiPct, setMunshiPct] = useState('0.70')
-  const [workersPct, setWorkersPct] = useState('0.30')
   const [paymentNow, setPaymentNow] = useState('0')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
-  const [lastMessage, setLastMessage] = useState('')
 
-  useEffect(() => {
-    Promise.all([farmerApi.getAll(), settingsApi.getProducts(), settingsApi.get()])
-      .then(([f, p, s]) => {
+  const loadLists = useCallback(() => {
+    Promise.all([farmerApi.getAll(), settingsApi.getProducts(), dheriApi.getAll()])
+      .then(([f, p, d]) => {
         setFarmers(f.data.data)
         setProducts(p.data.data)
-        if (p.data.data[0]) setProductId(String(p.data.data[0].id))
-        const st = s.data.data
-        if (st) {
-          setArhatPct(String(st.arhatSharePercentage ?? 3))
-          setMunshiPct(String(st.supervisorSharePercentage ?? 0.7))
-          setWorkersPct(String(st.laborSharePercentage ?? 0.3))
-        }
+        setDheris(d.data.data || [])
+        if (p.data.data[0] && !productId) setProductId(String(p.data.data[0].id))
       })
       .catch(() => {})
-  }, [])
+  }, [productId])
+
+  useEffect(() => { loadLists() }, [loadLists])
+
+  const farmerProducts = useMemo(
+    () => dheris.filter((d) => !farmerId || String(d.farmerId) === farmerId),
+    [dheris, farmerId],
+  )
 
   const payload = useMemo(() => ({
     numberOfBags: parseInt(numberOfBags) || 0,
     weightPerBag: parseFloat(weightPerBag) || 40,
     partialBagWeight: parseFloat(partialBagWeight) || 0,
     marketRate: parseFloat(marketRate) || 0,
-    arhatSharePercentage: parseFloat(arhatPct) || 3,
-    munshiNigranSharePercentage: parseFloat(munshiPct) || 0.7,
-    workersSharePercentage: parseFloat(workersPct) || 0.3,
-  }), [numberOfBags, weightPerBag, partialBagWeight, marketRate, arhatPct, munshiPct, workersPct])
+  }), [numberOfBags, weightPerBag, partialBagWeight, marketRate])
 
   const runCalculation = useCallback(async () => {
     try {
@@ -95,12 +86,8 @@ export default function FarmerProductPage() {
     setWeightPerBag('40')
     setPartialBagWeight('0')
     setMarketRate('0')
-    setArhatPct('3')
-    setMunshiPct('0.70')
-    setWorkersPct('0.30')
     setPaymentNow('0')
     setNotes('')
-    setLastMessage('')
     setResult(emptyResult)
   }
 
@@ -118,7 +105,7 @@ export default function FarmerProductPage() {
       return
     }
     if ((parseFloat(marketRate) || 0) <= 0) {
-      toast.error('Enter market rate per 40kg / mann')
+      toast.error('Enter market rate')
       return
     }
 
@@ -134,9 +121,9 @@ export default function FarmerProductPage() {
         transactionDate,
         notes: notes || undefined,
       })
-      const data = res.data.data
-      setLastMessage(data.message || 'Saved')
-      toast.success(data.message || 'Farmer product saved')
+      toast.success(res.data.data.message || 'Farmer product saved')
+      reset()
+      loadLists()
       farmerApi.getAll().then((r) => setFarmers(r.data.data))
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -147,34 +134,83 @@ export default function FarmerProductPage() {
   }
 
   const resultRows = [
-    { label: 'Formula', value: '(bags × kg) ÷ 40 × rate' },
-    { label: 'Total Weight (kg)', value: `${formatNumber(result.totalWeight)} kg` },
-    { label: 'Total Mann (40kg)', value: formatNumber(result.totalMann, 4) },
+    { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: `Arhat (${result.arhatSharePercentage}% of total)`, value: formatCurrency(result.arhatShare) },
-    { label: `Munshi/Nigran (${result.munshiNigranSharePercentage}% of total)`, value: formatCurrency(result.munshiNigranShare) },
-    { label: `Workers (${result.workersSharePercentage}% of total)`, value: formatCurrency(result.workersShare) },
-    { label: `Total Commission (${result.commissionPercentage}%)`, value: formatCurrency(result.commission), accent: true },
-    { label: 'Farmer Payable (after commission)', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+    { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: true },
+    { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Farmer Product Entry"
-        description="Same pattern as Price Calculator — enter bags, weight, and market rate; post farmer payable"
-      />
+      <PageHeader title="Farmer Product" description="Enter products and view farmer product records" />
+
+      <div className="card-3d overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">Farmer product details</h2>
+          <div className="w-56">
+            <Select
+              label=""
+              value={farmerId}
+              onChange={(e) => setFarmerId(e.target.value)}
+              options={[
+                { value: '', label: 'All farmers' },
+                ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` })),
+              ]}
+            />
+          </div>
+        </div>
+        {farmerProducts.length === 0 ? (
+          <p className="p-6 text-sm text-gray-500">No farmer products yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
+                <tr>
+                  <th className="px-4 py-2">Dheri</th>
+                  <th className="px-4 py-2">Farmer</th>
+                  <th className="px-4 py-2">Product</th>
+                  <th className="px-4 py-2">Bags</th>
+                  <th className="px-4 py-2">Weight</th>
+                  <th className="px-4 py-2">Rate</th>
+                  <th className="px-4 py-2">Gross</th>
+                  <th className="px-4 py-2">Commission</th>
+                  <th className="px-4 py-2">Payable</th>
+                  <th className="px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {farmerProducts.map((d) => (
+                  <tr key={d.id}>
+                    <td className="px-4 py-2">
+                      <Link className="text-primary font-medium" to={`/dheris/${d.id}`}>{d.dheriId}</Link>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Link className="text-primary" to={`/farmers/${d.farmerId}`}>{d.farmerName}</Link>
+                    </td>
+                    <td className="px-4 py-2">{d.productName}</td>
+                    <td className="px-4 py-2">{d.numberOfBags}</td>
+                    <td className="px-4 py-2">{formatNumber(d.totalWeight)} kg</td>
+                    <td className="px-4 py-2">{formatCurrency(d.marketRate)}</td>
+                    <td className="px-4 py-2">{formatCurrency(d.totalPrice)}</td>
+                    <td className="px-4 py-2">{formatCurrency(d.commissionAmount)}</td>
+                    <td className="px-4 py-2 font-medium">{formatCurrency(d.farmerReceivable)}</td>
+                    <td className="px-4 py-2">{d.sellingStatus}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="card-3d p-6 lg:p-8">
         <div className="flex items-center gap-2 mb-6">
           <PackagePlus className="h-6 w-6 text-primary" />
-          <h2 className="text-lg font-semibold">Enter farmer product</h2>
+          <h2 className="text-lg font-semibold">Add farmer product</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Inputs</h3>
-
             <Select
               label="Farmer *"
               value={farmerId}
@@ -188,56 +224,33 @@ export default function FarmerProductPage() {
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
             />
             <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight of One Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input label="Partial Bag / Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
-            <Input label="Market Rate per 1 Mann / 40kg (PKR) *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
-
-            <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800/40 p-4 space-y-3">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Commission of total amount</p>
-              <Input label="Arhat % of total" type="number" step="0.01" value={arhatPct} onChange={(e) => setArhatPct(e.target.value)} />
-              <Input label="Munshi/Nigran % of total" type="number" step="0.01" value={munshiPct} onChange={(e) => setMunshiPct(e.target.value)} />
-              <Input label="Workers % of total" type="number" step="0.01" value={workersPct} onChange={(e) => setWorkersPct(e.target.value)} />
-            </div>
-
-            <Input label="Transaction date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
-
-            <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-3">
-              <p className="text-sm font-semibold text-primary">Pay farmer now (optional)</p>
-              <Input label="Cash paid now (PKR)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />
-              <Select
-                label="Payment method"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                options={[
-                  { value: 'CASH', label: 'Cash' },
-                  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
-                  { value: 'CHEQUE', label: 'Cheque' },
-                  { value: 'OTHER', label: 'Other' },
-                ]}
-              />
-              <button type="button" className="text-xs text-primary underline" onClick={() => setPaymentNow(String(result.farmerFinalBalance))}>
-                Fill full farmer payable
-              </button>
-            </div>
-
+            <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label="Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            <Input label="Market Rate / 40kg *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
+            <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
+            <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />
+            <Select
+              label="Payment method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              options={[
+                { value: 'CASH', label: 'Cash' },
+                { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+                { value: 'CHEQUE', label: 'Cheque' },
+                { value: 'OTHER', label: 'Other' },
+              ]}
+            />
             <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
 
             <div className="flex flex-wrap gap-3 pt-2">
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
-              <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Recalculate</Button>
-              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save farmer product</Button>
+              <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Calculate</Button>
+              <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save</Button>
             </div>
-
-            {lastMessage && (
-              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 text-sm text-emerald-800 dark:text-emerald-200">
-                {lastMessage}{' '}
-                <Link className="underline text-primary" to="/payments">View payments</Link>
-              </div>
-            )}
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Live calculation</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Summary</h3>
             {resultRows.map((row) => (
               <div
                 key={row.label}

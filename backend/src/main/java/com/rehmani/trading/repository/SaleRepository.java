@@ -35,6 +35,9 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("SELECT s FROM Sale s JOIN FETCH s.buyer WHERE s.deleted = false AND s.buyer.id = :buyerId ORDER BY s.saleDate DESC")
     List<Sale> findByBuyerId(@Param("buyerId") Long buyerId);
 
+    @Query("SELECT DISTINCT s FROM Sale s JOIN FETCH s.buyer LEFT JOIN FETCH s.items i LEFT JOIN FETCH i.product LEFT JOIN FETCH i.dheri LEFT JOIN FETCH i.farmer WHERE s.deleted = false AND s.buyer.id = :buyerId ORDER BY s.saleDate DESC, s.id DESC")
+    List<Sale> findByBuyerIdWithItems(@Param("buyerId") Long buyerId);
+
     @Query("SELECT DISTINCT s FROM Sale s JOIN FETCH s.buyer LEFT JOIN FETCH s.items i LEFT JOIN FETCH i.product LEFT JOIN FETCH i.farmer WHERE s.deleted = false AND s.id = :id")
     java.util.Optional<Sale> findByIdWithDetails(@Param("id") Long id);
 }

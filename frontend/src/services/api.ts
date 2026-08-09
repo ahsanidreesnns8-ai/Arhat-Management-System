@@ -48,7 +48,8 @@ export const farmerApi = {
   getPayments: (id: number) => api.get<ApiResponse<Payment[]>>(`/farmers/${id}/payments`),
   getDheris: (id: number) => api.get<ApiResponse<Dheri[]>>(`/farmers/${id}/dheris`),
   getTrucks: (id: number) => api.get<ApiResponse<Truck[]>>(`/farmers/${id}/trucks`),
-  getBillHtml: (id: number) => api.get<string>(`/bills/farmer/${id}`, { responseType: 'text' as never }),
+  getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
+    api.get<string>(`/bills/farmer/${id}`, { params: { lang }, responseType: 'text' as never }),
 }
 
 export const buyerApi = {
@@ -59,7 +60,8 @@ export const buyerApi = {
   delete: (id: number) => api.delete<ApiResponse<void>>(`/buyers/${id}`),
   getPayments: (id: number) => api.get<ApiResponse<Payment[]>>(`/buyers/${id}/payments`),
   getSales: (id: number) => api.get<ApiResponse<Sale[]>>(`/buyers/${id}/sales`),
-  getBillHtml: (id: number) => api.get<string>(`/bills/buyer/${id}`, { responseType: 'text' as never }),
+  getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
+    api.get<string>(`/bills/buyer/${id}`, { params: { lang }, responseType: 'text' as never }),
 }
 
 export const truckApi = {
