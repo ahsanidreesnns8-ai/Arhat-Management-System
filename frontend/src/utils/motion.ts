@@ -16,17 +16,19 @@ export const pageTransition: Transition = {
 }
 
 export const pageVariants: Variants = {
-  initial: { opacity: 0, y: 12, filter: 'blur(4px)' },
+  initial: { opacity: 0, y: 16, scale: 0.985, filter: 'blur(6px)' },
   animate: {
     opacity: 1,
     y: 0,
+    scale: 1,
     filter: 'blur(0px)',
     transition: pageTransition,
   },
   exit: {
     opacity: 0,
-    y: -8,
-    filter: 'blur(2px)',
+    y: -10,
+    scale: 0.99,
+    filter: 'blur(3px)',
     transition: { duration: 0.18, ease: 'easeIn' },
   },
 }

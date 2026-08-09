@@ -183,7 +183,7 @@ export default function AiAssistantPanel() {
           <motion.button
             key="ai-fab"
             onClick={() => setOpen(true)}
-            className={`fixed bottom-6 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center ${
+            className={`ai-fab fixed bottom-6 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center ${
               isUrdu ? 'left-6' : 'right-6'
             }`}
             title={t('aiTitle')}
@@ -195,7 +195,7 @@ export default function AiAssistantPanel() {
             transition={softSpring}
           >
             <motion.span
-              className="absolute inset-0 rounded-full bg-primary/40"
+              className="absolute inset-0 rounded-full bg-cyan-400/40"
               animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -208,7 +208,7 @@ export default function AiAssistantPanel() {
         {open && (
           <motion.div
             key="ai-panel"
-            className={`fixed bottom-6 z-50 w-96 max-w-[calc(100vw-3rem)] h-[32rem] card flex flex-col shadow-2xl overflow-hidden ${
+            className={`fixed bottom-6 z-50 w-96 max-w-[calc(100vw-3rem)] h-[32rem] card-3d flex flex-col shadow-glass overflow-hidden ${
               isUrdu ? 'left-6' : 'right-6'
             }`}
             variants={slideFromRight}
@@ -216,20 +216,20 @@ export default function AiAssistantPanel() {
             animate="show"
             exit="exit"
           >
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <motion.div
-                  className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center"
+                  className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500/30 to-violet-500/30 border border-cyan-400/30 flex items-center justify-center"
                   animate={{ rotate: [0, -8, 8, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                 >
-                  <Bot className="h-4 w-4 text-primary" />
+                  <Bot className="h-4 w-4 text-cyan-300" />
                 </motion.div>
                 <div>
-                  <h3 className={`text-sm font-semibold text-gray-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
+                  <h3 className={`text-sm font-semibold text-slate-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
                     {t('aiTitle')}
                   </h3>
-                  <p className={`text-xs text-gray-500 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSubtitle')}</p>
+                  <p className={`text-xs text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSubtitle')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -241,7 +241,7 @@ export default function AiAssistantPanel() {
                       return !v
                     })
                   }}
-                  className={`p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ${speakReplies ? 'text-primary' : 'text-gray-400'}`}
+                  className={`nav-icon-btn ${speakReplies ? 'text-cyan-400' : 'text-slate-400'}`}
                   title={speakReplies ? t('aiVoiceOff') : t('aiVoiceOn')}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -249,11 +249,11 @@ export default function AiAssistantPanel() {
                 </motion.button>
                 <motion.button
                   onClick={() => { stopListening(); window.speechSynthesis?.cancel(); setOpen(false) }}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="nav-icon-btn"
                   whileHover={{ rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                 >
-                  <X className="h-4 w-4 text-gray-500" />
+                  <X className="h-4 w-4 text-slate-400" />
                 </motion.button>
               </div>
             </div>
@@ -275,8 +275,8 @@ export default function AiAssistantPanel() {
                 >
                   <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                      ? 'bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-[0_8px_20px_rgba(99,102,241,0.35)]'
+                      : 'bg-slate-100/90 dark:bg-white/5 border border-white/10 text-slate-900 dark:text-slate-100'
                   } ${isUrdu && msg.role === 'assistant' ? 'font-urdu' : ''}`}>
                     <p className="whitespace-pre-wrap leading-relaxed">
                       {msg.content.replace(/\*\*(.+?)\*\*/g, '$1')}
@@ -308,9 +308,9 @@ export default function AiAssistantPanel() {
               <div ref={bottomRef} />
             </motion.div>
 
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            <div className="p-4 border-t border-white/10 space-y-2">
               {listening && (
-                <p className={`text-xs text-primary text-center ${isUrdu ? 'font-urdu' : ''}`}>
+                <p className={`text-xs text-cyan-400 text-center ${isUrdu ? 'font-urdu' : ''}`}>
                   {t('aiListening')}
                 </p>
               )}
@@ -319,10 +319,10 @@ export default function AiAssistantPanel() {
                   type="button"
                   onClick={toggleListen}
                   disabled={loading}
-                  className={`p-2.5 rounded-lg disabled:opacity-50 ${
+                  className={`p-2.5 rounded-xl disabled:opacity-50 ${
                     listening
-                      ? 'bg-red-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-primary hover:bg-primary/10'
+                      ? 'bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)]'
+                      : 'bg-white/5 border border-white/10 text-cyan-300 hover:bg-cyan-500/10'
                   }`}
                   title={listening ? t('aiStopVoice') : t('aiStartVoice')}
                   whileHover={{ scale: 1.05 }}
@@ -340,7 +340,7 @@ export default function AiAssistantPanel() {
                 <motion.button
                   onClick={handleSend}
                   disabled={loading || !input.trim()}
-                  className="p-2.5 rounded-lg bg-primary text-white hover:bg-primary-700 disabled:opacity-50"
+                  className="p-2.5 rounded-xl btn-primary disabled:opacity-50"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.94 }}
                 >

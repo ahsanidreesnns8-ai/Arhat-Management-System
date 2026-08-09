@@ -1,4 +1,5 @@
 import { Menu, Sun, Moon, Monitor, Bell, LogOut, User } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -30,51 +31,65 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+    <header className="app-navbar sticky top-0 z-30 h-16">
       <div className="flex items-center justify-between h-full px-4 md:px-6 gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <button
+          <motion.button
+            type="button"
             onClick={onToggleSidebar}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+            className="nav-icon-btn flex-shrink-0 text-slate-600 dark:text-slate-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.94 }}
           >
-            <Menu className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-          </button>
+            <Menu className="h-5 w-5" />
+          </motion.button>
           <GlobalSearch />
         </div>
 
         <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
           <WeatherWidget />
 
-          <button
+          <motion.button
+            type="button"
             onClick={cycleTheme}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="nav-icon-btn text-slate-600 dark:text-slate-300"
             title={`${t('theme')}: ${theme}`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.94 }}
           >
-            <ThemeIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-          </button>
+            <ThemeIcon className="h-5 w-5" />
+          </motion.button>
 
-          <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
-            <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <motion.button
+            type="button"
+            className="nav-icon-btn relative text-slate-600 dark:text-slate-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.94 }}
+          >
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
+          </motion.button>
 
-          <div className="flex items-center gap-2 pl-3 border-l border-gray-200 dark:border-gray-700">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-4 w-4 text-primary" />
+          <div className="flex items-center gap-2 pl-3 border-l border-slate-200/70 dark:border-white/10">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500/25 to-violet-500/30 border border-cyan-400/30 flex items-center justify-center shadow-[0_0_16px_rgba(56,189,248,0.25)]">
+              <User className="h-4 w-4 text-sky-300" />
             </div>
             <div className="hidden md:block">
-              <p className={`text-sm font-medium text-gray-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
+              <p className={`text-sm font-medium text-slate-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
                 {user?.fullName}
               </p>
-              <p className="text-xs text-gray-500">{user?.role}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{user?.role}</p>
             </div>
-            <button
+            <motion.button
+              type="button"
               onClick={logout}
-              className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+              className="nav-icon-btn text-slate-400 hover:text-rose-400"
               title={t('logout')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.94 }}
             >
               <LogOut className="h-4 w-4" />
-            </button>
+            </motion.button>
           </div>
         </div>
       </div>

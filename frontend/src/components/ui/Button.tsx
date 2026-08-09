@@ -23,8 +23,8 @@ export default function Button({
   const variants = {
     primary: 'btn-primary',
     secondary: 'btn-secondary',
-    danger: 'bg-red-600 text-white hover:bg-red-700 transition-colors',
-    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 transition-colors',
+    danger: 'bg-gradient-to-r from-rose-600 to-red-500 text-white shadow-[0_8px_24px_rgba(244,63,94,0.35)] hover:brightness-110 transition-all',
+    ghost: 'bg-transparent hover:bg-sky-500/10 text-slate-700 dark:text-slate-200 transition-colors',
   }
 
   const sizes = {
@@ -37,14 +37,14 @@ export default function Button({
     <motion.button
       type={type}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-medium disabled:opacity-50',
         variants[variant],
         sizes[size],
         className
       )}
       disabled={disabled || loading}
       onClick={onClick}
-      whileHover={disabled || loading ? undefined : { y: -1 }}
+      whileHover={disabled || loading ? undefined : { y: -2, scale: 1.02 }}
       whileTap={disabled || loading ? undefined : { scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 420, damping: 28 }}
       {...(props as Record<string, unknown>)}

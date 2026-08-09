@@ -46,7 +46,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       transition={{ type: 'spring', stiffness: 320, damping: 34 }}
     >
       <div className="sidebar-3d-inner h-full flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-16 border-b border-white/10">
+        <div className="flex items-center gap-3 px-4 h-16 border-b border-white/10 relative">
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
           <RhmaniLogo size="sm" showText={!collapsed} light />
         </div>
 

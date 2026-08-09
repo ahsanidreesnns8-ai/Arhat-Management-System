@@ -28,18 +28,18 @@ export default function RecordsPage() {
           <StaggerItem key={section.title}>
             <Link to={section.to} className="block h-full">
               <motion.div
-                className="card p-6 h-full"
-                whileHover={{ y: -4, transition: { type: 'spring', stiffness: 400, damping: 28 } }}
+                className="card-3d p-6 h-full"
+                whileHover={{ y: -6, transition: { type: 'spring', stiffness: 400, damping: 28 } }}
                 whileTap={{ scale: 0.985 }}
               >
                 <motion.div
-                  className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4"
+                  className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-violet-500/25 border border-cyan-400/25 flex items-center justify-center mb-4 shadow-[0_0_18px_rgba(56,189,248,0.2)]"
                   whileHover={{ scale: 1.1, rotate: -4 }}
                 >
-                  <section.icon className="h-5 w-5 text-primary" />
+                  <section.icon className="h-5 w-5 text-cyan-300" />
                 </motion.div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">{section.title}</h3>
-                <p className="text-sm text-gray-500 mt-1">{section.description}</p>
+                <h3 className="font-semibold text-slate-900 dark:text-white">{section.title}</h3>
+                <p className="text-sm text-slate-500 mt-1">{section.description}</p>
               </motion.div>
             </Link>
           </StaggerItem>

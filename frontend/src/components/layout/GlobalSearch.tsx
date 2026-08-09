@@ -71,9 +71,7 @@ export default function GlobalSearch() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
-          className={`w-full pl-10 pr-10 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${
-            isUrdu ? 'font-urdu' : ''
-          }`}
+          className={`input-field w-full pl-10 pr-10 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
         />
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
       </div>
@@ -81,7 +79,7 @@ export default function GlobalSearch() {
       <AnimatePresence>
         {open && results.length > 0 && (
           <motion.div
-            className="absolute top-full mt-2 w-full bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 z-50 max-h-80 overflow-y-auto origin-top"
+            className="absolute top-full mt-2 w-full card-3d z-50 max-h-80 overflow-y-auto origin-top"
             initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -91,18 +89,18 @@ export default function GlobalSearch() {
               <motion.button
                 key={`${r.type}-${r.id}-${i}`}
                 onClick={() => handleSelect(r)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-b border-gray-50 dark:border-gray-800 last:border-0"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cyan-500/10 transition-colors text-left border-b border-white/5 last:border-0"
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.2 }}
                 whileHover={{ x: 3 }}
               >
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${typeColors[r.type] || 'bg-gray-100 text-gray-600'}`}>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${typeColors[r.type] || 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}>
                   {r.type}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{r.title}</p>
-                  <p className="text-xs text-gray-500 truncate">{r.subtitle}</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{r.title}</p>
+                  <p className="text-xs text-slate-500 truncate">{r.subtitle}</p>
                 </div>
               </motion.button>
             ))}

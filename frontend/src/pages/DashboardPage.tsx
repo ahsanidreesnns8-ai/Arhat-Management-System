@@ -90,27 +90,34 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Sales Trend</h3>
-            <Link to="/sales" className="text-sm text-primary hover:underline">View sales</Link>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Weekly Sales Trend</h3>
+            <Link to="/sales" className="text-sm text-cyan-500 dark:text-cyan-300 hover:underline">View sales</Link>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#002D62" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#002D62" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+              <YAxis stroke="#94a3b8" fontSize={12} />
+              <Tooltip
+                contentStyle={{
+                  background: 'rgba(15,23,42,0.92)',
+                  border: '1px solid rgba(56,189,248,0.25)',
+                  borderRadius: 12,
+                  color: '#E2E8F0',
+                }}
+              />
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#002D62"
+                stroke="#38BDF8"
                 fill="url(#salesGrad)"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 isAnimationActive
                 animationDuration={900}
                 animationEasing="ease-out"
@@ -127,19 +134,32 @@ export default function DashboardPage() {
           transition={{ delay: 0.08 }}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stock Levels</h3>
-            <Link to="/stock" className="text-sm text-primary hover:underline">View stock</Link>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Stock Levels</h3>
+            <Link to="/stock" className="text-sm text-cyan-500 dark:text-cyan-300 hover:underline">View stock</Link>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
-              <Tooltip />
+              <defs>
+                <linearGradient id="stockGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#A78BFA" />
+                  <stop offset="100%" stopColor="#22D3EE" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+              <YAxis stroke="#94a3b8" fontSize={12} />
+              <Tooltip
+                contentStyle={{
+                  background: 'rgba(15,23,42,0.92)',
+                  border: '1px solid rgba(139,92,246,0.3)',
+                  borderRadius: 12,
+                  color: '#E2E8F0',
+                }}
+              />
               <Bar
                 dataKey="stock"
-                fill="#C5A059"
-                radius={[6, 6, 0, 0]}
+                fill="url(#stockGrad)"
+                radius={[8, 8, 0, 0]}
                 isAnimationActive
                 animationDuration={900}
                 animationEasing="ease-out"
@@ -151,8 +171,8 @@ export default function DashboardPage() {
 
       <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center gap-2 mb-4">
-          <Activity className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
+          <Activity className="h-5 w-5 text-cyan-400" />
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Activity</h3>
         </div>
         {loading ? (
           <div className="space-y-3">
@@ -166,14 +186,14 @@ export default function DashboardPage() {
               <StaggerItem key={i}>
                 <Link to={activityLink(item.entityType)}>
                   <motion.div
-                    className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-teal-50/40 dark:from-gray-800/50 dark:to-teal-950/20"
+                    className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-gradient-to-r from-sky-500/5 to-violet-500/10 hover:from-sky-500/10 hover:to-violet-500/15 transition-colors"
                     whileHover={{ x: 4, scale: 1.01 }}
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{item.description}</p>
-                      <p className="text-xs text-gray-500">{item.entityType} · {item.action}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{item.description}</p>
+                      <p className="text-xs text-slate-500">{item.entityType} · {item.action}</p>
                     </div>
-                    <span className="text-xs text-gray-400">{formatDateTime(item.timestamp)}</span>
+                    <span className="text-xs text-slate-400">{formatDateTime(item.timestamp)}</span>
                   </motion.div>
                 </Link>
               </StaggerItem>

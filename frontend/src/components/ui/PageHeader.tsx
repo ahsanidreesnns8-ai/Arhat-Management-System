@@ -17,10 +17,10 @@ export default function PageHeader({ title, description, action }: PageHeaderPro
       animate="show"
     >
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{title}</h1>
+        <h1 className="page-title">{title}</h1>
         {description && (
           <motion.p
-            className="text-gray-500 dark:text-gray-400 mt-1"
+            className="text-slate-500 dark:text-slate-400 mt-1"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08, duration: 0.35 }}

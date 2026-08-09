@@ -30,7 +30,7 @@ function toApi(theme: ThemeMode): string {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     const stored = localStorage.getItem('rehmani_theme') as ThemeMode
-    return stored || 'system'
+    return stored || 'dark'
   })
 
   const resolvedTheme = theme === 'system' ? getSystemTheme() : theme

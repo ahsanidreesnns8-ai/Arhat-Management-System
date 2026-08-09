@@ -25,7 +25,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-[#0A0E17]/70 backdrop-blur-md"
             variants={modalBackdrop}
             initial="hidden"
             animate="show"
@@ -34,7 +34,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
           />
           <motion.div
             className={clsx(
-              'relative w-full card p-6 max-h-[90vh] overflow-y-auto z-10',
+              'relative w-full card-3d p-6 max-h-[90vh] overflow-y-auto z-10 shadow-glass',
               sizes[size]
             )}
             variants={modalPanel}
@@ -43,15 +43,15 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             exit="exit"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+              <h2 className="text-xl font-bold page-title">{title}</h2>
               <motion.button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="nav-icon-btn"
                 whileHover={{ rotate: 90 }}
                 whileTap={{ scale: 0.92 }}
               >
-                <X className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-slate-400" />
               </motion.button>
             </div>
             {children}

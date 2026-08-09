@@ -65,7 +65,7 @@ export default function WeatherWidget() {
 
   if (failed) {
     return (
-      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-xs text-gray-500">
+      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
         <Cloud className="h-3.5 w-3.5" />
         {t('weatherUnavailable')}
       </div>
@@ -74,7 +74,7 @@ export default function WeatherWidget() {
 
   if (!weather) {
     return (
-      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-xs text-gray-500">
+      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
         <Cloud className="h-3.5 w-3.5 animate-pulse" />
         {t('weatherLoading')}
       </div>
@@ -85,16 +85,12 @@ export default function WeatherWidget() {
 
   return (
     <div
-      className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
-      style={{
-        background: 'linear-gradient(145deg, rgba(59,130,246,0.12), rgba(14,165,233,0.08))',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(37,99,235,0.08)',
-      }}
+      className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 shadow-[0_0_16px_rgba(56,189,248,0.12)]"
       title={`${weather.label} · Lahore`}
     >
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      <span className="text-gray-800 dark:text-gray-100">{weather.temp}°C</span>
-      <span className={`text-gray-500 ${isUrdu ? 'font-urdu' : ''}`}>{weather.label}</span>
+      <Icon className="h-3.5 w-3.5 text-cyan-400" />
+      <span className="text-slate-800 dark:text-slate-100">{weather.temp}°C</span>
+      <span className={`text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}>{weather.label}</span>
     </div>
   )
 }

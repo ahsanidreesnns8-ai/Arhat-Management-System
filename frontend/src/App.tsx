@@ -97,7 +97,18 @@ export default function App() {
         <BusinessProvider>
           <AuthProvider>
             <BrowserRouter>
-              <Toaster position="top-right" />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  style: {
+                    background: 'rgba(15, 23, 42, 0.92)',
+                    color: '#E2E8F0',
+                    border: '1px solid rgba(99, 102, 241, 0.35)',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                  },
+                }}
+              />
               <AppRoutes />
             </BrowserRouter>
           </AuthProvider>
