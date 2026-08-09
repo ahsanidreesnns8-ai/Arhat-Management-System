@@ -149,7 +149,24 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-4">
             <Input label={t('companyName')} value={settings?.companyName || ''} onChange={(e) => update('companyName', e.target.value)} />
-            <Input label={t('logoUrl')} value={settings?.companyLogoUrl || ''} onChange={(e) => update('companyLogoUrl', e.target.value)} />
+            <Input
+              label={t('logoUrl')}
+              placeholder="/rehmani-logo.svg"
+              value={settings?.companyLogoUrl || ''}
+              onChange={(e) => update('companyLogoUrl', e.target.value)}
+            />
+            <p className="text-xs text-gray-500 -mt-2">
+              Default: <code className="text-primary">/rehmani-logo.svg</code> (shown on login &amp; sidebar). Paste a full image URL if you host your own logo.
+            </p>
+            {(settings?.companyLogoUrl || '/rehmani-logo.svg') && (
+              <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white p-4 flex justify-center">
+                <img
+                  src={settings?.companyLogoUrl || '/rehmani-logo.svg'}
+                  alt="Logo preview"
+                  className="h-28 w-auto object-contain"
+                />
+              </div>
+            )}
             <Input label={t('address')} value={settings?.address || ''} onChange={(e) => update('address', e.target.value)} />
             <Input label={t('phone')} value={settings?.phone || ''} onChange={(e) => update('phone', e.target.value)} />
             <Input label={t('email')} value={settings?.email || ''} onChange={(e) => update('email', e.target.value)} />

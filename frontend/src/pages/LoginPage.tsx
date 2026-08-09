@@ -52,7 +52,7 @@ export default function LoginPage() {
         />
         <div className="relative z-10 flex flex-col justify-center items-center px-12 w-full">
           <motion.div
-            className="bg-white rounded-3xl px-10 py-8 shadow-2xl"
+            className="bg-white rounded-3xl px-10 py-8 shadow-2xl ring-1 ring-[#C5A059]/30"
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: easeOutExpo }}
@@ -98,8 +98,11 @@ export default function LoginPage() {
           transition={{ duration: 0.5, ease: easeOutExpo }}
           className="w-full max-w-md"
         >
-          <div className="lg:hidden flex justify-center mb-8">
-            <RhmaniLogo variant="full" size="lg" />
+          {/* Always show logo above the form (desktop + mobile) */}
+          <div className="flex justify-center mb-8">
+            <div className="bg-white dark:bg-white rounded-2xl px-6 py-4 shadow-md ring-1 ring-[#002D62]/10">
+              <RhmaniLogo variant="full" size="lg" />
+            </div>
           </div>
 
           <motion.div
@@ -139,7 +142,7 @@ export default function LoginPage() {
           </motion.div>
 
           <p className={`text-center text-sm text-gray-400 mt-6 ${isUrdu ? 'font-urdu' : ''}`}>
-            &copy; {new Date().getFullYear()} {t('brandName')}
+            &copy; {new Date().getFullYear()} {companyName || t('brandName')}
           </p>
         </motion.div>
       </div>

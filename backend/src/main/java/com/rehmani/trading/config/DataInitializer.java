@@ -42,6 +42,7 @@ public class DataInitializer {
                 log.info("Seeding dev business settings");
                 settingsRepository.save(BusinessSettings.builder()
                         .companyName("Rehmani Trading Company")
+                        .companyLogoUrl("/rehmani-logo.svg")
                         .address("Main Market, Grain Trading Hub")
                         .phone("+92-300-0000000")
                         .email("info@rehmanitrading.com")
@@ -50,6 +51,14 @@ public class DataInitializer {
                         .supervisorSharePercentage(new BigDecimal("0.70"))
                         .laborSharePercentage(new BigDecimal("0.30"))
                         .build());
+            } else {
+                settingsRepository.findAll().forEach(s -> {
+                    if (s.getCompanyLogoUrl() == null || s.getCompanyLogoUrl().isBlank()) {
+                        s.setCompanyLogoUrl("/rehmani-logo.svg");
+                        settingsRepository.save(s);
+                        log.info("Set default company logo URL on business settings");
+                    }
+                });
             }
 
             if (productRepository.count() == 0) {
