@@ -132,13 +132,15 @@ export default function DheriDetailPage() {
                   <td className="px-4 py-2">{p.paymentMethod}</td>
                   <td className="px-4 py-2 text-gray-500">{p.notes || '—'}</td>
                   <td className="px-4 py-2">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
-                      onClick={() => { setEditingPayment(p); setPayOpen(true) }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Update
-                    </button>
+                    {p.paymentType === 'FARMER' && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                        onClick={() => { setEditingPayment(p); setPayOpen(true) }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Update
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -151,9 +153,9 @@ export default function DheriDetailPage() {
         open={payOpen}
         onClose={() => { setPayOpen(false); setEditingPayment(null) }}
         onSuccess={load}
-        type={editingPayment?.paymentType === 'BUYER' ? 'BUYER' : 'FARMER'}
-        partyId={editingPayment?.paymentType === 'BUYER' ? (editingPayment.buyerId || dheri.farmerId) : dheri.farmerId}
-        partyName={editingPayment?.paymentType === 'BUYER' ? (editingPayment.buyerName || dheri.farmerName) : dheri.farmerName}
+        type="FARMER"
+        partyId={dheri.farmerId}
+        partyName={dheri.farmerName}
         outstanding={farmerOutstanding}
         dheriId={dheri.id}
         editingPayment={editingPayment}
