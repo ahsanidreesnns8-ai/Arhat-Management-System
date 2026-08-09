@@ -1,7 +1,9 @@
 import { Menu, Sun, Moon, Monitor, Bell, LogOut, User } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useLanguage } from '../../context/LanguageContext'
 import GlobalSearch from './GlobalSearch'
+import WeatherWidget from './WeatherWidget'
 import type { ThemeMode } from '../../types'
 
 interface NavbarProps {
@@ -11,6 +13,7 @@ interface NavbarProps {
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { t, isUrdu } = useLanguage()
 
   const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
     { value: 'light', icon: Sun, label: 'Light' },
@@ -24,26 +27,28 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     setTheme(order[(idx + 1) % order.length])
   }
 
-  const ThemeIcon = themeOptions.find((t) => t.value === theme)?.icon || Monitor
+  const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-      <div className="flex items-center justify-between h-full px-6">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between h-full px-4 md:px-6 gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={onToggleSidebar}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
           >
             <Menu className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
           <GlobalSearch />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+          <WeatherWidget />
+
           <button
             onClick={cycleTheme}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title={`Theme: ${theme}`}
+            title={`${t('theme')}: ${theme}`}
           >
             <ThemeIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
@@ -58,13 +63,15 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               <User className="h-4 w-4 text-primary" />
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.fullName}</p>
+              <p className={`text-sm font-medium text-gray-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
+                {user?.fullName}
+              </p>
               <p className="text-xs text-gray-500">{user?.role}</p>
             </div>
             <button
               onClick={logout}
               className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
-              title="Logout"
+              title={t('logout')}
             >
               <LogOut className="h-4 w-4" />
             </button>

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { BusinessProvider } from './context/BusinessContext'
+import { LanguageProvider } from './context/LanguageContext'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 
@@ -86,14 +87,16 @@ function AppRoutes() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BusinessProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <Toaster position="top-right" />
-            <AppRoutes />
-          </BrowserRouter>
-        </AuthProvider>
-      </BusinessProvider>
+      <LanguageProvider>
+        <BusinessProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <Toaster position="top-right" />
+              <AppRoutes />
+            </BrowserRouter>
+          </AuthProvider>
+        </BusinessProvider>
+      </LanguageProvider>
     </ThemeProvider>
   )
 }

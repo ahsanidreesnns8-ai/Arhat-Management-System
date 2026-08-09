@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MessageCircle, X, Send, Bot } from 'lucide-react'
 import { aiApi } from '../../services/api'
+import { useLanguage } from '../../context/LanguageContext'
 import { slideFromRight, softSpring, staggerContainer, staggerItem } from '../../utils/motion'
 
 interface Message {
@@ -11,13 +12,29 @@ interface Message {
 }
 
 export default function AiAssistantPanel() {
+  const { t, isUrdu, lang } = useLanguage()
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I\'m your Rehmani Trading assistant. Ask me about stock levels, queue status, outstanding balances, or today\'s sales.' },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const welcomed = useRef(false)
+
+  useEffect(() => {
+    if (!welcomed.current) {
+      setMessages([{ role: 'assistant', content: t('aiWelcome') }])
+      welcomed.current = true
+      return
+    }
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === 'assistant') {
+        return [{ role: 'assistant', content: t('aiWelcome') }]
+      }
+      return prev
+    })
+    // Refresh welcome copy when language changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -31,13 +48,16 @@ export default function AiAssistantPanel() {
     setLoading(true)
     try {
       const res = await aiApi.chat(userMsg)
+      const payload = res.data?.data
+      const reply = payload?.reply?.trim()
+      if (!reply) throw new Error('empty reply')
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: res.data.data.reply,
-        source: res.data.data.source,
+        content: reply,
+        source: payload.source,
       }])
     } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, I couldn\'t fetch that data right now.' }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: t('aiError') }])
     } finally {
       setLoading(false)
     }
@@ -50,8 +70,10 @@ export default function AiAssistantPanel() {
           <motion.button
             key="ai-fab"
             onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center"
-            title="Chat with AI"
+            className={`fixed bottom-6 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center ${
+              isUrdu ? 'left-6' : 'right-6'
+            }`}
+            title={t('aiTitle')}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
@@ -73,7 +95,9 @@ export default function AiAssistantPanel() {
         {open && (
           <motion.div
             key="ai-panel"
-            className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] h-[32rem] card flex flex-col shadow-2xl overflow-hidden"
+            className={`fixed bottom-6 z-50 w-96 max-w-[calc(100vw-3rem)] h-[32rem] card flex flex-col shadow-2xl overflow-hidden ${
+              isUrdu ? 'left-6' : 'right-6'
+            }`}
             variants={slideFromRight}
             initial="hidden"
             animate="show"
@@ -89,8 +113,10 @@ export default function AiAssistantPanel() {
                   <Bot className="h-4 w-4 text-primary" />
                 </motion.div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">AI Assistant</h3>
-                  <p className="text-xs text-gray-500">Live business data</p>
+                  <h3 className={`text-sm font-semibold text-gray-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>
+                    {t('aiTitle')}
+                  </h3>
+                  <p className={`text-xs text-gray-500 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiSubtitle')}</p>
                 </div>
               </div>
               <motion.button
@@ -122,8 +148,8 @@ export default function AiAssistantPanel() {
                     msg.role === 'user'
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                  }`}>
-                    <p>{msg.content}</p>
+                  } ${isUrdu && msg.role === 'assistant' ? 'font-urdu' : ''}`}>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
                     {msg.source && msg.source !== 'system' && (
                       <p className="text-xs opacity-60 mt-1">Source: {msg.source}</p>
                     )}
@@ -150,8 +176,8 @@ export default function AiAssistantPanel() {
             <div className="p-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex gap-2">
                 <input
-                  className="input-field flex-1 text-sm"
-                  placeholder="Ask about your business data..."
+                  className={`input-field flex-1 text-sm ${isUrdu ? 'font-urdu' : ''}`}
+                  placeholder={t('aiPlaceholder')}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
