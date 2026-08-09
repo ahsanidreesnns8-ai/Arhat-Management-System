@@ -21,7 +21,7 @@ export const translations = {
     reports: 'Reports',
     settings: 'Settings',
     ownerPanel: 'Owner Panel',
-    welcomeBack: 'Welcome back',
+    welcomeBack: 'Welcome Back',
     signInSubtitle: 'Sign in to your secure workspace',
     username: 'Username',
     password: 'Password',
