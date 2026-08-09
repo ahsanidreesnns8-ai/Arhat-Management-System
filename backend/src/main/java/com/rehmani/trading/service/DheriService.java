@@ -25,6 +25,13 @@ public class DheriService {
                 .stream().map(this::toResponse).toList();
     }
 
+    public List<DheriResponse> getByFarmer(Long farmerId) {
+        farmerRepository.findByIdAndDeletedFalse(farmerId)
+                .orElseThrow(() -> new RuntimeException("Farmer not found"));
+        return dheriRepository.findByFarmerIdAndDeletedFalse(farmerId)
+                .stream().map(this::toResponse).toList();
+    }
+
     public DheriResponse getById(Long id) {
         Dheri dheri = dheriRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new RuntimeException("Dheri not found"));
@@ -106,7 +113,7 @@ public class DheriService {
         return String.format("DHR%05d", next);
     }
 
-    private DheriResponse toResponse(Dheri dheri) {
+    DheriResponse toResponse(Dheri dheri) {
         return DheriResponse.builder()
                 .id(dheri.getId())
                 .dheriId(dheri.getDheriId())

@@ -24,10 +24,25 @@ public class TruckService {
                 .stream().map(this::toResponse).toList();
     }
 
+    public List<TruckResponse> getByFarmer(Long farmerId) {
+        farmerRepository.findByIdAndDeletedFalse(farmerId)
+                .orElseThrow(() -> new RuntimeException("Farmer not found"));
+        return truckRepository.findByFarmerIdAndDeletedFalse(farmerId)
+                .stream().map(this::toResponse).toList();
+    }
+
     public TruckResponse getById(Long id) {
         Truck truck = truckRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new RuntimeException("Truck not found"));
         return toResponse(truck);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Truck truck = truckRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new RuntimeException("Truck not found"));
+        truck.setDeleted(true);
+        truckRepository.save(truck);
     }
 
     @Transactional
@@ -69,7 +84,7 @@ public class TruckService {
         return String.format("TRK%05d", next);
     }
 
-    private TruckResponse toResponse(Truck truck) {
+    TruckResponse toResponse(Truck truck) {
         return TruckResponse.builder()
                 .id(truck.getId())
                 .truckId(truck.getTruckId())

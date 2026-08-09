@@ -2,6 +2,8 @@ package com.rehmani.trading.controller;
 
 import com.rehmani.trading.dto.*;
 import com.rehmani.trading.service.BuyerService;
+import com.rehmani.trading.service.PaymentService;
+import com.rehmani.trading.service.SaleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,8 @@ import java.util.List;
 public class BuyerController {
 
     private final BuyerService buyerService;
+    private final PaymentService paymentService;
+    private final SaleService saleService;
 
     @GetMapping
     public ApiResponse<List<BuyerResponse>> getAll() {
@@ -23,6 +27,22 @@ public class BuyerController {
     @GetMapping("/{id}")
     public ApiResponse<BuyerResponse> getById(@PathVariable Long id) {
         return ApiResponse.ok(buyerService.getById(id));
+    }
+
+    @GetMapping("/{id}/payments")
+    public ApiResponse<List<PaymentResponse>> getPayments(@PathVariable Long id) {
+        buyerService.getById(id);
+        return ApiResponse.ok(paymentService.getByBuyer(id));
+    }
+
+    @GetMapping("/{id}/sales")
+    public ApiResponse<List<SaleResponse>> getSales(@PathVariable Long id) {
+        return ApiResponse.ok(saleService.getByBuyer(id));
+    }
+
+    @GetMapping("/{id}/ledger")
+    public ApiResponse<EntityLedgerResponse> getLedger(@PathVariable Long id) {
+        return ApiResponse.ok(buyerService.getLedger(id));
     }
 
     @PostMapping

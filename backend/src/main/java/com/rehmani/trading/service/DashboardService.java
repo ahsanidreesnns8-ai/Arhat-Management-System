@@ -25,7 +25,6 @@ public class DashboardService {
     private final StockRepository stockRepository;
     private final QueueEntryRepository queueEntryRepository;
     private final AuditLogRepository auditLogRepository;
-    private final PaymentRepository paymentRepository;
 
     public DashboardStats getStats() {
         LocalDate today = LocalDate.now();
