@@ -2,6 +2,8 @@ package com.rehmani.trading.service;
 
 import com.rehmani.trading.dto.DheriRequest;
 import com.rehmani.trading.dto.DheriResponse;
+import com.rehmani.trading.dto.PriceCalculationRequest;
+import com.rehmani.trading.dto.PriceCalculationResult;
 import com.rehmani.trading.entity.*;
 import com.rehmani.trading.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class DheriService {
     private final TruckRepository truckRepository;
     private final ProductRepository productRepository;
     private final BusinessSettingsRepository settingsRepository;
+    private final PriceCalculatorService priceCalculatorService;
 
     public List<DheriResponse> getAll() {
         return dheriRepository.findByDeletedFalseOrderByCreatedAtDesc()
@@ -54,16 +57,36 @@ public class DheriService {
         var settings = settingsRepository.findAll().stream().findFirst().orElse(null);
         var commissionPct = settings != null ? settings.getDefaultCommissionPercentage() : new java.math.BigDecimal("4.00");
 
+        int bags = request.getNumberOfBags() != null ? request.getNumberOfBags() : 0;
+        var weightPerBag = request.getWeightPerBag() != null ? request.getWeightPerBag() : new java.math.BigDecimal("40");
+        var partial = request.getPartialBagWeight() != null ? request.getPartialBagWeight() : java.math.BigDecimal.ZERO;
+        var marketRate = request.getMarketRate() != null ? request.getMarketRate() : java.math.BigDecimal.ZERO;
+
+        PriceCalculationResult calc = priceCalculatorService.calculate(PriceCalculationRequest.builder()
+                .numberOfBags(bags)
+                .weightPerBag(weightPerBag)
+                .partialBagWeight(partial)
+                .marketRate(marketRate)
+                .commissionPercentage(commissionPct)
+                .build());
+
         Dheri dheri = Dheri.builder()
                 .dheriId(generateDheriId())
                 .farmer(farmer)
                 .truck(truck)
                 .product(product)
-                .numberOfBags(request.getNumberOfBags() != null ? request.getNumberOfBags() : 0)
-                .weightPerBag(request.getWeightPerBag() != null ? request.getWeightPerBag() : new java.math.BigDecimal("40"))
-                .partialBagWeight(request.getPartialBagWeight() != null ? request.getPartialBagWeight() : java.math.BigDecimal.ZERO)
-                .marketRate(request.getMarketRate() != null ? request.getMarketRate() : java.math.BigDecimal.ZERO)
-                .commissionPercentage(commissionPct)
+                .numberOfBags(bags)
+                .weightPerBag(weightPerBag)
+                .partialBagWeight(partial)
+                .marketRate(marketRate)
+                .commissionPercentage(calc.getCommissionPercentage())
+                .totalWeight(calc.getTotalWeight())
+                .totalPrice(calc.getTotalAmount())
+                .commissionAmount(calc.getCommission())
+                .farmerReceivable(calc.getFarmerFinalBalance())
+                .supervisorShare(calc.getMunshiNigranShare())
+                .laborShare(calc.getWorkersShare())
+                .arhatShare(calc.getArhatShare())
                 .notes(request.getNotes())
                 .build();
 

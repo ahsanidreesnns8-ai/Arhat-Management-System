@@ -43,6 +43,12 @@ public class UserController {
         return ApiResponse.ok("User suspended", null);
     }
 
+    @PatchMapping("/{id}/activate")
+    public ApiResponse<Void> activate(@PathVariable Long id) {
+        userService.activate(id);
+        return ApiResponse.ok("User activated", null);
+    }
+
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         userService.delete(id);

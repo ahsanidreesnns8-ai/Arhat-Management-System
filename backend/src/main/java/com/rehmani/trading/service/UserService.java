@@ -75,6 +75,13 @@ public class UserService {
     }
 
     @Transactional
+    public void activate(Long id) {
+        User user = findUser(id);
+        user.setActive(true);
+        userRepository.save(user);
+    }
+
+    @Transactional
     public void suspend(Long id) {
         User user = findUser(id);
         user.setActive(false);
