@@ -7,6 +7,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
@@ -144,6 +145,7 @@ export default function BuyersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
+                  <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Status</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Buyer ID</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Name</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Phone</th>
@@ -155,26 +157,45 @@ export default function BuyersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((buyer) => (
+                {filtered.map((buyer) => {
+                  const settled = isPartySettled(buyer)
+                  const hasBilling = (buyer.totalBilled || 0) > 0
+                  return (
                   <tr key={buyer.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-primary/5 transition-colors">
+                    <td className="p-4">
+                      {settled ? (
+                        <SettledBadge settled label="Paid" />
+                      ) : hasBilling ? (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                          Due
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="p-4 font-mono text-primary">
                       <Link to={`/buyers/${buyer.id}`}>{buyer.buyerId}</Link>
                     </td>
                     <td className="p-4 font-medium text-gray-900 dark:text-white">
-                      <Link to={`/buyers/${buyer.id}`} className="hover:text-primary">{buyer.name}</Link>
+                      <Link to={`/buyers/${buyer.id}`} className="inline-flex items-center gap-2 hover:text-primary">
+                        {buyer.name}
+                        <SettledBadge settled={settled} />
+                      </Link>
                     </td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{buyer.phone || '—'}</td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{buyer.city || '—'}</td>
                     <td className="p-4 text-right">{formatCurrency(buyer.totalBilled || 0)}</td>
                     <td className="p-4 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(buyer.totalPaid || 0)}</td>
-                    <td className="p-4 text-right font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(buyer.outstandingBalance)}</td>
+                    <td className={`p-4 text-right font-semibold ${settled ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'}`}>
+                      {formatCurrency(buyer.outstandingBalance)}
+                    </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => setPayBuyer(buyer)}
                           disabled={(buyer.outstandingBalance || 0) <= 0}
                           className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-500 hover:text-emerald-600 disabled:opacity-30"
-                          title="Receive payment"
+                          title={settled ? 'Fully paid — history kept' : 'Receive payment'}
                         >
                           <Wallet className="h-4 w-4" />
                         </button>
@@ -190,9 +211,10 @@ export default function BuyersPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {!filtered.length && (
-                  <tr><td colSpan={8} className="p-8 text-center text-gray-500">No buyers found</td></tr>
+                  <tr><td colSpan={9} className="p-8 text-center text-gray-500">No buyers found</td></tr>
                 )}
               </tbody>
             </table>
@@ -227,7 +249,7 @@ export default function BuyersPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Delete Buyer"
-        message="Are you sure you want to delete this buyer?"
+        message="Delete this buyer profile? Purchase bills, products, and payment history stay linked in records — prefer keeping paid buyers with a Paid tick instead of deleting."
       />
 
       {payBuyer && (

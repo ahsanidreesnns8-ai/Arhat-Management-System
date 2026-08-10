@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
+import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { farmerApi, paymentApi } from '../services/api'
@@ -68,6 +69,11 @@ export default function FarmerDetailPage() {
 
   const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
   const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
+  const settled = isPartySettled({
+    outstandingBalance: farmer.outstandingBalance,
+    totalBilled,
+    totalPaid,
+  })
 
   return (
     <div className="space-y-6">
@@ -75,14 +81,17 @@ export default function FarmerDetailPage() {
         <Link to="/farmers" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><ArrowLeft className="h-5 w-5" /></Link>
         <PageHeader
           title={farmer.name}
-          description={farmer.farmerId}
+          description={`${farmer.farmerId}${settled ? ' · Fully paid — record kept' : ''}`}
           action={
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SettledBadge settled={settled} label="Paid in full" />
               <Button
                 onClick={() => { setEditingPayment(null); setPayOpen(true) }}
                 disabled={(farmer.outstandingBalance || 0) <= 0}
+                title={settled ? 'Already paid — history is kept' : 'Pay farmer'}
               >
-                <Wallet className="h-4 w-4" /> Pay / Settle remaining
+                {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
+                {settled ? 'Paid' : 'Pay / Settle remaining'}
               </Button>
               <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Bill (EN)</Button>
               <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> بل (UR)</Button>
@@ -95,11 +104,16 @@ export default function FarmerDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MoneyCard label="Total payable (products)" value={totalBilled} tone="neutral" />
         <MoneyCard label="Amount paid to farmer" value={totalPaid} tone="good" />
-        <MoneyCard label="Remaining to pay" value={farmer.outstandingBalance} tone="warn" />
+        <MoneyCard label="Remaining to pay" value={farmer.outstandingBalance} tone={settled ? 'good' : 'warn'} />
         <div className="card-3d p-5">
           <p className="text-sm text-gray-500">Contact</p>
           <p className="mt-1 font-medium">{farmer.phone || '—'}</p>
           <p className="text-sm text-gray-500">{farmer.city || farmer.address || ''}</p>
+          {settled && (
+            <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records
+            </p>
+          )}
         </div>
       </div>
 
