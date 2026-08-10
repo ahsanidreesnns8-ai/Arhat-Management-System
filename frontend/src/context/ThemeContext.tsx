@@ -58,10 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem('rehmani_user')
       if (stored) {
-        const user = JSON.parse(stored) as { username?: string }
-        if (user.username) {
-          authApi.updateTheme(user.username, toApi(newTheme)).catch(() => {})
-        }
+        authApi.updateTheme(toApi(newTheme)).catch(() => {})
       }
     } catch {
       // ignore persistence errors

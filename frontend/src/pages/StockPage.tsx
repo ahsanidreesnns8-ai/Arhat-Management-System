@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -7,6 +7,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import { useLiveReload } from '../context/SyncContext'
 import { stockApi, settingsApi } from '../services/api'
 import { formatNumber, formatDateTime } from '../utils/format'
 import type { Product, StockItem, StockTransaction } from '../types'
@@ -20,19 +21,20 @@ export default function StockPage() {
   const [form, setForm] = useState({ productId: '', quantity: '', type: 'INCOMING', notes: '' })
   const [saving, setSaving] = useState(false)
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     Promise.all([stockApi.getAll(), stockApi.getHistory(), settingsApi.getProducts()])
       .then(([s, h, p]) => {
         setStock(s.data.data)
         setHistory(h.data.data)
         setProducts(p.data.data)
       })
-      .catch(() => toast.error('Failed to load stock'))
-      .finally(() => setLoading(false))
-  }
+      .catch(() => { if (!soft) toast.error('Failed to load stock') })
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const handleAdjust = async () => {
     if (!form.productId || !form.quantity) {

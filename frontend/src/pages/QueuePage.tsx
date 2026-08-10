@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Play, CheckCircle, XCircle, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import { useLiveReload } from '../context/SyncContext'
 import { queueApi, dheriApi } from '../services/api'
 import type { Dheri, QueueEntry } from '../types'
 
@@ -18,8 +19,8 @@ export default function QueuePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedDheri, setSelectedDheri] = useState('')
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     Promise.all([queueApi.getPending(), queueApi.getActive(), queueApi.getCompleted(), dheriApi.getAll()])
       .then(([p, a, c, d]) => {
         setPending(p.data.data)
@@ -27,11 +28,12 @@ export default function QueuePage() {
         setCompleted(c.data.data)
         setDheris(d.data.data.filter((dh) => !dh.queueNumber))
       })
-      .catch(() => toast.error('Failed to load queue'))
-      .finally(() => setLoading(false))
-  }
+      .catch(() => { if (!soft) toast.error('Failed to load queue') })
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const handleAdd = async () => {
     if (!selectedDheri) return

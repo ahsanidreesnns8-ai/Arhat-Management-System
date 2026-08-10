@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dheriApi, farmerApi, saleApi, settingsApi, stockApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Buyer, Dheri, Farmer, Product, Sale, SaleItem, StockItem } from '../types'
@@ -39,13 +40,13 @@ export default function SalesPage() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<SaleItem[]>([emptyItem()])
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     saleApi.getAll()
       .then((res) => setSales(res.data.data || []))
-      .catch(() => toast.error('Failed to load sales'))
-      .finally(() => setLoading(false))
-  }
+      .catch(() => { if (!soft) toast.error('Failed to load sales') })
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
   useEffect(() => {
     load()
@@ -62,7 +63,8 @@ export default function SalesPage() {
       setProducts(p.data.data)
       setStock(s.data.data)
     }).catch(() => {})
-  }, [])
+  }, [load])
+  useLiveReload(() => load(true))
 
   const openCreate = () => {
     setBuyerId('')

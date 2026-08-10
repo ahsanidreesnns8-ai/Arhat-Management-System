@@ -18,6 +18,7 @@ public class SettingsService {
 
     private final BusinessSettingsRepository settingsRepository;
     private final ProductRepository productRepository;
+    private final WeatherCalendarService weatherCalendarService;
 
     public BusinessSettingsResponse getSettings() {
         BusinessSettings settings = settingsRepository.findAll().stream()
@@ -46,6 +47,39 @@ public class SettingsService {
         if (request.getPaymentReminderDays() != null) settings.setPaymentReminderDays(request.getPaymentReminderDays());
         // Gemini/Groq keys are env-managed (GEMINI_API_KEY / GROQ_API_KEY). Ignore client updates.
 
+        if (request.getWeatherLatitude() != null) settings.setWeatherLatitude(request.getWeatherLatitude());
+        if (request.getWeatherLongitude() != null) settings.setWeatherLongitude(request.getWeatherLongitude());
+        if (request.getWeatherLocationLabel() != null) settings.setWeatherLocationLabel(request.getWeatherLocationLabel().trim());
+        if (request.getWeatherTimezone() != null && !request.getWeatherTimezone().isBlank()) {
+            settings.setWeatherTimezone(request.getWeatherTimezone().trim());
+        }
+
+        if (Boolean.TRUE.equals(request.getResetHijriAuto())) {
+            settings.setHijriAdjustmentDays(0);
+        } else if (request.getHijriCorrectDay() != null
+                && request.getHijriCorrectMonth() != null
+                && request.getHijriCorrectYear() != null) {
+            int day = request.getHijriCorrectDay();
+            int month = request.getHijriCorrectMonth();
+            int year = request.getHijriCorrectYear();
+            if (day < 1 || day > 30 || month < 1 || month > 12 || year < 1300 || year > 1600) {
+                throw new IllegalArgumentException("Invalid Islamic date. Use day 1–30, month 1–12, year 1300–1600.");
+            }
+            int adjustment = weatherCalendarService.computeHijriAdjustment(
+                    day, month, year, settings.getWeatherTimezone());
+            // Keep offset in a practical range for moon-sighting differences
+            if (adjustment < -3 || adjustment > 3) {
+                throw new IllegalArgumentException("Islamic date correction is more than ±3 days from the calculated date. Check the values.");
+            }
+            settings.setHijriAdjustmentDays(adjustment);
+        } else if (request.getHijriAdjustmentDays() != null) {
+            int adj = request.getHijriAdjustmentDays();
+            if (adj < -3 || adj > 3) {
+                throw new IllegalArgumentException("Hijri adjustment must be between -3 and +3 days.");
+            }
+            settings.setHijriAdjustmentDays(adj);
+        }
+
         // Keep total commission in sync with share-of-total model
         if (settings.getArhatSharePercentage() != null
                 && settings.getSupervisorSharePercentage() != null
@@ -56,7 +90,9 @@ public class SettingsService {
                             .add(settings.getLaborSharePercentage()));
         }
 
-        return toResponse(settingsRepository.save(settings));
+        BusinessSettingsResponse response = toResponse(settingsRepository.save(settings));
+        weatherCalendarService.clearCache();
+        return response;
     }
 
     public List<ProductResponse> getProducts() {
@@ -89,6 +125,11 @@ public class SettingsService {
                 .paymentReminderDays(settings.getPaymentReminderDays())
                 // Never expose AI key status from DB; keys are env-managed
                 .geminiApiKeyConfigured(false)
+                .weatherLatitude(settings.getWeatherLatitude())
+                .weatherLongitude(settings.getWeatherLongitude())
+                .weatherLocationLabel(settings.getWeatherLocationLabel())
+                .weatherTimezone(settings.getWeatherTimezone())
+                .hijriAdjustmentDays(settings.getHijriAdjustmentDays())
                 .build();
     }
 }

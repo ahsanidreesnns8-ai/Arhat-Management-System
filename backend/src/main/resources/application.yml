@@ -8,8 +8,12 @@ spring:
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 20
+      # Sized for ~10 concurrent shared sessions without hanging
+      maximum-pool-size: 30
       minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
@@ -32,8 +36,12 @@ server:
 
 app:
   jwt:
-    secret: RehmaniTradingCompanySecretKey2026EnterpriseERPSystemSecureToken
-    expiration-ms: 86400000
+    # Override in production: JWT_SECRET=<long-random-secret>
+    secret: ${JWT_SECRET:RehmaniTradingCompanySecretKey2026EnterpriseERPSystemSecureToken}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    # Comma-separated origins for production domain, e.g. https://yourdomain.com,https://www.yourdomain.com
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   company:
     name: Rehmani Trading Company
   ai:

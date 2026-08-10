@@ -68,6 +68,31 @@ public class BusinessSettings {
     @Column(name = "gemini_api_key")
     private String geminiApiKey;
 
+    /** Weather location for navbar / AI (default: Lahore grain market area). */
+    @Column(name = "weather_latitude", nullable = false, precision = 10, scale = 6)
+    @Builder.Default
+    private BigDecimal weatherLatitude = new BigDecimal("31.520400");
+
+    @Column(name = "weather_longitude", nullable = false, precision = 10, scale = 6)
+    @Builder.Default
+    private BigDecimal weatherLongitude = new BigDecimal("74.358700");
+
+    @Column(name = "weather_location_label", nullable = false)
+    @Builder.Default
+    private String weatherLocationLabel = "Lahore";
+
+    @Column(name = "weather_timezone", nullable = false)
+    @Builder.Default
+    private String weatherTimezone = "Asia/Karachi";
+
+    /**
+     * Days to shift Islamic date relative to algorithmic Umm al-Qura conversion.
+     * Used when local moon-sighting differs; still advances automatically each day.
+     */
+    @Column(name = "hijri_adjustment_days", nullable = false)
+    @Builder.Default
+    private Integer hijriAdjustmentDays = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

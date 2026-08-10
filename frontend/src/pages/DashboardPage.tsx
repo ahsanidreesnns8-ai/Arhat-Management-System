@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -13,6 +13,7 @@ import StatCard from '../components/ui/StatCard'
 import PageHeader from '../components/ui/PageHeader'
 import { StatCardSkeleton, Skeleton } from '../components/ui/Skeleton'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
+import { useLiveReload } from '../context/SyncContext'
 import { dashboardApi } from '../services/api'
 import { formatCurrency, formatDateTime } from '../utils/format'
 import type { DashboardStats } from '../types'
@@ -47,12 +48,16 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     dashboardApi.getStats()
       .then((res) => setStats(res.data.data))
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!soft) setStats(null) })
+      .finally(() => { if (!soft) setLoading(false) })
   }, [])
+
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const statCards = stats ? [
     { title: "Today's Sales", value: formatCurrency(stats.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },

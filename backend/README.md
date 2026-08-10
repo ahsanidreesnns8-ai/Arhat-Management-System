@@ -49,3 +49,12 @@ Built from this folder via root `docker-compose.yml` (`backend` service, port `8
 export GEMINI_API_KEY=...
 export GROQ_API_KEY=...
 ```
+
+## Production security (recommended)
+
+```bash
+export JWT_SECRET='use-a-long-random-secret'
+export CORS_ALLOWED_ORIGINS='https://your-domain.com,https://www.your-domain.com'
+```
+
+Concurrent logins (same `owner` / password on multiple devices) are supported. Shared data stays in sync via `/api/sync/pulse`. Weather area and Islamic calendar correction are managed in Settings.

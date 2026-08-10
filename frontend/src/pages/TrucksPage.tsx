@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+import { useLiveReload } from '../context/SyncContext'
 import { truckApi, farmerApi } from '../services/api'
 import type { Farmer, Truck } from '../types'
 
@@ -36,14 +37,15 @@ export default function TrucksPage() {
       }))
   }, [form.registrationNumber, trucks])
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     Promise.all([truckApi.getAll(), farmerApi.getAll()])
       .then(([t, f]) => { setTrucks(t.data.data); setFarmers(f.data.data) })
-      .finally(() => setLoading(false))
-  }
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const handleCreate = async () => {
     if (!form.registrationNumber || !form.farmerId) {

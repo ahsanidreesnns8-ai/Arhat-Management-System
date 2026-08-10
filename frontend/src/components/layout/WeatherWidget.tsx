@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Cloud, CloudRain, CloudSun, Sun, Snowflake, Wind } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Cloud, CloudRain, CloudSun, MoonStar, Snowflake, Sun, Wind } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
-
-interface WeatherState {
-  temp: number
-  label: string
-  code: number
-}
+import { useBusiness } from '../../context/BusinessContext'
+import { useSync } from '../../context/SyncContext'
+import { weatherApi } from '../../services/api'
+import type { WeatherCalendar } from '../../types'
 
 function weatherIcon(code: number) {
   if (code === 0) return Sun
@@ -17,53 +15,30 @@ function weatherIcon(code: number) {
   return Wind
 }
 
-function weatherLabel(code: number, urdu: boolean) {
-  if (code === 0) return urdu ? 'صاف' : 'Clear'
-  if (code <= 2) return urdu ? 'جزوی ابر' : 'Partly cloudy'
-  if (code <= 48) return urdu ? 'ابر آلود' : 'Cloudy'
-  if (code <= 67 || (code >= 80 && code <= 82)) return urdu ? 'بارش' : 'Rain'
-  if (code >= 71 && code <= 77) return urdu ? 'برف' : 'Snow'
-  return urdu ? 'ہوا' : 'Windy'
-}
-
-/** Lahore grain market area — Open-Meteo (no API key) */
-const LAT = 31.5204
-const LON = 74.3587
-
 export default function WeatherWidget() {
   const { t, isUrdu } = useLanguage()
-  const [weather, setWeather] = useState<WeatherState | null>(null)
+  const { settings } = useBusiness()
+  const { revision } = useSync()
+  const [data, setData] = useState<WeatherCalendar | null>(null)
   const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weather_code&timezone=Asia%2FKarachi`
-        const res = await fetch(url)
-        if (!res.ok) throw new Error('weather failed')
-        const data = await res.json()
-        if (cancelled) return
-        const code = Number(data?.current?.weather_code ?? 0)
-        setWeather({
-          temp: Math.round(Number(data?.current?.temperature_2m ?? 0)),
-          code,
-          label: weatherLabel(code, isUrdu),
-        })
-        setFailed(false)
-      } catch {
-        if (!cancelled) setFailed(true)
-      }
+  const load = useCallback(async () => {
+    try {
+      const res = await weatherApi.get()
+      setData(res.data.data)
+      setFailed(false)
+    } catch {
+      setFailed(true)
     }
+  }, [])
+
+  useEffect(() => {
     load()
     const id = window.setInterval(load, 15 * 60 * 1000)
-    return () => {
-      cancelled = true
-      window.clearInterval(id)
-    }
-  }, [isUrdu])
+    return () => window.clearInterval(id)
+  }, [load, settings?.weatherLatitude, settings?.weatherLongitude, settings?.hijriAdjustmentDays, settings?.weatherLocationLabel, revision])
 
-  if (failed) {
+  if (failed && !data) {
     return (
       <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
         <Cloud className="h-3.5 w-3.5" />
@@ -72,7 +47,7 @@ export default function WeatherWidget() {
     )
   }
 
-  if (!weather) {
+  if (!data) {
     return (
       <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
         <Cloud className="h-3.5 w-3.5 animate-pulse" />
@@ -81,16 +56,38 @@ export default function WeatherWidget() {
     )
   }
 
-  const Icon = weatherIcon(weather.code)
+  const Icon = weatherIcon(data.weatherCode || 0)
+  const condition = isUrdu ? data.conditionUr : data.conditionEn
+  const hijri = isUrdu ? data.hijri.formattedUr : data.hijri.formattedEn
+  const area = data.locationLabel || settings?.weatherLocationLabel || '—'
 
   return (
     <div
-      className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-violet-500/10 shadow-[0_0_16px_rgba(56,189,248,0.12)]"
-      title={`${weather.label} · Lahore`}
+      className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10 max-w-[22rem]"
+      title={`${condition} · ${area} · ${hijri}`}
     >
-      <Icon className="h-3.5 w-3.5 text-cyan-400" />
-      <span className="text-slate-800 dark:text-slate-100">{weather.temp}°C</span>
-      <span className={`text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}>{weather.label}</span>
+      {data.weatherAvailable !== false && data.temperatureC != null ? (
+        <>
+          <Icon className="h-3.5 w-3.5 text-cyan-500 flex-shrink-0" />
+          <span className="text-slate-800 dark:text-slate-100 whitespace-nowrap">
+            {data.temperatureC}°C
+          </span>
+          <span className={`text-slate-500 truncate max-w-[4.5rem] ${isUrdu ? 'font-urdu' : ''}`}>
+            {condition}
+          </span>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span className={`text-slate-600 dark:text-slate-300 truncate max-w-[4rem] ${isUrdu ? 'font-urdu' : ''}`}>
+            {area}
+          </span>
+        </>
+      ) : (
+        <span className="text-slate-500">{t('weatherUnavailable')}</span>
+      )}
+      <span className="text-slate-300 dark:text-slate-600">|</span>
+      <MoonStar className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+      <span className={`text-slate-700 dark:text-slate-200 truncate ${isUrdu ? 'font-urdu' : ''}`} dir={isUrdu ? 'rtl' : 'ltr'}>
+        {hijri}
+      </span>
     </div>
   )
 }

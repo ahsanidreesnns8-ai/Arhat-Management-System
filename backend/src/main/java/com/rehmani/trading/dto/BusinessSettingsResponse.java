@@ -23,4 +23,9 @@ public class BusinessSettingsResponse {
     private Integer paymentReminderDays;
     /** Masked indicator — never returns the raw key. */
     private Boolean geminiApiKeyConfigured;
+    private BigDecimal weatherLatitude;
+    private BigDecimal weatherLongitude;
+    private String weatherLocationLabel;
+    private String weatherTimezone;
+    private Integer hijriAdjustmentDays;
 }

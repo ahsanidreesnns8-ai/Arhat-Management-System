@@ -1,9 +1,11 @@
 import { ArrowLeft, Menu, Sun, Moon, Monitor, Bell, LogOut, User } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useSync } from '../../context/SyncContext'
 import GlobalSearch from './GlobalSearch'
 import WeatherWidget from './WeatherWidget'
 import type { ThemeMode } from '../../types'
@@ -16,6 +18,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t, isUrdu } = useLanguage()
+  const { live, revision, lastSyncedAt } = useSync()
   const navigate = useNavigate()
   const location = useLocation()
   const isHome = location.pathname === '/dashboard'
@@ -92,11 +95,25 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           <motion.button
             type="button"
             className="nav-icon-btn relative text-slate-600 dark:text-slate-300"
+            title={live ? t('liveSyncOn') : t('liveSyncOff')}
+            onClick={() =>
+              toast.success(
+                live
+                  ? `${t('liveSyncOn')} · rev ${revision}${lastSyncedAt ? ` · ${new Date(lastSyncedAt).toLocaleTimeString()}` : ''}`
+                  : t('liveSyncOff'),
+              )
+            }
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.94 }}
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-gradient-to-br from-[#C5A059] to-[#E8C87A] shadow-[0_0_8px_rgba(197,160,89,0.8)]" />
+            <span
+              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
+                live
+                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+                  : 'bg-gradient-to-br from-[#C5A059] to-[#E8C87A] shadow-[0_0_8px_rgba(197,160,89,0.8)]'
+              }`}
+            />
           </motion.button>
 
           <div className="flex items-center gap-2 pl-3 border-l border-slate-200/70 dark:border-white/10">

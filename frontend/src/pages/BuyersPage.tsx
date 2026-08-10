@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Search, Eye, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -11,6 +11,7 @@ import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
+import { useLiveReload } from '../context/SyncContext'
 import { buyerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Buyer } from '../types'
@@ -28,15 +29,16 @@ export default function BuyersPage() {
   const [saving, setSaving] = useState(false)
   const [payBuyer, setPayBuyer] = useState<Buyer | null>(null)
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     buyerApi.getAll()
       .then((res) => setBuyers(res.data?.data ?? []))
-      .catch(() => toast.error('Failed to load buyers'))
-      .finally(() => setLoading(false))
-  }
+      .catch(() => { if (!soft) toast.error('Failed to load buyers') })
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const filtered = buyers.filter((b) =>
     b.name.toLowerCase().includes(search.toLowerCase()) ||

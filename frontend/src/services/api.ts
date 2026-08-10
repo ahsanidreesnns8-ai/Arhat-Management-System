@@ -3,28 +3,48 @@ import type {
   ApiResponse, AiChatResponse, BusinessSettings, Buyer, DashboardStats,
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
   ReportSummary, Sale, SearchResult, StockItem, StockTransaction,
-  SystemUser, Truck, User,
+  SyncPulse, SystemUser, Truck, User, WeatherCalendar,
 } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30000,
 })
 
 api.interceptors.request.use((config) => {
   const stored = localStorage.getItem('rehmani_user')
   if (stored) {
-    const user = JSON.parse(stored) as User
-    config.headers.Authorization = `Bearer ${user.token}`
+    try {
+      const user = JSON.parse(stored) as User
+      if (user?.token) config.headers.Authorization = `Bearer ${user.token}`
+    } catch {
+      // ignore corrupt session
+    }
   }
   return config
 })
 
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error?.response?.status
+    const url = String(error?.config?.url || '')
+    if (status === 401 && !url.includes('/auth/login')) {
+      localStorage.removeItem('rehmani_user')
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login')
+      }
+    }
+    return Promise.reject(error)
+  },
+)
+
 export const authApi = {
   login: (username: string, password: string) =>
     api.post<ApiResponse<User & { token: string }>>('/auth/login', { username, password }),
-  updateTheme: (username: string, theme: string) =>
-    api.put('/auth/theme', null, { params: { username, theme } }),
+  updateTheme: (theme: string) =>
+    api.put('/auth/theme', null, { params: { theme } }),
 }
 
 export const settingsApi = {
@@ -33,6 +53,14 @@ export const settingsApi = {
   update: (data: Partial<BusinessSettings>) =>
     api.put<ApiResponse<BusinessSettings>>('/settings', data),
   getProducts: () => api.get<ApiResponse<Product[]>>('/settings/products'),
+}
+
+export const weatherApi = {
+  get: () => api.get<ApiResponse<WeatherCalendar>>('/weather'),
+}
+
+export const syncApi = {
+  pulse: () => api.get<ApiResponse<SyncPulse>>('/sync/pulse'),
 }
 
 export const dashboardApi = {

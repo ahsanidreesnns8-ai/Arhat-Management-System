@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+import { useLiveReload } from '../context/SyncContext'
 import { dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Product } from '../types'
@@ -24,18 +25,19 @@ export default function DheriesPage() {
   const [form, setForm] = useState({ farmerId: '', productId: '', numberOfBags: '0', weightPerBag: '40', marketRate: '0', notes: '' })
   const [saving, setSaving] = useState(false)
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     Promise.all([dheriApi.getAll(), farmerApi.getAll(), settingsApi.getProducts()])
       .then(([d, f, p]) => {
         setDheris(d.data.data)
         setFarmers(f.data.data)
         setProducts(p.data.data)
       })
-      .finally(() => setLoading(false))
-  }
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const recentForFarmer = useMemo(() => {
     if (!form.farmerId) return []

@@ -31,6 +31,50 @@ export interface BusinessSettings {
   paymentReminderDays: number
   geminiApiKeyConfigured?: boolean
   geminiApiKey?: string
+  weatherLatitude?: number
+  weatherLongitude?: number
+  weatherLocationLabel?: string
+  weatherTimezone?: string
+  hijriAdjustmentDays?: number
+  /** Client-only fields used when saving Hijri correction */
+  hijriCorrectDay?: number
+  hijriCorrectMonth?: number
+  hijriCorrectYear?: number
+  resetHijriAuto?: boolean
+}
+
+export interface HijriDateInfo {
+  day: number
+  month: number
+  year: number
+  monthNameEn: string
+  monthNameUr: string
+  adjustmentDays: number
+  formattedEn: string
+  formattedUr: string
+  autoDaily: boolean
+}
+
+export interface WeatherCalendar {
+  locationLabel: string
+  latitude: number
+  longitude: number
+  timezone: string
+  temperatureC?: number | null
+  weatherCode: number
+  conditionEn: string
+  conditionUr: string
+  humidity?: number | null
+  windKmh?: number | null
+  gregorianDate: string
+  hijri: HijriDateInfo
+  weatherAvailable: boolean
+}
+
+export interface SyncPulse {
+  revision: number
+  serverTime: string
+  updatedAt?: string | null
 }
 
 export interface DashboardStats {

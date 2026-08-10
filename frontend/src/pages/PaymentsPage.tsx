@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
+import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, farmerApi, paymentApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Payment, Sale } from '../types'
@@ -19,16 +20,17 @@ export default function PaymentsPage() {
   const [partyOutstanding, setPartyOutstanding] = useState(0)
   const [partySales, setPartySales] = useState<Sale[]>([])
 
-  const load = () => {
-    setLoading(true)
+  const load = useCallback((soft = false) => {
+    if (!soft) setLoading(true)
     const req = dateFilter ? paymentApi.getByDate(dateFilter) : paymentApi.getAll()
     req
       .then((res) => setPayments(res.data.data || []))
-      .catch(() => toast.error('Failed to load payments'))
-      .finally(() => setLoading(false))
-  }
+      .catch(() => { if (!soft) toast.error('Failed to load payments') })
+      .finally(() => { if (!soft) setLoading(false) })
+  }, [dateFilter])
 
-  useEffect(() => { load() }, [dateFilter])
+  useEffect(() => { load() }, [load])
+  useLiveReload(() => load(true))
 
   const openEdit = async (p: Payment) => {
     try {

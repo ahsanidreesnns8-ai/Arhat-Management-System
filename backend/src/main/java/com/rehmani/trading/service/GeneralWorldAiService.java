@@ -386,12 +386,21 @@ public class GeneralWorldAiService {
     private Optional<String> tryWeatherQuestion(String q, boolean urdu) {
         if (!WEATHER_Q.matcher(q).find()) return Optional.empty();
         try {
+            BusinessSettings settings = settingsRepository.findAll().stream().findFirst().orElse(null);
+            double lat = settings != null && settings.getWeatherLatitude() != null
+                    ? settings.getWeatherLatitude().doubleValue() : 31.5204;
+            double lon = settings != null && settings.getWeatherLongitude() != null
+                    ? settings.getWeatherLongitude().doubleValue() : 74.3587;
+            String tz = settings != null && settings.getWeatherTimezone() != null
+                    ? settings.getWeatherTimezone() : "Asia/Karachi";
+            String area = settings != null && settings.getWeatherLocationLabel() != null
+                    ? settings.getWeatherLocationLabel() : "Lahore";
             String url = UriComponentsBuilder
                     .fromHttpUrl("https://api.open-meteo.com/v1/forecast")
-                    .queryParam("latitude", 31.5204)
-                    .queryParam("longitude", 74.3587)
+                    .queryParam("latitude", lat)
+                    .queryParam("longitude", lon)
                     .queryParam("current", "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m")
-                    .queryParam("timezone", "Asia/Karachi")
+                    .queryParam("timezone", tz)
                     .toUriString();
             JsonNode cur = objectMapper.readTree(
                     restClientBuilder.build().get().uri(url).retrieve().body(String.class)).path("current");
@@ -400,11 +409,11 @@ public class GeneralWorldAiService {
             double wind = cur.path("wind_speed_10m").asDouble();
             String condition = weatherLabel(cur.path("weather_code").asInt(), urdu);
             if (urdu) {
-                return Optional.of("لاہور علاقے کا موجودہ موسم:\n• حالت: " + condition
+                return Optional.of(area + " علاقے کا موجودہ موسم:\n• حالت: " + condition
                         + "\n• درجہ حرارت: " + Math.round(temp) + "°C\n• نمی: " + humidity
                         + "%\n• ہوا: " + Math.round(wind) + " km/h");
             }
-            return Optional.of("Current weather (Lahore area):\n• Condition: " + condition
+            return Optional.of("Current weather (" + area + " area):\n• Condition: " + condition
                     + "\n• Temperature: " + Math.round(temp) + "°C\n• Humidity: " + humidity
                     + "%\n• Wind: " + Math.round(wind) + " km/h");
         } catch (Exception ex) {
