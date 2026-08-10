@@ -302,6 +302,32 @@ export interface SystemUser {
   lastLoginAt?: string
 }
 
+export type ReportKey = 'sales' | 'commission' | 'stock' | 'profit'
+
+export interface ReportLine {
+  saleId?: number
+  invoiceNumber?: string
+  saleDate?: string
+  buyerName?: string
+  totalBags?: number
+  totalWeight?: number
+  totalAmount?: number
+  paidAmount?: number
+  dheriId?: number
+  dheriNumber?: string
+  farmerName?: string
+  totalPrice?: number
+  commissionAmount?: number
+  arhatShare?: number
+  supervisorShare?: number
+  laborShare?: number
+  productId?: number
+  productCode?: string
+  productName?: string
+  quantity?: number
+  lowStockAlert?: boolean
+}
+
 export interface ReportSummary {
   from?: string
   to?: string
@@ -314,6 +340,12 @@ export interface ReportSummary {
   profit?: number
   estimatedProfit?: number
   saleCount?: number
+  totalArhatShare?: number
+  totalSupervisorShare?: number
+  totalLaborShare?: number
+  totalQuantity?: number
+  lowStockCount?: number
+  lines?: ReportLine[]
   rows?: Record<string, unknown>[]
 }
 

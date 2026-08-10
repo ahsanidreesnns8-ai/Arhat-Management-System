@@ -33,7 +33,7 @@ const groups = [
     ur: 'ذہانت اور کنٹرول',
     items: [
       { icon: Bot, en: 'AI Assistant', ur: 'اے آئی اسسٹنٹ', dEn: 'Business + world Q&A with optional voice.', dUr: 'کاروبار + دنیا کے سوال، آواز کے ساتھ۔' },
-      { icon: BarChart3, en: 'Reports', ur: 'رپورٹس', dEn: 'Commission, sales, stock — Excel/PDF/print.', dUr: 'کمیشن، سیلز، اسٹاک — ایکسل/پی ڈی ایف۔' },
+      { icon: BarChart3, en: 'Reports', ur: 'رپورٹس', dEn: 'Commission, sales, stock — preview & print EN/UR.', dUr: 'کمیشن، سیلز، اسٹاک — پریویو اور پرنٹ اردو/انگریزی۔' },
       { icon: Settings, en: 'Business Settings', ur: 'کاروباری ترتیبات', dEn: 'Logo, address, commission rates, branding.', dUr: 'لوگو، پتہ، کمیشن، برانڈنگ۔' },
       { icon: Shield, en: 'Owner Panel', ur: 'مالک پینل', dEn: 'Users, audit trail, backups.', dUr: 'یوزرز، آڈٹ، بیک اپ۔' },
     ],

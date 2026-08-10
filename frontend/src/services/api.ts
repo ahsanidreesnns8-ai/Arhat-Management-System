@@ -239,12 +239,6 @@ export const reportApi = {
   stock: () => api.get<ApiResponse<ReportSummary>>('/reports/stock'),
   profit: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/profit', { params: { from, to } }),
-  exportExcel: (type: string, from?: string, to?: string) =>
-    api.get(`/reports/export/${type}.xlsx`, {
-      params: { from, to },
-      responseType: 'blob',
-      headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*' },
-    }),
 }
 
 export const userApi = {

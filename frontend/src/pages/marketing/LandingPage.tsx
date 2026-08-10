@@ -53,7 +53,7 @@ const powerFeatures = [
   { icon: Receipt, en: 'Sales & Bills', ur: 'سیلز اور بل', descEn: 'EN/UR receipts with logo and Gala Mandi footer.', descUr: 'لوگو اور گالا منڈی فوٹر کے ساتھ دو زبانی رسیدیں۔' },
   { icon: Wallet, en: 'Payments & Cashbook', ur: 'ادائیگی اور کیش بک', descEn: 'Pay farmers, receive from buyers, filter by date.', descUr: 'کسان کو ادا، خریدار سے وصول، تاریخ سے فلٹر۔' },
   { icon: Warehouse, en: 'Stock Control', ur: 'اسٹاک کنٹرول', descEn: 'In/out movements and low-stock visibility.', descUr: 'آمد/روانگی اور کم اسٹاک کی صورتحال۔' },
-  { icon: BarChart3, en: 'Mandi Reports', ur: 'منڈی رپورٹس', descEn: 'Commission, sales, balances — Excel/PDF ready.', descUr: 'کمیشن، فروخت، بیلنس — ایکسل/پی ڈی ایف۔' },
+  { icon: BarChart3, en: 'Mandi Reports', ur: 'منڈی رپورٹس', descEn: 'Commission, sales, stock — preview & print EN/UR.', descUr: 'کمیشن، فروخت، اسٹاک — پریویو اور پرنٹ اردو/انگریزی۔' },
   { icon: Bot, en: 'AI Digital Munshi', ur: 'اے آئی ڈیجیٹل منشی', descEn: 'Ask in Urdu or English about stock, sales, balances.', descUr: 'اردو یا انگریزی میں اسٹاک، سیلز، بیلنس پوچھیں۔' },
   { icon: FileText, en: 'Complete Records Hub', ur: 'مکمل ریکارڈز', descEn: 'One place for every farmer, sale, and payment.', descUr: 'ہر کسان، فروخت اور ادائیگی ایک جگہ۔' },
   { icon: Shield, en: 'Owner Controls', ur: 'مالک کنٹرول', descEn: 'Users, audit logs, backups, and role security.', descUr: 'یوزرز، آڈٹ لاگ، بیک اپ اور رول سیکیورٹی۔' },
