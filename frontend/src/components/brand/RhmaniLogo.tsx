@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useLanguage } from '../../context/LanguageContext'
 import { useBusiness } from '../../context/BusinessContext'
@@ -22,6 +22,18 @@ const sizeMap = {
 const FALLBACK_FULL = '/rehmani-logo.svg'
 const FALLBACK_MARK = '/rehmani-mark.svg'
 
+function uniqueSources(...candidates: Array<string | undefined | null>) {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const c of candidates) {
+    const v = c?.trim()
+    if (!v || seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+  }
+  return out
+}
+
 export default function RhmaniLogo({
   size = 'sm',
   showText = true,
@@ -31,13 +43,29 @@ export default function RhmaniLogo({
 }: RhmaniLogoProps) {
   const { isUrdu } = useLanguage()
   const { settings, companyName } = useBusiness()
-  const [imgFailed, setImgFailed] = useState(false)
   const s = sizeMap[size]
+  const customLogo = settings?.companyLogoUrl?.trim() || ''
 
-  const customLogo = settings?.companyLogoUrl?.trim()
-  const fullSrc = customLogo || FALLBACK_FULL
-  const markSrc = customLogo || FALLBACK_MARK
+  const sources = useMemo(() => {
+    if (variant === 'full') {
+      return uniqueSources(customLogo, FALLBACK_FULL, FALLBACK_MARK)
+    }
+    // Sidebar/mark: prefer compact mark; still try custom URL first if user set one
+    return uniqueSources(customLogo, FALLBACK_MARK, FALLBACK_FULL)
+  }, [customLogo, variant])
+
+  const [srcIndex, setSrcIndex] = useState(0)
+  useEffect(() => {
+    setSrcIndex(0)
+  }, [sources.join('|')])
+
+  const src = sources[srcIndex]
+  const imgFailed = !src
   const alt = isUrdu ? 'رحمانی ٹریڈنگ کمپنی' : companyName || 'Rehmani Trading Company'
+
+  const onImgError = () => {
+    setSrcIndex((i) => i + 1)
+  }
 
   if (variant === 'full') {
     return (
@@ -48,11 +76,12 @@ export default function RhmaniLogo({
       >
         {!imgFailed ? (
           <img
-            src={fullSrc}
+            key={src}
+            src={src}
             alt={alt}
             className={`${s.full} h-auto object-contain drop-shadow-lg`}
             draggable={false}
-            onError={() => setImgFailed(true)}
+            onError={onImgError}
           />
         ) : (
           <BrandFallback light={light} size={size} isUrdu={isUrdu} name={companyName} />
@@ -80,11 +109,12 @@ export default function RhmaniLogo({
       >
         {!imgFailed ? (
           <img
-            src={markSrc}
+            key={src}
+            src={src}
             alt="RTC"
             className="w-full h-full object-contain p-0.5"
             draggable={false}
-            onError={() => setImgFailed(true)}
+            onError={onImgError}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-[#002D62] text-[#C5A059] font-bold text-xs">

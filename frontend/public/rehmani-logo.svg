@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 560" role="img" aria-label="Rehmani Trading Company">
   <defs>
     <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -71,5 +72,5 @@
   <line x1="285" y1="475" x2="370" y2="475" stroke="#002D62" stroke-width="1.5"/>
 
   <!-- Motto -->
-  <text x="260" y="515" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#002D62" letter-spacing="3">TRUST · QUALITY · GROWTH</text>
+  <text x="260" y="515" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#002D62" letter-spacing="3">TRUST Â· QUALITY Â· GROWTH</text>
 </svg>

@@ -336,9 +336,16 @@ export default function SettingsPage() {
             {(settings?.companyLogoUrl || '/rehmani-logo.svg') && (
               <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white p-4 flex justify-center">
                 <img
+                  key={settings?.companyLogoUrl || '/rehmani-logo.svg'}
                   src={settings?.companyLogoUrl || '/rehmani-logo.svg'}
                   alt="Logo preview"
                   className="h-28 w-auto object-contain"
+                  onError={(e) => {
+                    const img = e.currentTarget
+                    if (img.dataset.fallback === '1') return
+                    img.dataset.fallback = '1'
+                    img.src = '/rehmani-mark.svg'
+                  }}
                 />
               </div>
             )}

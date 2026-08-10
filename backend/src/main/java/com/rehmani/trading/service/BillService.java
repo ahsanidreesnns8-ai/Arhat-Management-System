@@ -426,7 +426,7 @@ public class BillService {
         try {
             ClassPathResource resource = new ClassPathResource("static/rehmani-logo.svg");
             if (resource.exists()) {
-                byte[] bytes = StreamUtils.copyToByteArray(resource.getInputStream());
+                byte[] bytes = normalizeSvgUtf8(StreamUtils.copyToByteArray(resource.getInputStream()));
                 return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(bytes);
             }
         } catch (Exception ignored) {
@@ -437,6 +437,26 @@ public class BillService {
             return escape(url);
         }
         return null;
+    }
+
+    /** Fix legacy Latin-1 middle-dots (0xB7) that break SVG as UTF-8 in browsers. */
+    private byte[] normalizeSvgUtf8(byte[] bytes) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(bytes.length + 32);
+        for (int i = 0; i < bytes.length; i++) {
+            int b = bytes[i] & 0xFF;
+            // Lone Latin-1 middot — not already part of UTF-8 C2 B7
+            if (b == 0xB7 && (i == 0 || (bytes[i - 1] & 0xFF) != 0xC2)) {
+                out.write(0xC2);
+                out.write(0xB7);
+            } else {
+                out.write(b);
+            }
+        }
+        String svg = out.toString(java.nio.charset.StandardCharsets.UTF_8);
+        if (!svg.contains("encoding=")) {
+            svg = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + svg;
+        }
+        return svg.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private boolean isUrdu(String lang) {
