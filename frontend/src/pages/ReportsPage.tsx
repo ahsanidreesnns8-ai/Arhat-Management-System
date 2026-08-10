@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { BarChart3, Eye, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -9,6 +10,12 @@ import { reportApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { buildReportHtml, openReportPrint } from '../utils/reportPrint'
 import type { ReportKey, ReportSummary } from '../types'
+
+const REPORT_KEYS: ReportKey[] = ['sales', 'commission', 'stock', 'profit']
+
+function isReportKey(value: string | null): value is ReportKey {
+  return !!value && REPORT_KEYS.includes(value as ReportKey)
+}
 
 const reports: { key: ReportKey; title: string; titleUr: string; description: string; hasRange?: boolean }[] = [
   {
@@ -42,12 +49,15 @@ const reports: { key: ReportKey; title: string; titleUr: string; description: st
 
 export default function ReportsPage() {
   const { companyName } = useBusiness()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [preview, setPreview] = useState<ReportSummary | null>(null)
   const [active, setActive] = useState<ReportKey | null>(null)
   const [loadingKey, setLoadingKey] = useState<ReportKey | null>(null)
   const [printing, setPrinting] = useState<string | null>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const autoLoaded = useRef<string | null>(null)
 
   const fetchReport = async (key: ReportKey) => {
     const res =
@@ -61,13 +71,20 @@ export default function ReportsPage() {
     return res.data.data
   }
 
-  const loadPreview = async (key: ReportKey) => {
+  const loadPreview = async (key: ReportKey, opts?: { silent?: boolean; scroll?: boolean }) => {
     setLoadingKey(key)
     setActive(key)
     try {
       const data = await fetchReport(key)
       setPreview(data)
-      toast.success('Report loaded')
+      if (!opts?.silent) toast.success('Report loaded')
+      if (opts?.scroll !== false) {
+        setTimeout(() => previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+      }
+      // Keep URL in sync so Records → Commission deep-link stays accurate
+      const next = new URLSearchParams(searchParams)
+      next.set('type', key)
+      setSearchParams(next, { replace: true })
     } catch {
       toast.error('Failed to load report')
       setPreview(null)
@@ -75,6 +92,15 @@ export default function ReportsPage() {
       setLoadingKey(null)
     }
   }
+
+  // Deep-link from Records hub: /reports?type=commission (once on open)
+  useEffect(() => {
+    const type = searchParams.get('type')
+    if (!isReportKey(type) || autoLoaded.current === type) return
+    autoLoaded.current = type
+    void loadPreview(type, { silent: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const printReport = async (key: ReportKey, lang: 'en' | 'ur') => {
     const token = `${key}-${lang}`
@@ -158,7 +184,7 @@ export default function ReportsPage() {
       </div>
 
       {preview && active && (
-        <div className="card p-6 space-y-4">
+        <div ref={previewRef} className="card p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold capitalize">{active} summary</h3>
             <div className="flex flex-wrap gap-2">
