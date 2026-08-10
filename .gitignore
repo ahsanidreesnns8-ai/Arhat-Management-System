@@ -28,3 +28,6 @@ backend/data/
 
 # Docker
 mysql_data/
+
+# Vite cache
+frontend/.vite/
