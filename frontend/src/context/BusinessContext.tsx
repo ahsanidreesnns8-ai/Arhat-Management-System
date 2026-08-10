@@ -24,10 +24,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         ? await settingsApi.get()
         : await settingsApi.getPublic()
       setSettings(res.data.data)
-      document.title = `${res.data.data.companyName} — ERP`
+      document.title = `${res.data.data.companyName} — Mandi ERP`
     } catch {
       setSettings(null)
-      document.title = `${defaultName} — ERP`
+      document.title = `${defaultName} — Mandi ERP`
     } finally {
       setLoading(false)
     }

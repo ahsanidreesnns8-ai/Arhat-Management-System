@@ -54,7 +54,7 @@ export default function LoginPage() {
       else localStorage.removeItem('rehmani_remember_user')
       setSuccess(true)
       toast.success(`${t('welcomeBack')} — ${companyName || t('brandName')}`)
-      setTimeout(() => navigate('/'), 900)
+      setTimeout(() => navigate('/dashboard'), 900)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Access Denied')

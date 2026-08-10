@@ -6,8 +6,14 @@ import { BusinessProvider } from './context/BusinessContext'
 import { LanguageProvider } from './context/LanguageContext'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
+import MarketingLayout from './components/marketing/MarketingLayout'
 
 import LoginPage from './pages/LoginPage'
+import LandingPage from './pages/marketing/LandingPage'
+import FeaturesPage from './pages/marketing/FeaturesPage'
+import HowItWorksPage from './pages/marketing/HowItWorksPage'
+import AboutPage from './pages/marketing/AboutPage'
+import ContactPage from './pages/marketing/ContactPage'
 import DashboardPage from './pages/DashboardPage'
 import FarmersPage from './pages/FarmersPage'
 import FarmerDetailPage from './pages/FarmerDetailPage'
@@ -32,16 +38,25 @@ import OwnerPage from './pages/OwnerPage'
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
-  if (isAuthenticated) return <Navigate to="/" replace />
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 
 function AppRoutes() {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN'
 
   return (
     <Routes>
+      {/* Public marketing site (Pakka Khata–style structure) */}
+      <Route element={<MarketingLayout />}>
+        <Route index element={<LandingPage />} />
+        <Route path="features" element={<FeaturesPage />} />
+        <Route path="how-it-works" element={<HowItWorksPage />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="contact" element={<ContactPage />} />
+      </Route>
+
       <Route
         path="/login"
         element={
@@ -51,15 +66,15 @@ function AppRoutes() {
         }
       />
 
+      {/* Authenticated ERP app */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <AppLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="farmers" element={<FarmersPage />} />
         <Route path="farmers/:id" element={<FarmerDetailPage />} />
         <Route path="buyers" element={<BuyersPage />} />
@@ -81,11 +96,14 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route
           path="owner"
-          element={isOwner ? <OwnerPage /> : <Navigate to="/" replace />}
+          element={isOwner ? <OwnerPage /> : <Navigate to="/dashboard" replace />}
         />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="*"
+        element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} replace />}
+      />
     </Routes>
   )
 }

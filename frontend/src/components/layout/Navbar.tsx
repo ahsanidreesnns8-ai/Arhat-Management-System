@@ -18,7 +18,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { t, isUrdu } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
-  const isHome = location.pathname === '/'
+  const isHome = location.pathname === '/dashboard'
 
   const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
     { value: 'light', icon: Sun, label: 'Light' },
@@ -35,7 +35,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const goBack = () => {
     if (isHome) return
     if (window.history.length > 1) navigate(-1)
-    else navigate('/')
+    else navigate('/dashboard')
   }
 
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor

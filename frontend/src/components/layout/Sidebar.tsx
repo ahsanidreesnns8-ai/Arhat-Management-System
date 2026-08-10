@@ -11,7 +11,7 @@ import { navItem, staggerContainer } from '../../utils/motion'
 import type { TranslationKey } from '../../i18n/translations'
 
 const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: TranslationKey; ownerOnly?: boolean }[] = [
-  { to: '/', icon: LayoutDashboard, labelKey: 'dashboard' },
+  { to: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard' },
   { to: '/farmers', icon: Users, labelKey: 'farmers' },
   { to: '/buyers', icon: ShoppingBag, labelKey: 'buyers' },
   { to: '/trucks', icon: Truck, labelKey: 'trucks' },
@@ -63,7 +63,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               <motion.div key={item.to} variants={navItem}>
                 <NavLink
                   to={item.to}
-                  end={item.to === '/'}
+                  end={item.to === '/dashboard'}
                   className={({ isActive }) =>
                     `sidebar-link relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium ${
                       isActive ? 'sidebar-link-active' : ''
