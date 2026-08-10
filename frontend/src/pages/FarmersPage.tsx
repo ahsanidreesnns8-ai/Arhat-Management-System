@@ -30,8 +30,11 @@ export default function FarmersPage() {
   const load = () => {
     setLoading(true)
     farmerApi.getAll()
-      .then((res) => setFarmers(res.data.data))
-      .catch(() => toast.error('Failed to load farmers'))
+      .then((res) => setFarmers(res.data?.data ?? []))
+      .catch(() => {
+        setFarmers([])
+        toast.error('Failed to load farmers')
+      })
       .finally(() => setLoading(false))
   }
 

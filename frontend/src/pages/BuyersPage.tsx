@@ -30,7 +30,7 @@ export default function BuyersPage() {
   const load = () => {
     setLoading(true)
     buyerApi.getAll()
-      .then((res) => setBuyers(res.data.data))
+      .then((res) => setBuyers(res.data?.data ?? []))
       .catch(() => toast.error('Failed to load buyers'))
       .finally(() => setLoading(false))
   }
