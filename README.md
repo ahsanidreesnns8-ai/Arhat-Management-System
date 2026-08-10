@@ -12,11 +12,23 @@ Full-stack grain trading & commission agency (**arhat**) management system.
 
 ```
 ├── backend/      Spring Boot REST API (Java 17)
-├── frontend/     React (Vite) SPA — premium 3D glass UI
+├── frontend/     React (Vite) SPA — marketing site + ERP app
 ├── database/     MySQL schema pack + Workbench SQL queries
 ├── docker-compose.yml
 └── PROJECT_STRUCTURE.md
 ```
+
+### Website structure (inspired by [Pakka Khata](https://pakkakhata.com/))
+
+| URL | Purpose |
+|-----|---------|
+| `/` | Public landing — hero, features, AI munshi, audiences, steps |
+| `/features` | Full mandi feature catalog |
+| `/how-it-works` | Day workflow from login to bills |
+| `/about` | Mission, vision, business details |
+| `/contact` | Demo / support form + phone/email |
+| `/login` | Staff login |
+| `/dashboard` … | Authenticated ERP (farmers, arhat, payments, …) |
 
 See **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** for the full tree.  
 Folder guides: [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md) · [database/README.md](database/README.md)
