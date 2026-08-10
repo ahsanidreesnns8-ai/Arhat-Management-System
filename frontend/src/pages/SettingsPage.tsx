@@ -379,14 +379,6 @@ export default function SettingsPage() {
             <Input label="Low Stock Threshold" type="number" value={settings?.lowStockThreshold || 100} onChange={(e) => update('lowStockThreshold', parseFloat(e.target.value))} />
           </div>
         </div>
-
-        <div className="card-3d p-6 lg:col-span-2">
-          <h3 className={`text-lg font-semibold mb-4 ${isUrdu ? 'font-urdu' : ''}`}>{t('notificationSettings')}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Backup Reminder (days)" type="number" value={settings?.backupReminderDays || 7} onChange={(e) => update('backupReminderDays', parseInt(e.target.value))} />
-            <Input label="Payment Reminder (days)" type="number" value={settings?.paymentReminderDays || 3} onChange={(e) => update('paymentReminderDays', parseInt(e.target.value))} />
-          </div>
-        </div>
       </div>
     </div>
   )
