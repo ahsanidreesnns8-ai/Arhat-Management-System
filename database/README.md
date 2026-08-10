@@ -1,12 +1,23 @@
-# Rehmani Trading — Database Pack
+# Database — MySQL pack
 
-This folder contains everything you need to inspect and verify money, dheris, sales, and payments in **MySQL Workbench**.
+Readable SQL pack for **MySQL Workbench**. Runtime migrations still live in  
+`backend/src/main/resources/db/migration/` (keep both in sync).
+
+## Folder layout
+
+```
+database/
+├── migrations/   # Flyway V1–V6 (copy for inspection)
+├── schema/       # Create database helpers
+├── queries/      # Ready Workbench reports
+└── seed/         # Seed / default-user notes
+```
 
 ## Contents
 
 | Path | Purpose |
 |------|---------|
-| `migrations/` | Flyway SQL files used by the Spring Boot app (source of truth) |
+| `migrations/` | Flyway SQL files (mirror of backend migrations) |
 | `schema/01_create_database.sql` | Create DB + quick setup notes |
 | `queries/` | Ready-to-run Workbench queries for balances and day-wise records |
 | `seed/` | Notes about default seed data |
