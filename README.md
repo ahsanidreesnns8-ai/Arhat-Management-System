@@ -1,41 +1,59 @@
-# Rehmani Trading Company — Enterprise ERP
+# Arhat Management System (Rehmani Trading ERP)
 
-Grain trading & commission agency (arhat) management system.
+Full-stack grain trading & commission agency (**arhat**) management system.
 
-**Stack:** React + Vite + Tailwind · Java Spring Boot · MySQL · JWT
+**Repo:** https://github.com/ahsanidreesnns8-ai/Arhat-Management-System-
+
+**Stack:** React + Vite + Tailwind · Java Spring Boot 3 · MySQL · JWT · Flyway
+
+---
+
+## Repository layout
+
+```
+├── backend/      Spring Boot REST API (Java 17)
+├── frontend/     React (Vite) SPA — premium 3D glass UI
+├── database/     MySQL schema pack + Workbench SQL queries
+├── docker-compose.yml
+└── PROJECT_STRUCTURE.md
+```
+
+See **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** for the full tree.  
+Folder guides: [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md) · [database/README.md](database/README.md)
+
+---
 
 ## Quick start
 
 ### Prerequisites
 - Java 17+
 - Node.js 18+
-- MySQL 8+ (or use the included Docker Compose)
+- MySQL 8+ *(or Docker Compose)*
 
-### Database
+### 1) Database
 ```bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS rehmani_trading;"
 ```
+Or open `database/schema/01_create_database.sql` in MySQL Workbench.
 
-Default Flyway migrations create schema, products, and owner user.
-
-### Backend
+### 2) Backend
 ```bash
 cd backend
-# optional: export SPRING_DATASOURCE_PASSWORD=yourpassword
 mvn spring-boot:run
 ```
-API: `http://localhost:8080/api`  
-Health: `http://localhost:8080/api/health`
+- API: `http://localhost:8080/api`
+- Health: `http://localhost:8080/api/health`
 
-### Frontend
+### 3) Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-App: `http://localhost:5173`
+- App: `http://localhost:5173`
 
 ### Default login
+
 | Field | Value |
 |-------|-------|
 | Username | `owner` |
@@ -47,49 +65,25 @@ Change this password immediately in production.
 ```bash
 docker compose up -d --build
 ```
-- UI: http://localhost:5173  
-- API: http://localhost:8080/api  
-- MySQL: localhost:3306
+| Service | URL |
+|---------|-----|
+| UI | http://localhost:5173 |
+| API | http://localhost:8080/api |
+| MySQL | localhost:3306 (`root` / `root`) |
+
+---
 
 ## Modules
-Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Queue · Sales (mixed-source) · Records · Reports (Excel/PDF/Print) · Settings · Owner Panel · AI Assistant · Global Search · Bills
+Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Arhat Sale · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant (voice) · Global Search · Bilingual bills
 
 ## AI Assistant
-Answers **business data** (stock, queue, sales, balances, commission) and **general world questions**.
-Supports **voice** (mic + spoken replies) in the chat panel.
-
-API keys are **server-side only** (not shown in Settings):
+Server-side keys only (not in Settings UI):
 
 ```bash
-export GEMINI_API_KEY=your_key_here   # https://aistudio.google.com/apikey
-# optional fallback:
+export GEMINI_API_KEY=your_key_here
+# optional:
 export GROQ_API_KEY=your_groq_key
 ```
 
-Without a cloud key, the assistant still answers using Wikipedia, dictionary, weather, math, and ERP data.
-
-## Project layout
-```
-backend/     Spring Boot REST API
-frontend/    React (Vite) SPA
-database/    MySQL schema pack + Workbench queries
-docker-compose.yml
-```
-
 ## Database / MySQL Workbench
-See [`database/README.md`](database/README.md) for:
-- Creating `rehmani_trading`
-- Flyway migrations under `database/migrations/`
-- Ready SQL queries for farmer payables, buyer receivables, dheri payments by day, and day cashbook
-
-```sql
--- Quick connect after backend has run once
-USE rehmani_trading;
-SOURCE database/queries/01_overview_balances.sql;
-```
-
-## Arhat Sale
-Sidebar → **Arhat Sale**: calculator-style product settlement for
-- **Sell to Buyer** (receivable + optional cash now)
-- **Farmer Product Payable** (posts payable + optional pay now)
-Then open **Dheri detail** or **Payments** (date filter) for day-wise records.
+See [`database/README.md`](database/README.md) for migrations, seed notes, and ready queries (`queries/01` … `07`).
