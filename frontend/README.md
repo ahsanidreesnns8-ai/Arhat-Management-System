@@ -4,14 +4,21 @@ React · Vite · TypeScript · Tailwind · Framer Motion
 
 ## Run locally
 
+Backend must be running first (otherwise Dashboard/Stock show empty / errors):
+
 ```bash
+# terminal 1 — API
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+
+# terminal 2 — UI
 cd frontend
 npm install
 npm run dev
 ```
 
 App: `http://localhost:5173`  
-API proxy / base URL targets the backend at `http://localhost:8080/api`.
+Vite proxies `/api` → `http://127.0.0.1:8080`. If Stock/Dashboard fail, hard-refresh after both processes are up.
 
 ## Build
 
