@@ -59,6 +59,7 @@ export const translations = {
     aiVoiceOff: 'Mute spoken replies',
     dashboardWelcome: 'live business overview',
     allRights: 'All rights reserved.',
+    goBack: 'Back',
     loginHero: 'Professional grain trading management with real-time stock, intelligent pricing, and complete business records.',
   },
   ur: {
@@ -119,6 +120,7 @@ export const translations = {
     aiVoiceOff: 'آواز بند کریں',
     dashboardWelcome: 'لائیو کاروباری جائزہ',
     allRights: 'جملہ حقوق محفوظ ہیں۔',
+    goBack: 'واپس',
     loginHero: 'ریئل ٹائم اسٹاک، ذہین قیمتوں اور مکمل کاروباری ریکارڈ کے ساتھ پیشہ ورانہ اناج تجارت کا نظام۔',
   },
 } as const

@@ -91,14 +91,14 @@ export default function DashboardPage() {
         <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Weekly Sales Trend</h3>
-            <Link to="/sales" className="text-sm text-cyan-500 dark:text-cyan-300 hover:underline">View sales</Link>
+            <Link to="/sales" className="text-sm text-primary dark:text-accent-500 hover:underline">View sales</Link>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.45} />
-                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#002D62" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="#C5A059" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
@@ -106,16 +106,16 @@ export default function DashboardPage() {
               <YAxis stroke="#94a3b8" fontSize={12} />
               <Tooltip
                 contentStyle={{
-                  background: 'rgba(15,23,42,0.92)',
-                  border: '1px solid rgba(56,189,248,0.25)',
+                  background: 'rgba(11,29,54,0.94)',
+                  border: '1px solid rgba(197,160,89,0.3)',
                   borderRadius: 12,
-                  color: '#E2E8F0',
+                  color: '#F3EFE6',
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#38BDF8"
+                stroke="#3B6FA8"
                 fill="url(#salesGrad)"
                 strokeWidth={2.5}
                 isAnimationActive
@@ -135,14 +135,14 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Stock Levels</h3>
-            <Link to="/stock" className="text-sm text-cyan-500 dark:text-cyan-300 hover:underline">View stock</Link>
+            <Link to="/stock" className="text-sm text-primary dark:text-accent-500 hover:underline">View stock</Link>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
               <defs>
                 <linearGradient id="stockGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#A78BFA" />
-                  <stop offset="100%" stopColor="#22D3EE" />
+                  <stop offset="0%" stopColor="#C5A059" />
+                  <stop offset="100%" stopColor="#0A3A75" />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
@@ -150,10 +150,10 @@ export default function DashboardPage() {
               <YAxis stroke="#94a3b8" fontSize={12} />
               <Tooltip
                 contentStyle={{
-                  background: 'rgba(15,23,42,0.92)',
-                  border: '1px solid rgba(139,92,246,0.3)',
+                  background: 'rgba(11,29,54,0.94)',
+                  border: '1px solid rgba(197,160,89,0.3)',
                   borderRadius: 12,
-                  color: '#E2E8F0',
+                  color: '#F3EFE6',
                 }}
               />
               <Bar
@@ -171,7 +171,7 @@ export default function DashboardPage() {
 
       <motion.div className="card-3d p-6" variants={fadeUp} initial="hidden" animate="show">
         <div className="flex items-center gap-2 mb-4">
-          <Activity className="h-5 w-5 text-cyan-400" />
+          <Activity className="h-5 w-5 text-accent" />
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Activity</h3>
         </div>
         {loading ? (
@@ -186,7 +186,7 @@ export default function DashboardPage() {
               <StaggerItem key={i}>
                 <Link to={activityLink(item.entityType)}>
                   <motion.div
-                    className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-gradient-to-r from-sky-500/5 to-violet-500/10 hover:from-sky-500/10 hover:to-violet-500/15 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-xl border border-primary/5 dark:border-accent/10 bg-gradient-to-r from-primary/5 to-accent/10 hover:from-primary/10 hover:to-accent/15 transition-colors"
                     whileHover={{ x: 4, scale: 1.01 }}
                   >
                     <div>

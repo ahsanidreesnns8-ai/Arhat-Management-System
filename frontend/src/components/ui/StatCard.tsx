@@ -13,12 +13,12 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  blue: 'bg-sky-500/15 text-sky-600 dark:text-sky-300 shadow-[0_0_18px_rgba(56,189,248,0.2)]',
-  green: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,0.2)]',
-  orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.2)]',
-  teal: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.22)]',
-  red: 'bg-rose-500/15 text-rose-600 dark:text-rose-300 shadow-[0_0_18px_rgba(244,63,94,0.2)]',
-  amber: 'bg-violet-500/15 text-violet-600 dark:text-violet-300 shadow-[0_0_18px_rgba(139,92,246,0.22)]',
+  blue: 'bg-primary/10 text-primary dark:text-[#7BA3D4] shadow-[0_0_16px_rgba(0,45,98,0.18)]',
+  green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.18)]',
+  orange: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 shadow-[0_0_16px_rgba(249,115,22,0.18)]',
+  teal: 'bg-accent/15 text-accent-600 dark:text-accent-500 shadow-[0_0_16px_rgba(197,160,89,0.2)]',
+  red: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 shadow-[0_0_16px_rgba(244,63,94,0.18)]',
+  amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 shadow-[0_0_16px_rgba(245,158,11,0.18)]',
 }
 
 export default function StatCard({ title, value, icon, trend, color = 'teal', to }: StatCardProps) {
@@ -41,7 +41,7 @@ export default function StatCard({ title, value, icon, trend, color = 'teal', to
           />
           {trend && <p className="text-xs text-slate-400 mt-1">{trend}</p>}
           {to && (
-            <p className="text-xs text-cyan-500 dark:text-cyan-300 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <p className="text-xs text-primary dark:text-accent-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
               Open details →
             </p>
           )}

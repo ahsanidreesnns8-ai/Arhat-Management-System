@@ -1,4 +1,5 @@
-import { Menu, Sun, Moon, Monitor, Bell, LogOut, User } from 'lucide-react'
+import { ArrowLeft, Menu, Sun, Moon, Monitor, Bell, LogOut, User } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -15,6 +16,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t, isUrdu } = useLanguage()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isHome = location.pathname === '/'
 
   const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
     { value: 'light', icon: Sun, label: 'Light' },
@@ -28,21 +32,46 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     setTheme(order[(idx + 1) % order.length])
   }
 
+  const goBack = () => {
+    if (isHome) return
+    if (window.history.length > 1) navigate(-1)
+    else navigate('/')
+  }
+
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
 
   return (
     <header className="app-navbar sticky top-0 z-30 h-16">
       <div className="flex items-center justify-between h-full px-4 md:px-6 gap-3">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <motion.button
             type="button"
             onClick={onToggleSidebar}
             className="nav-icon-btn flex-shrink-0 text-slate-600 dark:text-slate-300"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.94 }}
+            aria-label="Toggle menu"
           >
             <Menu className="h-5 w-5" />
           </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={goBack}
+            disabled={isHome}
+            className={`back-btn flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
+              isHome
+                ? 'opacity-40 cursor-not-allowed text-slate-400'
+                : 'text-[#002D62] dark:text-[#E8C87A] hover:bg-[#002D62]/8 dark:hover:bg-[#C5A059]/15'
+            } ${isUrdu ? 'font-urdu' : ''}`}
+            title={t('goBack')}
+            whileHover={isHome ? undefined : { scale: 1.03, x: isUrdu ? 2 : -2 }}
+            whileTap={isHome ? undefined : { scale: 0.96 }}
+          >
+            <ArrowLeft className={`h-4 w-4 ${isUrdu ? 'rotate-180' : ''}`} />
+            <span className="hidden sm:inline">{t('goBack')}</span>
+          </motion.button>
+
           <GlobalSearch />
         </div>
 
@@ -67,12 +96,12 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
             whileTap={{ scale: 0.94 }}
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-gradient-to-br from-[#C5A059] to-[#E8C87A] shadow-[0_0_8px_rgba(197,160,89,0.8)]" />
           </motion.button>
 
           <div className="flex items-center gap-2 pl-3 border-l border-slate-200/70 dark:border-white/10">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500/25 to-violet-500/30 border border-cyan-400/30 flex items-center justify-center shadow-[0_0_16px_rgba(56,189,248,0.25)]">
-              <User className="h-4 w-4 text-sky-300" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#002D62]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center">
+              <User className="h-4 w-4 text-[#C5A059]" />
             </div>
             <div className="hidden md:block">
               <p className={`text-sm font-medium text-slate-900 dark:text-white ${isUrdu ? 'font-urdu' : ''}`}>

@@ -30,18 +30,20 @@ export default function AppLayout() {
         transition={{ type: 'spring', stiffness: 320, damping: 34 }}
       >
         <Navbar onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <main className="p-4 sm:p-6 min-h-[calc(100vh-4rem-3rem)]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+        <main className="p-3 sm:p-5 lg:p-6 min-h-[calc(100vh-4rem-3rem)]">
+          <div className="content-stage">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
         <motion.footer
           initial={{ opacity: 0 }}
@@ -50,7 +52,7 @@ export default function AppLayout() {
           className={`app-footer px-6 py-4 text-center text-sm text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}
         >
           &copy; {new Date().getFullYear()}{' '}
-          <span className="font-semibold bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">
+          <span className="font-semibold text-[#002D62] dark:text-[#E8C87A]">
             {companyName || t('companyFallback')}
           </span>
           . {t('allRights')}
