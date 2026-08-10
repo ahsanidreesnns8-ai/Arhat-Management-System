@@ -421,7 +421,7 @@ export default function PaymentsPage() {
                   ) : '—'}
                 </p>
               </div>
-              <Detail label="Created" value={formatDateTime((viewPayment as Payment & { createdAt?: string }).createdAt)} />
+              <Detail label="Created" value={formatDateTime(viewPayment.createdAt)} />
             </div>
             {viewPayment.notes && (
               <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3 text-sm">
