@@ -23,13 +23,15 @@ export default function StockPage() {
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
-    Promise.all([stockApi.getAll(), stockApi.getHistory(), settingsApi.getProducts()])
+    Promise.allSettled([stockApi.getAll(), stockApi.getHistory(), settingsApi.getProducts()])
       .then(([s, h, p]) => {
-        setStock(s.data.data)
-        setHistory(h.data.data)
-        setProducts(p.data.data)
+        if (s.status === 'fulfilled') setStock(s.value.data?.data ?? [])
+        if (h.status === 'fulfilled') setHistory(h.value.data?.data ?? [])
+        if (p.status === 'fulfilled') setProducts(p.value.data?.data ?? [])
+        const failed = [s, h, p].filter((r) => r.status === 'rejected').length
+        if (failed === 3 && !soft) toast.error('Failed to load stock — is the backend running?')
+        else if (failed > 0 && !soft) toast.error('Some stock data could not be loaded')
       })
-      .catch(() => { if (!soft) toast.error('Failed to load stock') })
       .finally(() => { if (!soft) setLoading(false) })
   }, [])
 
@@ -78,7 +80,11 @@ export default function StockPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stock.map((item) => (
+            {stock.length === 0 ? (
+              <div className="card-3d p-6 sm:col-span-2 lg:col-span-4 text-sm text-gray-500">
+                No stock rows yet. Use <strong>Adjust Stock</strong> to add opening quantity for a product.
+              </div>
+            ) : stock.map((item) => (
               <div key={item.id} className={`stat-card ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
                 <div className="flex items-start justify-between">
                   <div>
@@ -113,7 +119,11 @@ export default function StockPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 20).map((tx) => (
+                  {history.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-gray-500">No stock movements yet</td>
+                    </tr>
+                  ) : history.slice(0, 20).map((tx) => (
                     <tr key={tx.id} className="border-b border-gray-100 dark:border-gray-800">
                       <td className="p-4">{tx.productName}</td>
                       <td className="p-4"><span className="px-2 py-1 rounded text-xs bg-gray-100 dark:bg-gray-800">{tx.transactionType}</span></td>

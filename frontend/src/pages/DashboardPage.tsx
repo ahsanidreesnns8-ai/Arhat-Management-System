@@ -48,28 +48,52 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [loadError, setLoadError] = useState(false)
+
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
     dashboardApi.getStats()
-      .then((res) => setStats(res.data.data))
-      .catch(() => { if (!soft) setStats(null) })
+      .then((res) => {
+        setStats(res.data?.data ?? null)
+        setLoadError(false)
+      })
+      .catch(() => {
+        if (!soft) {
+          setStats(null)
+          setLoadError(true)
+        }
+      })
       .finally(() => { if (!soft) setLoading(false) })
   }, [])
 
   useEffect(() => { load() }, [load])
   useLiveReload(() => load(true))
 
-  const statCards = stats ? [
-    { title: "Today's Sales", value: formatCurrency(stats.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
-    { title: 'Current Queue', value: stats.currentQueue, icon: <ListOrdered className="h-5 w-5" />, color: 'orange' as const, to: '/queue' },
-    { title: 'Total Farmers', value: stats.totalFarmers, icon: <Users className="h-5 w-5" />, color: 'green' as const, to: '/farmers' },
-    { title: 'Total Buyers', value: stats.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'blue' as const, to: '/buyers' },
-    { title: 'Total Dheris', value: stats.totalDheris, icon: <Package className="h-5 w-5" />, color: 'amber' as const, to: '/dheris' },
-    { title: 'Current Stock', value: formatNumber(stats.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock' },
-    { title: 'Pending Payments', value: formatCurrency(stats.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments' },
-    { title: 'Revenue', value: formatCurrency(stats.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
-    { title: 'Commission', value: formatCurrency(stats.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports' },
-  ] : []
+  const emptyStats: DashboardStats = {
+    todaySales: 0,
+    currentQueue: 0,
+    totalFarmers: 0,
+    totalBuyers: 0,
+    totalDheris: 0,
+    currentStock: 0,
+    pendingPayments: 0,
+    revenue: 0,
+    commission: 0,
+    recentActivity: [],
+  }
+  const view = stats || emptyStats
+
+  const statCards = [
+    { title: "Today's Sales", value: formatCurrency(view.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
+    { title: 'Current Queue', value: view.currentQueue, icon: <ListOrdered className="h-5 w-5" />, color: 'orange' as const, to: '/queue' },
+    { title: 'Total Farmers', value: view.totalFarmers, icon: <Users className="h-5 w-5" />, color: 'green' as const, to: '/farmers' },
+    { title: 'Total Buyers', value: view.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'blue' as const, to: '/buyers' },
+    { title: 'Total Dheris', value: view.totalDheris, icon: <Package className="h-5 w-5" />, color: 'amber' as const, to: '/dheris' },
+    { title: 'Current Stock', value: formatNumber(view.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock' },
+    { title: 'Pending Payments', value: formatCurrency(view.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments' },
+    { title: 'Revenue', value: formatCurrency(view.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
+    { title: 'Commission', value: formatCurrency(view.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -77,6 +101,13 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Welcome to ${companyName} — tap any card for full details`}
       />
+
+      {loadError && !loading && (
+        <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
+          <span>Could not refresh live stats. Showing zeros until the API reconnects.</span>
+          <button type="button" onClick={() => load()} className="font-semibold underline">Retry</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

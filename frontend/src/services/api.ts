@@ -8,7 +8,7 @@ import type {
 
 const api = axios.create({
   baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
   timeout: 30000,
 })
 
@@ -26,7 +26,14 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    const ct = String(res.headers?.['content-type'] || '')
+    // Vite SPA fallback sometimes returns index.html for /api when proxy is down
+    if (ct.includes('text/html')) {
+      return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
+    }
+    return res
+  },
   (error) => {
     const status = error?.response?.status
     const url = String(error?.config?.url || '')
