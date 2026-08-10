@@ -85,6 +85,10 @@ docker compose up -d --build
 
 ---
 
+## Deploy
+
+See **[DEPLOY.md](DEPLOY.md)** for Render Blueprint / Docker production deploy.
+
 ## Modules
 Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Arhat Sale · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant (voice) · Global Search · Bilingual bills
 

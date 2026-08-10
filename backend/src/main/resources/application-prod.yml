@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    # File-backed H2 for single-container deploys; override with MySQL via SPRING_DATASOURCE_* in Docker Compose
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:/app/data/rehmani;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=FALSE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+  h2:
+    console:
+      enabled: false
+  flyway:
+    enabled: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    # Set to your public HTTPS origin in multi-host setups. Single nginx image can use *.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+
+logging:
+  level:
+    root: WARN
+    com.rehmani: INFO

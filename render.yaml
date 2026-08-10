@@ -1,0 +1,26 @@
+# Render Blueprint — one-click production deploy
+# Dashboard: https://dashboard.render.com/blueprints
+# Repo: ahsanidreesnns8-ai/Arhat-Management-System- (branch main)
+
+services:
+  - type: web
+    name: arhat-erp
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+      - key: JWT_EXPIRATION_MS
+        value: "86400000"
+      # Optional AI keys — set in Render dashboard if needed
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

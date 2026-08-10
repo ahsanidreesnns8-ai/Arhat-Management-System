@@ -78,7 +78,12 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList();
-        config.setAllowedOrigins(origins);
+        // Support "*" via origin patterns (credentials-compatible for single-host nginx deploy)
+        if (origins.size() == 1 && "*".equals(origins.get(0))) {
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOrigins(origins);
+        }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

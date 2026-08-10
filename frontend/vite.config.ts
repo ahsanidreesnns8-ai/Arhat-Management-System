@@ -7,6 +7,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Allow Cloudflare quick tunnels / reverse proxies during deploy demos
+    allowedHosts: true,
     proxy: {
       // Must proxy before SPA fallback — without this, /api/* returns index.html
       '/api': {
@@ -25,6 +27,7 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 5173,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',
