@@ -116,13 +116,15 @@ public class PaymentService {
             if (request.getSaleId() != null) {
                 Sale sale = saleRepository.findByIdAndDeletedFalse(request.getSaleId())
                         .orElseThrow(() -> new RuntimeException("Sale not found"));
-                BigDecimal remaining = sale.getTotalAmount().subtract(sale.getPaidAmount());
+                BigDecimal saleTotal = sale.getTotalAmount() != null ? sale.getTotalAmount() : BigDecimal.ZERO;
+                BigDecimal salePaid = sale.getPaidAmount() != null ? sale.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal remaining = saleTotal.subtract(salePaid);
                 if (amount.compareTo(remaining) > 0) {
                     throw new RuntimeException("Amount exceeds sale remaining balance of PKR " + remaining);
                 }
-                BigDecimal newPaidAmount = sale.getPaidAmount().add(amount);
+                BigDecimal newPaidAmount = salePaid.add(amount);
                 sale.setPaidAmount(newPaidAmount);
-                sale.setPaymentStatus(determinePaymentStatus(sale.getTotalAmount(), newPaidAmount));
+                sale.setPaymentStatus(determinePaymentStatus(saleTotal, newPaidAmount));
                 saleRepository.save(sale);
                 payment.setSale(sale);
             }

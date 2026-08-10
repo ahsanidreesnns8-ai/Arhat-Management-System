@@ -23,8 +23,14 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       const res = token
         ? await settingsApi.get()
         : await settingsApi.getPublic()
-      setSettings(res.data.data)
-      document.title = `${res.data.data.companyName} — Mandi ERP`
+      const data = res.data?.data
+      if (data) {
+        setSettings(data)
+        document.title = `${data.companyName || defaultName} — Mandi ERP`
+      } else {
+        setSettings(null)
+        document.title = `${defaultName} — Mandi ERP`
+      }
     } catch {
       setSettings(null)
       document.title = `${defaultName} — Mandi ERP`

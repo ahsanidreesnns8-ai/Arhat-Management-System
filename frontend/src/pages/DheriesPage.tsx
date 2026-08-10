@@ -27,11 +27,12 @@ export default function DheriesPage() {
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
-    Promise.all([dheriApi.getAll(), farmerApi.getAll(), settingsApi.getProducts()])
+    Promise.allSettled([dheriApi.getAll(), farmerApi.getAll(), settingsApi.getProducts()])
       .then(([d, f, p]) => {
-        setDheris(d.data.data)
-        setFarmers(f.data.data)
-        setProducts(p.data.data)
+        if (d.status === 'fulfilled') setDheris(d.value.data?.data ?? [])
+        if (f.status === 'fulfilled') setFarmers(f.value.data?.data ?? [])
+        if (p.status === 'fulfilled') setProducts(p.value.data?.data ?? [])
+        if (d.status === 'rejected' && !soft) toast.error('Failed to load dheris')
       })
       .finally(() => { if (!soft) setLoading(false) })
   }, [])
@@ -120,7 +121,7 @@ export default function DheriesPage() {
                     <td className="p-4">{d.farmerName}</td>
                     <td className="p-4">{d.productName}</td>
                     <td className="p-4 text-right">{d.numberOfBags}</td>
-                    <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(d.sellingStatus)}`}>{d.sellingStatus.replace('_', ' ')}</span></td>
+                    <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(d.sellingStatus || 'PENDING')}`}>{(d.sellingStatus || 'PENDING').replace(/_/g, ' ')}</span></td>
                     <td className="p-4 text-right">{formatCurrency(d.totalPrice)}</td>
                     <td className="p-4 text-right">
                       <button onClick={() => setDeleteId(d.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500">

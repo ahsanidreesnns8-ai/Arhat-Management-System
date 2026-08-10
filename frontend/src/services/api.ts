@@ -219,6 +219,7 @@ export const auditApi = {
 
 export const backupApi = {
   export: () => api.get('/backup/export', { responseType: 'blob' }),
+  exportJson: () => api.get<ApiResponse<unknown>>('/backup/export/json'),
   restore: (data: unknown) => api.post<ApiResponse<void>>('/backup/restore', data),
 }
 

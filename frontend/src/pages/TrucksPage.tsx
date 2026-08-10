@@ -39,8 +39,12 @@ export default function TrucksPage() {
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
-    Promise.all([truckApi.getAll(), farmerApi.getAll()])
-      .then(([t, f]) => { setTrucks(t.data.data); setFarmers(f.data.data) })
+    Promise.allSettled([truckApi.getAll(), farmerApi.getAll()])
+      .then(([t, f]) => {
+        if (t.status === 'fulfilled') setTrucks(t.value.data?.data ?? [])
+        if (f.status === 'fulfilled') setFarmers(f.value.data?.data ?? [])
+        if (t.status === 'rejected' && f.status === 'rejected' && !soft) toast.error('Failed to load trucks')
+      })
       .finally(() => { if (!soft) setLoading(false) })
   }, [])
 

@@ -14,7 +14,7 @@ import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/
 import { useLiveReload } from '../context/SyncContext'
 import { buyerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
-import type { Buyer } from '../types'
+import type { Buyer, Sale } from '../types'
 
 const emptyForm = { name: '', cnic: '', phone: '', address: '', city: '', notes: '' }
 
@@ -28,6 +28,7 @@ export default function BuyersPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [payBuyer, setPayBuyer] = useState<Buyer | null>(null)
+  const [paySales, setPaySales] = useState<Sale[]>([])
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
@@ -40,12 +41,13 @@ export default function BuyersPage() {
   useEffect(() => { load() }, [load])
   useLiveReload(() => load(true))
 
-  const filtered = buyers.filter((b) =>
-    b.name.toLowerCase().includes(search.toLowerCase()) ||
-    b.buyerId.toLowerCase().includes(search.toLowerCase()) ||
-    b.phone?.includes(search) ||
-    b.cnic?.includes(search)
-  )
+  const filtered = buyers.filter((b) => {
+    const q = search.toLowerCase()
+    return (b.name || '').toLowerCase().includes(q)
+      || (b.buyerId || '').toLowerCase().includes(q)
+      || (b.phone || '').includes(search)
+      || (b.cnic || '').includes(search)
+  })
 
   const duplicates = useMemo(() => {
     if (editing) return findPersonDuplicates(buyers, form, (b) => ({
@@ -194,7 +196,15 @@ export default function BuyersPage() {
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-1">
                         <button
-                          onClick={() => setPayBuyer(buyer)}
+                          onClick={async () => {
+                            setPayBuyer(buyer)
+                            try {
+                              const res = await buyerApi.getSales(buyer.id)
+                              setPaySales(res.data?.data ?? [])
+                            } catch {
+                              setPaySales([])
+                            }
+                          }}
                           disabled={(buyer.outstandingBalance || 0) <= 0}
                           className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-500 hover:text-emerald-600 disabled:opacity-30"
                           title={settled ? 'Fully paid — history kept' : 'Receive payment'}
@@ -257,12 +267,13 @@ export default function BuyersPage() {
       {payBuyer && (
         <PaymentModal
           open={!!payBuyer}
-          onClose={() => setPayBuyer(null)}
+          onClose={() => { setPayBuyer(null); setPaySales([]) }}
           onSuccess={load}
           type="BUYER"
           partyId={payBuyer.id}
           partyName={payBuyer.name}
           outstanding={payBuyer.outstandingBalance || 0}
+          sales={paySales}
         />
       )}
     </div>

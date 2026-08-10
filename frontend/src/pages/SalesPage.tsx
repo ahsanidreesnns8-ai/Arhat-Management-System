@@ -50,19 +50,19 @@ export default function SalesPage() {
 
   useEffect(() => {
     load()
-    Promise.all([
+    Promise.allSettled([
       buyerApi.getAll(),
       farmerApi.getAll(),
       dheriApi.getAll(),
       settingsApi.getProducts(),
       stockApi.getAll(),
     ]).then(([b, f, d, p, s]) => {
-      setBuyers(b.data.data)
-      setFarmers(f.data.data)
-      setDheris(d.data.data)
-      setProducts(p.data.data)
-      setStock(s.data.data)
-    }).catch(() => {})
+      if (b.status === 'fulfilled') setBuyers(b.value.data?.data ?? [])
+      if (f.status === 'fulfilled') setFarmers(f.value.data?.data ?? [])
+      if (d.status === 'fulfilled') setDheris(d.value.data?.data ?? [])
+      if (p.status === 'fulfilled') setProducts(p.value.data?.data ?? [])
+      if (s.status === 'fulfilled') setStock(s.value.data?.data ?? [])
+    })
   }, [load])
   useLiveReload(() => load(true))
 

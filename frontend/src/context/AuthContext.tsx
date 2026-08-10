@@ -15,8 +15,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { applyServerTheme } = useTheme()
   const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('rehmani_user')
-    return stored ? JSON.parse(stored) : null
+    try {
+      const stored = localStorage.getItem('rehmani_user')
+      if (!stored) return null
+      const parsed = JSON.parse(stored) as User
+      if (!parsed?.token) {
+        localStorage.removeItem('rehmani_user')
+        return null
+      }
+      return parsed
+    } catch {
+      localStorage.removeItem('rehmani_user')
+      return null
+    }
   })
 
   const login = async (username: string, password: string) => {

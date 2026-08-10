@@ -45,12 +45,13 @@ export default function FarmersPage() {
   useEffect(() => { load() }, [load])
   useLiveReload(() => load(true))
 
-  const filtered = farmers.filter((f) =>
-    f.name.toLowerCase().includes(search.toLowerCase()) ||
-    f.farmerId.toLowerCase().includes(search.toLowerCase()) ||
-    f.phone?.includes(search) ||
-    f.cnic?.includes(search)
-  )
+  const filtered = farmers.filter((f) => {
+    const q = search.toLowerCase()
+    return (f.name || '').toLowerCase().includes(q)
+      || (f.farmerId || '').toLowerCase().includes(q)
+      || (f.phone || '').includes(search)
+      || (f.cnic || '').includes(search)
+  })
 
   const duplicates = useMemo(() => {
     if (editing) return findPersonDuplicates(farmers, form, (f) => ({

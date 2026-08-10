@@ -53,30 +53,43 @@ export default function SettingsPage() {
   const loadPreview = async () => {
     try {
       const res = await weatherApi.get()
-      setPreview(res.data.data)
-      const h = res.data.data.hijri
-      setHijriDay(h.day)
-      setHijriMonth(h.month)
-      setHijriYear(h.year)
+      const data = res.data?.data
+      if (!data) return
+      setPreview(data)
+      const h = data.hijri
+      if (h) {
+        setHijriDay(h.day)
+        setHijriMonth(h.month)
+        setHijriYear(h.year)
+      }
     } catch {
       // preview optional while offline
     }
   }
 
   useEffect(() => {
-    Promise.all([settingsApi.get(), weatherApi.get().catch(() => null)])
-      .then(([res, weatherRes]) => {
-        setSettings(res.data.data)
-        if (weatherRes) {
-          setPreview(weatherRes.data.data)
-          const h = weatherRes.data.data.hijri
-          setHijriDay(h.day)
-          setHijriMonth(h.month)
-          setHijriYear(h.year)
+    Promise.allSettled([settingsApi.get(), weatherApi.get()])
+      .then(([settingsRes, weatherRes]) => {
+        if (settingsRes.status === 'fulfilled') {
+          setSettings(settingsRes.value.data?.data ?? null)
+        } else {
+          toast.error(t('settingsFailed'))
+        }
+        if (weatherRes.status === 'fulfilled') {
+          const data = weatherRes.value.data?.data
+          if (data) {
+            setPreview(data)
+            const h = data.hijri
+            if (h) {
+              setHijriDay(h.day)
+              setHijriMonth(h.month)
+              setHijriYear(h.year)
+            }
+          }
         }
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [t])
 
   const handleSave = async () => {
     if (!settings) return
@@ -263,9 +276,9 @@ export default function SettingsPage() {
               <span className="text-gray-500">{preview.locationLabel}</span>
               <span className={`inline-flex items-center gap-1.5 ${isUrdu ? 'font-urdu' : ''}`}>
                 <MoonStar className="h-4 w-4 text-amber-500" />
-                {isUrdu ? preview.hijri.formattedUr : preview.hijri.formattedEn}
-                {(preview.hijri.adjustmentDays || 0) !== 0 && (
-                  <span className="text-xs text-amber-600">({preview.hijri.adjustmentDays > 0 ? '+' : ''}{preview.hijri.adjustmentDays}d)</span>
+                {isUrdu ? (preview.hijri?.formattedUr || '—') : (preview.hijri?.formattedEn || '—')}
+                {(preview.hijri?.adjustmentDays || 0) !== 0 && (
+                  <span className="text-xs text-amber-600">({(preview.hijri?.adjustmentDays || 0) > 0 ? '+' : ''}{preview.hijri?.adjustmentDays}d)</span>
                 )}
               </span>
             </div>

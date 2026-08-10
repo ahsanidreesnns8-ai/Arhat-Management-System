@@ -143,7 +143,9 @@ export default function WeatherWidget() {
 
   const Icon = weatherIcon(data.weatherCode || 0)
   const condition = isUrdu ? data.conditionUr : data.conditionEn
-  const hijri = isUrdu ? data.hijri.formattedUr : data.hijri.formattedEn
+  const hijri = isUrdu
+    ? (data.hijri?.formattedUr || '—')
+    : (data.hijri?.formattedEn || '—')
   const area = data.locationLabel || settings?.weatherLocationLabel || '—'
 
   return (

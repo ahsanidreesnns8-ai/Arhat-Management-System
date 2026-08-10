@@ -35,7 +35,7 @@ export default function PriceCalculatorPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    dheriApi.getAll().then((res) => setDheris(res.data.data)).catch(() => {})
+    dheriApi.getAll().then((res) => setDheris(res.data?.data ?? [])).catch(() => setDheris([]))
   }, [])
 
   const payload = useMemo(() => ({
@@ -48,7 +48,7 @@ export default function PriceCalculatorPage() {
   const runCalculation = useCallback(async () => {
     try {
       const res = await calculatorApi.calculate(payload)
-      setResult(res.data.data)
+      setResult(res.data?.data ?? emptyResult)
     } catch {
       setResult(emptyResult)
     }

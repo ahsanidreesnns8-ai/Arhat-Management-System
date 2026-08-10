@@ -215,4 +215,55 @@ public class ReportService {
             throw new RuntimeException("Failed to export commission report", e);
         }
     }
+
+    public byte[] exportStockExcel() {
+        StockReportSummary report = getStockReport();
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Stock");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Code");
+            header.createCell(1).setCellValue("Product");
+            header.createCell(2).setCellValue("Quantity");
+            header.createCell(3).setCellValue("Low Stock");
+
+            int rowNum = 1;
+            for (StockReportLine line : report.getLines()) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(line.getProductCode());
+                row.createCell(1).setCellValue(line.getProductName());
+                row.createCell(2).setCellValue(line.getQuantity() != null ? line.getQuantity().doubleValue() : 0);
+                row.createCell(3).setCellValue(Boolean.TRUE.equals(line.getLowStockAlert()) ? "YES" : "NO");
+            }
+            for (int i = 0; i < 4; i++) sheet.autoSizeColumn(i);
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to export stock report", e);
+        }
+    }
+
+    public byte[] exportProfitExcel(LocalDate from, LocalDate to) {
+        ProfitReportSummary report = getProfitReport(from, to);
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Profit");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("From");
+            header.createCell(1).setCellValue("To");
+            header.createCell(2).setCellValue("Total Sales");
+            header.createCell(3).setCellValue("Total Commission");
+            header.createCell(4).setCellValue("Estimated Profit");
+
+            Row row = sheet.createRow(1);
+            row.createCell(0).setCellValue(report.getFrom() != null ? report.getFrom().toString() : "");
+            row.createCell(1).setCellValue(report.getTo() != null ? report.getTo().toString() : "");
+            row.createCell(2).setCellValue(report.getTotalSales() != null ? report.getTotalSales().doubleValue() : 0);
+            row.createCell(3).setCellValue(report.getTotalCommission() != null ? report.getTotalCommission().doubleValue() : 0);
+            row.createCell(4).setCellValue(report.getEstimatedProfit() != null ? report.getEstimatedProfit().doubleValue() : 0);
+            for (int i = 0; i < 5; i++) sheet.autoSizeColumn(i);
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to export profit report", e);
+        }
+    }
 }

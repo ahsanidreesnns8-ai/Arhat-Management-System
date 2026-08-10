@@ -47,7 +47,7 @@ public class SaleService {
     public List<SaleResponse> getByBuyer(Long buyerId) {
         buyerRepository.findByIdAndDeletedFalse(buyerId)
                 .orElseThrow(() -> new RuntimeException("Buyer not found"));
-        return saleRepository.findByBuyerIdAndDeletedFalseOrderBySaleDateDescCreatedAtDesc(buyerId)
+        return saleRepository.findByBuyerIdWithItems(buyerId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -315,21 +315,22 @@ public class SaleService {
     }
 
     SaleResponse toResponse(Sale sale) {
+        var items = sale.getItems() != null ? sale.getItems() : java.util.List.<com.rehmani.trading.entity.SaleItem>of();
         return SaleResponse.builder()
                 .id(sale.getId())
                 .invoiceNumber(sale.getInvoiceNumber())
-                .buyerId(sale.getBuyer().getId())
-                .buyerName(sale.getBuyer().getName())
-                .buyerCode(sale.getBuyer().getBuyerId())
+                .buyerId(sale.getBuyer() != null ? sale.getBuyer().getId() : null)
+                .buyerName(sale.getBuyer() != null ? sale.getBuyer().getName() : null)
+                .buyerCode(sale.getBuyer() != null ? sale.getBuyer().getBuyerId() : null)
                 .saleDate(sale.getSaleDate())
                 .totalBags(sale.getTotalBags())
-                .totalWeight(sale.getTotalWeight())
-                .totalAmount(sale.getTotalAmount())
-                .paidAmount(sale.getPaidAmount())
-                .paymentStatus(sale.getPaymentStatus().name())
+                .totalWeight(defaultZero(sale.getTotalWeight()))
+                .totalAmount(defaultZero(sale.getTotalAmount()))
+                .paidAmount(defaultZero(sale.getPaidAmount()))
+                .paymentStatus(sale.getPaymentStatus() != null ? sale.getPaymentStatus().name() : "UNPAID")
                 .notes(sale.getNotes())
                 .createdAt(sale.getCreatedAt())
-                .items(sale.getItems().stream().map(this::toItemResponse).toList())
+                .items(items.stream().map(this::toItemResponse).toList())
                 .build();
     }
 

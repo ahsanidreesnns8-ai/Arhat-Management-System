@@ -51,8 +51,7 @@ export default function ReportsPage() {
 
   const exportExcel = async (key: ReportKey) => {
     try {
-      const type = key === 'profit' ? 'sales' : key
-      const res = await reportApi.exportExcel(type, from || undefined, to || undefined)
+      const res = await reportApi.exportExcel(key, from || undefined, to || undefined)
       downloadBlob(res.data as Blob, `${key}-report.xlsx`)
       toast.success('Excel exported')
     } catch {
@@ -72,7 +71,7 @@ export default function ReportsPage() {
       th,td{border:1px solid #ddd;padding:8px;text-align:left} .meta{color:#666}</style></head><body>
       <h1>Rehmani Trading Company — ${active.toUpperCase()} Report</h1>
       <p class="meta">${preview.from || ''} ${preview.to ? 'to ' + preview.to : ''}</p>
-      <p>Total sales: ${formatCurrency(preview.totalSales || 0)} · Commission: ${formatCurrency(preview.totalCommission || 0)} · Profit: ${formatCurrency(preview.profit || 0)}</p>
+      <p>Total sales: ${formatCurrency(Number(preview.totalAmount ?? preview.totalSales ?? 0))} · Commission: ${formatCurrency(Number(preview.totalCommission || 0))} · Profit: ${formatCurrency(Number(preview.estimatedProfit ?? preview.profit ?? 0))}</p>
       <script>window.print()</script></body></html>`)
     win.document.close()
   }

@@ -43,14 +43,16 @@ export default function FarmerProductPage() {
   const [saving, setSaving] = useState(false)
 
   const loadLists = useCallback(() => {
-    Promise.all([farmerApi.getAll(), settingsApi.getProducts(), dheriApi.getAll()])
+    Promise.allSettled([farmerApi.getAll(), settingsApi.getProducts(), dheriApi.getAll()])
       .then(([f, p, d]) => {
-        setFarmers(f.data.data)
-        setProducts(p.data.data)
-        setDheris(d.data.data || [])
-        if (p.data.data[0] && !productId) setProductId(String(p.data.data[0].id))
+        if (f.status === 'fulfilled') setFarmers(f.value.data?.data ?? [])
+        if (p.status === 'fulfilled') {
+          const productsList = p.value.data?.data ?? []
+          setProducts(productsList)
+          if (productsList[0] && !productId) setProductId(String(productsList[0].id))
+        }
+        if (d.status === 'fulfilled') setDheris(d.value.data?.data ?? [])
       })
-      .catch(() => {})
   }, [productId])
 
   useEffect(() => { loadLists() }, [loadLists])
@@ -70,7 +72,7 @@ export default function FarmerProductPage() {
   const runCalculation = useCallback(async () => {
     try {
       const res = await calculatorApi.calculate(payload)
-      setResult(res.data.data)
+      setResult(res.data?.data ?? emptyResult)
     } catch {
       setResult(emptyResult)
     }

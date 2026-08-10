@@ -76,20 +76,37 @@ export default function OwnerPage() {
   const doRestore = async () => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'application/json'
+    input.accept = '.json,application/json'
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
       try {
         const text = await file.text()
-        await backupApi.restore(JSON.parse(text))
+        const parsed = JSON.parse(text)
+        await backupApi.restore(parsed)
         toast.success('Restore completed')
         load()
       } catch {
-        toast.error('Restore failed')
+        toast.error('Restore failed — select the backup JSON (not the ZIP). Use Export JSON if needed.')
       }
     }
     input.click()
+  }
+
+  const doBackupJson = async () => {
+    try {
+      const res = await backupApi.exportJson()
+      const blob = new Blob([JSON.stringify(res.data?.data ?? res.data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `rehmani-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('JSON backup downloaded (use this file for Restore)')
+    } catch {
+      toast.error('JSON backup failed')
+    }
   }
 
   return (
@@ -148,11 +165,12 @@ export default function OwnerPage() {
               Database Management
             </h3>
             <p className="text-gray-500 text-sm mb-4">
-              Export a JSON backup of core business data, or restore from a previous export.
+              ZIP is for archive. For Restore, download JSON and select that JSON file.
             </p>
-            <div className="flex gap-3">
-              <Button onClick={doBackup}>Backup Database</Button>
-              <Button variant="secondary" onClick={doRestore}>Restore Database</Button>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={doBackup}>Backup ZIP</Button>
+              <Button variant="secondary" onClick={doBackupJson}>Backup JSON</Button>
+              <Button variant="secondary" onClick={doRestore}>Restore from JSON</Button>
             </div>
           </div>
 

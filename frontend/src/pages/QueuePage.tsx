@@ -21,14 +21,15 @@ export default function QueuePage() {
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
-    Promise.all([queueApi.getPending(), queueApi.getActive(), queueApi.getCompleted(), dheriApi.getAll()])
+    Promise.allSettled([queueApi.getPending(), queueApi.getActive(), queueApi.getCompleted(), dheriApi.getAll()])
       .then(([p, a, c, d]) => {
-        setPending(p.data.data)
-        setActive(a.data.data)
-        setCompleted(c.data.data)
-        setDheris(d.data.data.filter((dh) => !dh.queueNumber))
+        if (p.status === 'fulfilled') setPending(p.value.data?.data ?? [])
+        if (a.status === 'fulfilled') setActive(a.value.data?.data ?? [])
+        if (c.status === 'fulfilled') setCompleted(c.value.data?.data ?? [])
+        if (d.status === 'fulfilled') setDheris((d.value.data?.data ?? []).filter((dh) => !dh.queueNumber))
+        const failed = [p, a, c, d].filter((r) => r.status === 'rejected').length
+        if (failed === 4 && !soft) toast.error('Failed to load queue')
       })
-      .catch(() => { if (!soft) toast.error('Failed to load queue') })
       .finally(() => { if (!soft) setLoading(false) })
   }, [])
 
@@ -52,7 +53,8 @@ export default function QueuePage() {
       if (action === 'activate') await queueApi.activate(id)
       else if (action === 'complete') await queueApi.complete(id)
       else await queueApi.cancel(id)
-      toast.success(`Queue ${action}d`)
+      const labels = { activate: 'activated', complete: 'completed', cancel: 'cancelled' } as const
+      toast.success(`Queue ${labels[action]}`)
       load()
     } catch {
       toast.error(`Failed to ${action} queue`)

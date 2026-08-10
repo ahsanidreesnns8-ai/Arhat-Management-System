@@ -49,18 +49,21 @@ export default function ArhatSalePage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       farmerApi.getAll(),
       buyerApi.getAll(),
       settingsApi.getProducts(),
       dheriApi.getAll(),
     ]).then(([f, b, p, d]) => {
-      setFarmers(f.data.data)
-      setBuyers(b.data.data)
-      setProducts(p.data.data)
-      setDheris(d.data.data)
-      if (p.data.data[0]) setProductId(String(p.data.data[0].id))
-    }).catch(() => {})
+      if (f.status === 'fulfilled') setFarmers(f.value.data?.data ?? [])
+      if (b.status === 'fulfilled') setBuyers(b.value.data?.data ?? [])
+      if (p.status === 'fulfilled') {
+        const productsList = p.value.data?.data ?? []
+        setProducts(productsList)
+        if (productsList[0]) setProductId(String(productsList[0].id))
+      }
+      if (d.status === 'fulfilled') setDheris(d.value.data?.data ?? [])
+    })
   }, [])
 
   const farmerDheris = useMemo(
@@ -78,7 +81,7 @@ export default function ArhatSalePage() {
   const runCalculation = useCallback(async () => {
     try {
       const res = await calculatorApi.calculate(payload)
-      setResult(res.data.data)
+      setResult(res.data?.data ?? emptyResult)
     } catch {
       setResult(emptyResult)
     }
