@@ -22,15 +22,25 @@ api.interceptors.request.use((config) => {
       // ignore corrupt session
     }
   }
+  // Bill endpoints return HTML receipts — must not send Accept: application/json
+  const url = String(config.url || '')
+  if (url.includes('/bills/')) {
+    config.headers.Accept = 'text/html,application/xhtml+xml,*/*'
+    if (!config.responseType) config.responseType = 'text' as never
+  }
   return config
 })
 
 api.interceptors.response.use(
   (res) => {
     const ct = String(res.headers?.['content-type'] || '')
-    // Vite SPA fallback sometimes returns index.html for /api when proxy is down
-    if (ct.includes('text/html')) {
-      return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
+    const url = String(res.config?.url || '')
+    // Bills intentionally return text/html. Only reject SPA fallback HTML on JSON APIs.
+    if (ct.includes('text/html') && !url.includes('/bills/')) {
+      const body = typeof res.data === 'string' ? res.data : ''
+      if (body.includes('id="root"') || body.includes('/@vite/client')) {
+        return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
+      }
     }
     return res
   },
@@ -46,6 +56,13 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+const billRequest = (path: string, lang: 'en' | 'ur' = 'en') =>
+  api.get<string>(path, {
+    params: { lang },
+    responseType: 'text' as never,
+    headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
+  })
 
 export const authApi = {
   login: (username: string, password: string) =>
@@ -84,7 +101,7 @@ export const farmerApi = {
   getDheris: (id: number) => api.get<ApiResponse<Dheri[]>>(`/farmers/${id}/dheris`),
   getTrucks: (id: number) => api.get<ApiResponse<Truck[]>>(`/farmers/${id}/trucks`),
   getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
-    api.get<string>(`/bills/farmer/${id}`, { params: { lang }, responseType: 'text' as never }),
+    billRequest(`/bills/farmer/${id}`, lang),
 }
 
 export const buyerApi = {
@@ -96,7 +113,14 @@ export const buyerApi = {
   getPayments: (id: number) => api.get<ApiResponse<Payment[]>>(`/buyers/${id}/payments`),
   getSales: (id: number) => api.get<ApiResponse<Sale[]>>(`/buyers/${id}/sales`),
   getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
-    api.get<string>(`/bills/buyer/${id}`, { params: { lang }, responseType: 'text' as never }),
+    billRequest(`/bills/buyer/${id}`, lang),
+}
+
+export const billApi = {
+  farmer: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/farmer/${id}`, lang),
+  buyer: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/buyer/${id}`, lang),
+  saleFarmer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/farmer`, lang),
+  saleBuyer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/buyer`, lang),
 }
 
 export const truckApi = {

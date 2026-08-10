@@ -190,7 +190,8 @@ public class BillService {
 
         StringBuilder rows = new StringBuilder();
         BigDecimal total = BigDecimal.ZERO;
-        for (SaleItem item : sale.getItems()) {
+        List<SaleItem> farmerItems = sale.getItems() != null ? sale.getItems() : List.of();
+        for (SaleItem item : farmerItems) {
             if (item.getSourceType() != SaleSourceType.FARMER || item.getFarmer() == null) continue;
             total = total.add(safe(item.getAmount()));
             rows.append("<tr>")
@@ -222,10 +223,14 @@ public class BillService {
         BusinessSettings settings = getSettings();
         Map<String, String> t = labels(urdu);
         Buyer buyer = sale.getBuyer();
+        if (buyer == null) {
+            throw new RuntimeException("Sale has no buyer");
+        }
 
         StringBuilder rows = new StringBuilder();
         String saleDate = sale.getSaleDate() != null ? sale.getSaleDate().format(DATE_FMT) : "";
-        for (SaleItem item : sale.getItems()) {
+        List<SaleItem> items = sale.getItems() != null ? sale.getItems() : List.of();
+        for (SaleItem item : items) {
             rows.append("<tr>")
                     .append(td(saleDate))
                     .append(td(item.getProduct() != null ? item.getProduct().getName() : ""))

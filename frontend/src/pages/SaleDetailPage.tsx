@@ -5,7 +5,8 @@ import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { TableSkeleton } from '../components/ui/Skeleton'
-import api, { saleApi } from '../services/api'
+import { billApi, saleApi } from '../services/api'
+import { openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Sale } from '../types'
 
@@ -25,16 +26,13 @@ export default function SaleDetailPage() {
 
   const openBill = async (party: 'farmer' | 'buyer', lang: 'en' | 'ur' = 'en') => {
     try {
-      const res = await api.get(`/bills/sale/${saleId}/${party}`, {
-        params: { lang },
-        responseType: 'text' as never,
-      })
-      const html = typeof res.data === 'string' ? res.data : String(res.data)
-      const win = window.open('', '_blank')
-      if (win) {
-        win.document.write(html)
-        win.document.close()
-      }
+      const res = party === 'buyer'
+        ? await billApi.saleBuyer(saleId, lang)
+        : await billApi.saleFarmer(saleId, lang)
+      openHtmlBill(
+        typeof res.data === 'string' ? res.data : String(res.data),
+        `${party} bill ${sale?.invoiceNumber || saleId}`,
+      )
     } catch {
       toast.error(`Could not generate ${party} bill`)
     }
