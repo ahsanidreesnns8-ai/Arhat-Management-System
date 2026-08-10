@@ -289,6 +289,7 @@ export interface Payment {
   referenceNumber?: string
   notes?: string
   status: string
+  createdAt?: string
 }
 
 export interface SystemUser {

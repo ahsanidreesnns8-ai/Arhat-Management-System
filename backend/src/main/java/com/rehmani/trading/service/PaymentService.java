@@ -26,7 +26,7 @@ public class PaymentService {
     private final AuditService auditService;
 
     public List<PaymentResponse> getAll() {
-        return paymentRepository.findAllByOrderByPaymentDateDescCreatedAtDesc()
+        return paymentRepository.findAllWithDetails()
                 .stream().map(this::toResponse).toList();
     }
 
@@ -46,7 +46,7 @@ public class PaymentService {
     }
 
     public List<PaymentResponse> getByDate(LocalDate date) {
-        return paymentRepository.findByPaymentDateOrderByCreatedAtDesc(date)
+        return paymentRepository.findByDateWithDetails(date)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -56,7 +56,7 @@ public class PaymentService {
     }
 
     public PaymentResponse getById(Long id) {
-        Payment payment = paymentRepository.findById(id)
+        Payment payment = paymentRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
         return toResponse(payment);
     }

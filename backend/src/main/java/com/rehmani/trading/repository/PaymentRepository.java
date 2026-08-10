@@ -17,6 +17,37 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByPaymentDateOrderByCreatedAtDesc(LocalDate paymentDate);
     List<Payment> findByDheriIdAndPaymentDateOrderByCreatedAtDesc(Long dheriId, LocalDate paymentDate);
 
+    @Query("""
+            SELECT DISTINCT p FROM Payment p
+            LEFT JOIN FETCH p.farmer
+            LEFT JOIN FETCH p.buyer
+            LEFT JOIN FETCH p.sale
+            LEFT JOIN FETCH p.dheri
+            ORDER BY p.paymentDate DESC, p.createdAt DESC
+            """)
+    List<Payment> findAllWithDetails();
+
+    @Query("""
+            SELECT DISTINCT p FROM Payment p
+            LEFT JOIN FETCH p.farmer
+            LEFT JOIN FETCH p.buyer
+            LEFT JOIN FETCH p.sale
+            LEFT JOIN FETCH p.dheri
+            WHERE p.paymentDate = :date
+            ORDER BY p.createdAt DESC
+            """)
+    List<Payment> findByDateWithDetails(@Param("date") LocalDate date);
+
+    @Query("""
+            SELECT DISTINCT p FROM Payment p
+            LEFT JOIN FETCH p.farmer
+            LEFT JOIN FETCH p.buyer
+            LEFT JOIN FETCH p.sale
+            LEFT JOIN FETCH p.dheri
+            WHERE p.id = :id
+            """)
+    java.util.Optional<Payment> findByIdWithDetails(@Param("id") Long id);
+
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.farmer.id = :farmerId")
     BigDecimal getTotalPaidToFarmer(@Param("farmerId") Long farmerId);
 

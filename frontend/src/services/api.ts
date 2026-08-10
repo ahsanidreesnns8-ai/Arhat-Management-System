@@ -204,6 +204,7 @@ export const saleApi = {
 
 export const paymentApi = {
   getAll: () => api.get<ApiResponse<Payment[]>>('/payments'),
+  getById: (id: number) => api.get<ApiResponse<Payment>>(`/payments/${id}`),
   getByDate: (date: string) => api.get<ApiResponse<Payment[]>>('/payments/by-date', { params: { date } }),
   getByDheri: (dheriId: number, date?: string) =>
     api.get<ApiResponse<Payment[]>>(`/payments/dheri/${dheriId}`, { params: date ? { date } : {} }),
