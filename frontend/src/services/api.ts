@@ -35,13 +35,31 @@ api.interceptors.response.use(
   (res) => {
     const ct = String(res.headers?.['content-type'] || '')
     const url = String(res.config?.url || '')
-    // Bills intentionally return text/html. Only reject SPA fallback HTML on JSON APIs.
-    if (ct.includes('text/html') && !url.includes('/bills/')) {
-      const body = typeof res.data === 'string' ? res.data : ''
+    const isBill = url.includes('/bills/')
+
+    // Vite SPA fallback must never be treated as an API/bill response
+    if (typeof res.data === 'string') {
+      const body = res.data
       if (body.includes('id="root"') || body.includes('/@vite/client')) {
         return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
       }
+      if (isBill && ct.includes('application/json')) {
+        return Promise.reject(new Error('Bill endpoint returned JSON instead of HTML'))
+      }
     }
+
+    // Blob downloads (Excel/ZIP) can receive SPA HTML when proxy is down
+    if (res.config?.responseType === 'blob' && res.data instanceof Blob) {
+      if (ct.includes('text/html') || res.data.type.includes('text/html')) {
+        return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
+      }
+    }
+
+    // Non-bill JSON APIs that somehow get HTML
+    if (!isBill && ct.includes('text/html')) {
+      return Promise.reject(new Error('API proxy unavailable — start the backend on port 8080'))
+    }
+
     return res
   },
   (error) => {
@@ -128,7 +146,6 @@ export const truckApi = {
   getById: (id: number) => api.get<ApiResponse<Truck>>(`/trucks/${id}`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Truck>>('/trucks', data),
   update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<Truck>>(`/trucks/${id}`, data),
-  delete: (id: number) => api.delete<ApiResponse<void>>(`/trucks/${id}`),
 }
 
 export const dheriApi = {
@@ -223,9 +240,11 @@ export const reportApi = {
   profit: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/profit', { params: { from, to } }),
   exportExcel: (type: string, from?: string, to?: string) =>
-    api.get(`/reports/export/${type}.xlsx`, { params: { from, to }, responseType: 'blob' }),
-  exportPdf: (type: string, from?: string, to?: string) =>
-    api.get(`/reports/export/${type}.pdf`, { params: { from, to }, responseType: 'blob' }),
+    api.get(`/reports/export/${type}.xlsx`, {
+      params: { from, to },
+      responseType: 'blob',
+      headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*' },
+    }),
 }
 
 export const userApi = {

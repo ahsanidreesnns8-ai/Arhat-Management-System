@@ -52,10 +52,14 @@ export default function ReportsPage() {
   const exportExcel = async (key: ReportKey) => {
     try {
       const res = await reportApi.exportExcel(key, from || undefined, to || undefined)
-      downloadBlob(res.data as Blob, `${key}-report.xlsx`)
+      const blob = res.data as Blob
+      if (!blob || blob.size < 32 || String(blob.type || '').includes('html')) {
+        throw new Error('Excel export returned invalid file')
+      }
+      downloadBlob(blob, `${key}-report.xlsx`)
       toast.success('Excel exported')
-    } catch {
-      toast.error('Excel export failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Excel export failed')
     }
   }
 
@@ -65,7 +69,10 @@ export default function ReportsPage() {
       return
     }
     const win = window.open('', '_blank')
-    if (!win) return
+    if (!win) {
+      toast.error('Popup blocked — allow popups to print reports')
+      return
+    }
     win.document.write(`<!doctype html><html><head><title>${active} report</title>
       <style>body{font-family:system-ui;padding:24px} h1{margin:0 0 8px} table{width:100%;border-collapse:collapse;margin-top:16px}
       th,td{border:1px solid #ddd;padding:8px;text-align:left} .meta{color:#666}</style></head><body>

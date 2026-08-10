@@ -52,8 +52,8 @@ public class ReportService {
         }).toList();
 
         for (Sale s : sales) {
-            totalAmount = totalAmount.add(s.getTotalAmount());
-            totalPaid = totalPaid.add(s.getPaidAmount());
+            totalAmount = totalAmount.add(safe(s.getTotalAmount()));
+            totalPaid = totalPaid.add(safe(s.getPaidAmount()));
         }
 
         return SalesReportSummary.builder()
@@ -93,10 +93,10 @@ public class ReportService {
         }).toList();
 
         for (Dheri d : dheris) {
-            totalCommission = totalCommission.add(d.getCommissionAmount());
-            totalArhat = totalArhat.add(d.getArhatShare());
-            totalSupervisor = totalSupervisor.add(d.getSupervisorShare());
-            totalLabor = totalLabor.add(d.getLaborShare());
+            totalCommission = totalCommission.add(safe(d.getCommissionAmount()));
+            totalArhat = totalArhat.add(safe(d.getArhatShare()));
+            totalSupervisor = totalSupervisor.add(safe(d.getSupervisorShare()));
+            totalLabor = totalLabor.add(safe(d.getLaborShare()));
         }
 
         return CommissionReportSummary.builder()
@@ -126,7 +126,7 @@ public class ReportService {
         }).toList();
 
         for (Stock s : stockList) {
-            totalQty = totalQty.add(s.getQuantity());
+            totalQty = totalQty.add(safe(s.getQuantity()));
             if (Boolean.TRUE.equals(s.getLowStockAlert())) {
                 lowStockCount++;
             }
@@ -265,5 +265,9 @@ public class ReportService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to export profit report", e);
         }
+    }
+
+    private static BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

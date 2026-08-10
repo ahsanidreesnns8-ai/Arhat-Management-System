@@ -41,8 +41,18 @@ public class StockService {
         Stock stock = stockRepository.findByProductId(product.getId())
                 .orElseGet(() -> Stock.builder().product(product).quantity(BigDecimal.ZERO).build());
 
-        BigDecimal previous = stock.getQuantity();
-        BigDecimal newQty = previous.subtract(qty);
+        BigDecimal previous = stock.getQuantity() != null ? stock.getQuantity() : BigDecimal.ZERO;
+        BigDecimal need = qty != null ? qty : BigDecimal.ZERO;
+        if (need.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Sale stock quantity must be positive");
+        }
+        if (previous.compareTo(need) < 0) {
+            throw new RuntimeException(
+                    "Insufficient stock for " + product.getName()
+                            + " (available " + previous + " kg, needed " + need + " kg)"
+            );
+        }
+        BigDecimal newQty = previous.subtract(need);
         stock.setQuantity(newQty);
         updateLowStockAlert(stock);
         stockRepository.save(stock);
@@ -50,7 +60,7 @@ public class StockService {
         StockTransaction tx = StockTransaction.builder()
                 .product(product)
                 .transactionType(StockTransactionType.SALE)
-                .quantity(qty)
+                .quantity(need)
                 .previousQuantity(previous)
                 .newQuantity(newQty)
                 .notes(notes)

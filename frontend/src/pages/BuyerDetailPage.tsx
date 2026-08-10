@@ -8,7 +8,7 @@ import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { buyerApi, paymentApi } from '../services/api'
-import { openHtmlBill } from '../utils/bill'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import type { Buyer, Payment, Sale } from '../types'
 
@@ -45,8 +45,8 @@ export default function BuyerDetailPage() {
     try {
       const res = await buyerApi.getBillHtml(buyerId, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), `Buyer Bill ${buyer?.buyerId || buyerId}`)
-    } catch {
-      toast.error('Could not generate buyer bill')
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate buyer bill'))
     }
   }
 

@@ -6,7 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { billApi, saleApi } from '../services/api'
-import { openHtmlBill } from '../utils/bill'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Sale } from '../types'
 
@@ -33,13 +33,17 @@ export default function SaleDetailPage() {
         typeof res.data === 'string' ? res.data : String(res.data),
         `${party} bill ${sale?.invoiceNumber || saleId}`,
       )
-    } catch {
-      toast.error(`Could not generate ${party} bill`)
+    } catch (err) {
+      toast.error(billErrorMessage(err, `Could not generate ${party} bill`))
     }
   }
 
   if (loading) return <TableSkeleton rows={6} />
   if (!sale) return <p className="text-gray-500">Sale not found.</p>
+
+  const hasFarmerLines = (sale.items || []).some(
+    (item) => item.sourceType === 'FARMER' || !!item.farmerName || !!item.dheriCode,
+  )
 
   return (
     <div className="space-y-6">
@@ -52,8 +56,12 @@ export default function SaleDetailPage() {
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => openBill('buyer', 'en')}><FileText className="h-4 w-4" /> Buyer Bill (EN)</Button>
               <Button variant="secondary" onClick={() => openBill('buyer', 'ur')}><FileText className="h-4 w-4" /> خریدار بل</Button>
-              <Button variant="secondary" onClick={() => openBill('farmer', 'en')}><FileText className="h-4 w-4" /> Farmer Bill (EN)</Button>
-              <Button variant="secondary" onClick={() => openBill('farmer', 'ur')}><FileText className="h-4 w-4" /> کسان بل</Button>
+              {hasFarmerLines && (
+                <>
+                  <Button variant="secondary" onClick={() => openBill('farmer', 'en')}><FileText className="h-4 w-4" /> Farmer Bill (EN)</Button>
+                  <Button variant="secondary" onClick={() => openBill('farmer', 'ur')}><FileText className="h-4 w-4" /> کسان بل</Button>
+                </>
+              )}
             </div>
           }
         />

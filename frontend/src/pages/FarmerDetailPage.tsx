@@ -8,7 +8,7 @@ import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { farmerApi, paymentApi } from '../services/api'
-import { openHtmlBill } from '../utils/bill'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Payment, Truck } from '../types'
 
@@ -48,8 +48,8 @@ export default function FarmerDetailPage() {
     try {
       const res = await farmerApi.getBillHtml(farmerId, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), `Farmer Bill ${farmer?.farmerId || farmerId}`)
-    } catch {
-      toast.error('Could not generate farmer bill')
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate farmer bill'))
     }
   }
 
