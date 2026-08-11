@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
 import { calculatorApi, dheriApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, PriceCalculationResult } from '../types'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -101,6 +102,10 @@ export default function PriceCalculatorPage() {
     { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: 'orange' as const },
     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
+
+  useVoicePageActions({
+    save: () => { void handleSave() },
+  })
 
   return (
     <div className="space-y-6">

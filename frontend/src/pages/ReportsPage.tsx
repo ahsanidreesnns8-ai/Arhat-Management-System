@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import { useBusiness } from '../context/BusinessContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { reportApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { buildReportHtml, openReportPrint } from '../utils/reportPrint'
@@ -125,6 +126,17 @@ export default function ReportsPage() {
       setPrinting(null)
     }
   }
+
+  useVoicePageActions({
+    custom: {
+      preview: () => { void loadPreview(active || 'sales') },
+      sales: () => { void loadPreview('sales') },
+      commission: () => { void loadPreview('commission') },
+      stock: () => { void loadPreview('stock') },
+      profit: () => { void loadPreview('profit') },
+      print: () => { void printReport(active || 'sales', 'en') },
+    },
+  })
 
   return (
     <div className="space-y-6">

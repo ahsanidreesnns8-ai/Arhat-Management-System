@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import { arhatApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -141,6 +142,10 @@ export default function FarmerProductPage() {
     { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: true },
     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
+
+  useVoicePageActions({
+    save: () => { void handleSave() },
+  })
 
   return (
     <div className="space-y-6">

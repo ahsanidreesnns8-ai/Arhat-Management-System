@@ -1,0 +1,1670 @@
+Rehmani trading company ERP
+
+From 1472f68ea26953a84fa8f61200a3b5f348dc48eb Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Mon, 10 Aug 2026 18:31:09 +0000
+Subject: [PATCH] Add global voice control across the ERP app
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Users can tap a persistent Voice button and speak to navigate,
+open forms, fill fields, search, save, click buttons, and ask
+the AI — with per-field mic dictation on inputs (EN/UR).
+
+Co-authored-by: M. Ahsan Idrees <ahsanidreesnns8@gmail.com>
+---
+ frontend/src/App.tsx                          |  29 +-
+ frontend/src/components/layout/AppLayout.tsx  |   2 +
+ .../src/components/layout/GlobalSearch.tsx    |  20 +-
+ frontend/src/components/ui/Input.tsx          |  42 +-
+ .../components/voice/GlobalVoiceControl.tsx   |  97 +++++
+ .../src/components/voice/VoiceFieldMic.tsx    |  82 ++++
+ frontend/src/context/VoiceControlContext.tsx  | 391 ++++++++++++++++++
+ frontend/src/i18n/translations.ts             |  18 +-
+ frontend/src/pages/ArhatSalePage.tsx          |   5 +
+ frontend/src/pages/BuyersPage.tsx             |   9 +
+ frontend/src/pages/DheriesPage.tsx            |   9 +
+ frontend/src/pages/FarmerProductPage.tsx      |   5 +
+ frontend/src/pages/FarmersPage.tsx            |   9 +
+ frontend/src/pages/OwnerPage.tsx              |   9 +
+ frontend/src/pages/PaymentsPage.tsx           |  10 +
+ frontend/src/pages/PriceCalculatorPage.tsx    |   5 +
+ frontend/src/pages/QueuePage.tsx              |   9 +
+ frontend/src/pages/ReportsPage.tsx            |  12 +
+ frontend/src/pages/SalesPage.tsx              |   8 +
+ frontend/src/pages/SettingsPage.tsx           |   6 +
+ frontend/src/pages/StockPage.tsx              |   9 +
+ frontend/src/pages/TrucksPage.tsx             |   9 +
+ frontend/src/voice/commandParser.ts           | 195 +++++++++
+ frontend/src/voice/domActions.ts              | 158 +++++++
+ frontend/src/voice/speech.ts                  |  71 ++++
+ 25 files changed, 1199 insertions(+), 20 deletions(-)
+ create mode 100644 frontend/src/components/voice/GlobalVoiceControl.tsx
+ create mode 100644 frontend/src/components/voice/VoiceFieldMic.tsx
+ create mode 100644 frontend/src/context/VoiceControlContext.tsx
+ create mode 100644 frontend/src/voice/commandParser.ts
+ create mode 100644 frontend/src/voice/domActions.ts
+ create mode 100644 frontend/src/voice/speech.ts
+
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 58777c7..2e0a820 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext'
+ import { BusinessProvider } from './context/BusinessContext'
+ import { LanguageProvider } from './context/LanguageContext'
+ import { SyncProvider } from './context/SyncContext'
++import { VoiceControlProvider } from './context/VoiceControlContext'
+ import ProtectedRoute from './components/auth/ProtectedRoute'
+ import AppLayout from './components/layout/AppLayout'
+ import MarketingLayout from './components/marketing/MarketingLayout'
+@@ -117,19 +118,21 @@ export default function App() {
+           <AuthProvider>
+             <SyncProvider>
+               <BrowserRouter>
+-                <Toaster
+-                  position="top-right"
+-                  toastOptions={{
+-                    style: {
+-                      background: 'rgba(11, 29, 54, 0.94)',
+-                      color: '#F3EFE6',
+-                      border: '1px solid rgba(197, 160, 89, 0.35)',
+-                      backdropFilter: 'blur(12px)',
+-                      boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+-                    },
+-                  }}
+-                />
+-                <AppRoutes />
++                <VoiceControlProvider>
++                  <Toaster
++                    position="top-right"
++                    toastOptions={{
++                      style: {
++                        background: 'rgba(11, 29, 54, 0.94)',
++                        color: '#F3EFE6',
++                        border: '1px solid rgba(197, 160, 89, 0.35)',
++                        backdropFilter: 'blur(12px)',
++                        boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
++                      },
++                    }}
++                  />
++                  <AppRoutes />
++                </VoiceControlProvider>
+               </BrowserRouter>
+             </SyncProvider>
+           </AuthProvider>
+diff --git a/frontend/src/components/layout/AppLayout.tsx b/frontend/src/components/layout/AppLayout.tsx
+index 22aea73..20026ac 100644
+--- a/frontend/src/components/layout/AppLayout.tsx
++++ b/frontend/src/components/layout/AppLayout.tsx
+@@ -5,6 +5,7 @@ import Sidebar from './Sidebar'
+ import Navbar from './Navbar'
+ import AmbientScene from './AmbientScene'
+ import AiAssistantPanel from '../ai/AiAssistantPanel'
++import GlobalVoiceControl from '../voice/GlobalVoiceControl'
+ import { useBusiness } from '../../context/BusinessContext'
+ import { useLanguage } from '../../context/LanguageContext'
+ import { pageVariants } from '../../utils/motion'
+@@ -58,6 +59,7 @@ export default function AppLayout() {
+           . {t('allRights')}
+         </motion.footer>
+       </motion.div>
++      <GlobalVoiceControl />
+       <AiAssistantPanel />
+     </div>
+   )
+diff --git a/frontend/src/components/layout/GlobalSearch.tsx b/frontend/src/components/layout/GlobalSearch.tsx
+index d1da8cd..22ac75e 100644
+--- a/frontend/src/components/layout/GlobalSearch.tsx
++++ b/frontend/src/components/layout/GlobalSearch.tsx
+@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
+ import { Search, Loader2 } from 'lucide-react'
+ import { searchApi } from '../../services/api'
+ import { useLanguage } from '../../context/LanguageContext'
++import VoiceFieldMic from '../voice/VoiceFieldMic'
+ import type { SearchResult } from '../../types'
+ import { easeOutExpo } from '../../utils/motion'
+ 
+@@ -46,6 +47,18 @@ export default function GlobalSearch() {
+     return () => document.removeEventListener('mousedown', handler)
+   }, [])
+ 
++  useEffect(() => {
++    const onVoiceSearch = (e: Event) => {
++      const query = (e as CustomEvent<{ query?: string }>).detail?.query
++      if (typeof query === 'string' && query.trim()) {
++        setQuery(query.trim())
++        setOpen(true)
++      }
++    }
++    window.addEventListener('rehmani:voice-search', onVoiceSearch)
++    return () => window.removeEventListener('rehmani:voice-search', onVoiceSearch)
++  }, [])
++
+   const handleSelect = (result: SearchResult) => {
+     navigate(result.link)
+     setQuery('')
+@@ -71,9 +84,12 @@ export default function GlobalSearch() {
+           value={query}
+           onChange={(e) => setQuery(e.target.value)}
+           onFocus={() => results.length > 0 && setOpen(true)}
+-          className={`input-field w-full pl-10 pr-10 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
++          className={`input-field w-full pl-10 pr-16 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
+         />
+-        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
++        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
++          {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
++          <VoiceFieldMic onText={(text) => { setQuery(text); setOpen(true) }} />
++        </div>
+       </div>
+ 
+       <AnimatePresence>
+diff --git a/frontend/src/components/ui/Input.tsx b/frontend/src/components/ui/Input.tsx
+index cfed022..5a449b8 100644
+--- a/frontend/src/components/ui/Input.tsx
++++ b/frontend/src/components/ui/Input.tsx
+@@ -1,12 +1,35 @@
+ import { clsx } from 'clsx'
+-import type { InputHTMLAttributes } from 'react'
++import type { ChangeEvent, InputHTMLAttributes } from 'react'
++import VoiceFieldMic from '../voice/VoiceFieldMic'
+ 
+ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+   label?: string
+   error?: string
++  /** Show mic to fill this field by voice (default true for text-like inputs). */
++  voiceDictation?: boolean
+ }
+ 
+-export default function Input({ label, error, className, ...props }: InputProps) {
++export default function Input({
++  label,
++  error,
++  className,
++  voiceDictation,
++  value,
++  onChange,
++  type = 'text',
++  ...props
++}: InputProps) {
++  const enableVoice = voiceDictation ?? !['hidden', 'checkbox', 'radio', 'file', 'date', 'number', 'password'].includes(type)
++
++  const applyVoice = (text: string) => {
++    if (!onChange) return
++    const next = type === 'email' || type === 'tel' ? text.replace(/\s+/g, '') : text
++    onChange({
++      target: { value: next },
++      currentTarget: { value: next },
++    } as ChangeEvent<HTMLInputElement>)
++  }
++
+   return (
+     <div className="space-y-1.5">
+       {label && (
+@@ -14,7 +37,20 @@ export default function Input({ label, error, className, ...props }: InputProps)
+           {label}
+         </label>
+       )}
+-      <input className={clsx('input-field', error && 'border-red-500', className)} {...props} />
++      <div className="relative">
++        <input
++          type={type}
++          value={value}
++          onChange={onChange}
++          className={clsx('input-field', enableVoice && 'pr-10', error && 'border-red-500', className)}
++          {...props}
++        />
++        {enableVoice && onChange && (
++          <div className="absolute inset-y-0 right-1.5 flex items-center">
++            <VoiceFieldMic onText={applyVoice} />
++          </div>
++        )}
++      </div>
+       {error && <p className="text-sm text-red-500">{error}</p>}
+     </div>
+   )
+diff --git a/frontend/src/components/voice/GlobalVoiceControl.tsx b/frontend/src/components/voice/GlobalVoiceControl.tsx
+new file mode 100644
+index 0000000..6d6dd74
+--- /dev/null
++++ b/frontend/src/components/voice/GlobalVoiceControl.tsx
+@@ -0,0 +1,97 @@
++import { AnimatePresence, motion } from 'framer-motion'
++import { Mic, MicOff, Volume2, VolumeX, Sparkles } from 'lucide-react'
++import { useLanguage } from '../../context/LanguageContext'
++import { useVoiceControl } from '../../context/VoiceControlContext'
++import { softSpring } from '../../utils/motion'
++
++export default function GlobalVoiceControl() {
++  const { t, isUrdu } = useLanguage()
++  const {
++    supported,
++    listening,
++    interim,
++    lastHeard,
++    lastResult,
++    speakEnabled,
++    setSpeakEnabled,
++    toggleListening,
++  } = useVoiceControl()
++
++  return (
++    <div className={`fixed bottom-6 z-40 flex flex-col items-end gap-2 ${isUrdu ? 'right-6' : 'left-6'}`}>
++      <AnimatePresence>
++        {(listening || interim || lastHeard || lastResult) && (
++          <motion.div
++            key="voice-status"
++            initial={{ opacity: 0, y: 12, scale: 0.96 }}
++            animate={{ opacity: 1, y: 0, scale: 1 }}
++            exit={{ opacity: 0, y: 8, scale: 0.96 }}
++            className={`max-w-[min(22rem,calc(100vw-5rem))] rounded-2xl border border-white/15 bg-slate-900/90 text-slate-100 shadow-glass backdrop-blur-md px-4 py-3 ${isUrdu ? 'font-urdu text-right' : ''}`}
++          >
++            <div className="flex items-center gap-2 text-xs text-cyan-300 mb-1">
++              <Sparkles className="h-3.5 w-3.5" />
++              <span>{listening ? t('voiceListening') : t('voiceReady')}</span>
++            </div>
++            {listening && interim && (
++              <p className="text-sm text-cyan-200/90 italic">{interim}</p>
++            )}
++            {!listening && lastHeard && (
++              <p className="text-sm text-white/90">
++                <span className="text-slate-400">{t('voiceYouSaid')} </span>
++                {lastHeard}
++              </p>
++            )}
++            {!listening && lastResult && (
++              <p className="text-xs text-slate-300 mt-1 line-clamp-4">{lastResult}</p>
++            )}
++            <p className="text-[11px] text-slate-500 mt-2">{t('voiceHint')}</p>
++          </motion.div>
++        )}
++      </AnimatePresence>
++
++      <div className="flex items-center gap-2">
++        <motion.button
++          type="button"
++          onClick={() => setSpeakEnabled(!speakEnabled)}
++          className={`w-11 h-11 rounded-full border border-white/15 flex items-center justify-center ${
++            speakEnabled
++              ? 'bg-slate-800/90 text-cyan-300'
++              : 'bg-slate-800/70 text-slate-400'
++          }`}
++          title={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
++          whileHover={{ scale: 1.05 }}
++          whileTap={{ scale: 0.94 }}
++        >
++          {speakEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
++        </motion.button>
++
++        <motion.button
++          type="button"
++          onClick={toggleListening}
++          disabled={!supported}
++          className={`relative w-16 h-16 rounded-full text-white flex items-center justify-center shadow-lg disabled:opacity-50 ${
++            listening
++              ? 'bg-gradient-to-br from-rose-500 to-orange-500'
++              : 'bg-gradient-to-br from-[#002D62] to-[#0B4F8A]'
++          }`}
++          title={listening ? t('voiceStop') : t('voiceStart')}
++          aria-label={listening ? t('voiceStop') : t('voiceStart')}
++          initial={{ scale: 0, opacity: 0 }}
++          animate={{ scale: 1, opacity: 1 }}
++          whileHover={{ scale: 1.06 }}
++          whileTap={{ scale: 0.94 }}
++          transition={softSpring}
++        >
++          {listening && (
++            <motion.span
++              className="absolute inset-0 rounded-full bg-rose-400/40"
++              animate={{ scale: [1, 1.4, 1], opacity: [0.55, 0, 0.55] }}
++              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
++            />
++          )}
++          {listening ? <MicOff className="relative h-7 w-7" /> : <Mic className="relative h-7 w-7" />}
++        </motion.button>
++      </div>
++    </div>
++  )
++}
+diff --git a/frontend/src/components/voice/VoiceFieldMic.tsx b/frontend/src/components/voice/VoiceFieldMic.tsx
+new file mode 100644
+index 0000000..14b229c
+--- /dev/null
++++ b/frontend/src/components/voice/VoiceFieldMic.tsx
+@@ -0,0 +1,82 @@
++import { useEffect, useRef, useState } from 'react'
++import { Mic, MicOff } from 'lucide-react'
++import toast from 'react-hot-toast'
++import { useLanguage } from '../../context/LanguageContext'
++import {
++  getSpeechRecognitionCtor,
++  parseRecognitionResult,
++  stopSpeaking,
++  type SpeechRecognitionLike,
++} from '../../voice/speech'
++
++type Props = {
++  onText: (text: string) => void
++  className?: string
++  title?: string
++}
++
++/** Small mic for dictating into a single field. */
++export default function VoiceFieldMic({ onText, className = '', title }: Props) {
++  const { isUrdu, lang, t } = useLanguage()
++  const [listening, setListening] = useState(false)
++  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
++
++  const stop = () => {
++    try { recognitionRef.current?.stop() } catch { /* ignore */ }
++    setListening(false)
++  }
++
++  useEffect(() => () => stop(), [])
++
++  const toggle = () => {
++    if (listening) {
++      stop()
++      return
++    }
++    const Ctor = getSpeechRecognitionCtor()
++    if (!Ctor) {
++      toast.error(isUrdu ? 'آواز سپورٹ نہیں' : 'Voice not supported in this browser')
++      return
++    }
++    stopSpeaking()
++    const recognition = new Ctor()
++    recognition.lang = lang === 'ur' ? 'ur-PK' : 'en-US'
++    recognition.continuous = false
++    recognition.interimResults = false
++    recognition.onresult = (event) => {
++      const { finalText } = parseRecognitionResult(event)
++      const text = finalText.trim()
++      if (text) onText(text)
++    }
++    recognition.onerror = (event) => {
++      setListening(false)
++      if (event.error !== 'aborted' && event.error !== 'no-speech') {
++        toast.error(isUrdu ? 'آواز سننے میں مسئلہ' : `Voice error: ${event.error}`)
++      }
++    }
++    recognition.onend = () => setListening(false)
++    recognitionRef.current = recognition
++    try {
++      recognition.start()
++      setListening(true)
++    } catch {
++      toast.error(isUrdu ? 'مائیک شروع نہیں ہوا' : 'Could not start microphone')
++    }
++  }
++
++  return (
++    <button
++      type="button"
++      onClick={toggle}
++      className={`inline-flex items-center justify-center rounded-lg p-1.5 transition-colors ${
++        listening
++          ? 'bg-rose-500 text-white'
++          : 'text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-300'
++      } ${className}`}
++      title={title || (listening ? t('voiceStop') : t('voiceDictateField'))}
++      aria-label={title || t('voiceDictateField')}
++    >
++      {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
++    </button>
++  )
++}
+diff --git a/frontend/src/context/VoiceControlContext.tsx b/frontend/src/context/VoiceControlContext.tsx
+new file mode 100644
+index 0000000..7d8d5b7
+--- /dev/null
++++ b/frontend/src/context/VoiceControlContext.tsx
+@@ -0,0 +1,391 @@
++import {
++  createContext,
++  useCallback,
++  useContext,
++  useEffect,
++  useMemo,
++  useRef,
++  useState,
++  type ReactNode,
++} from 'react'
++import { useNavigate } from 'react-router-dom'
++import toast from 'react-hot-toast'
++import { useAuth } from './AuthContext'
++import { useLanguage } from './LanguageContext'
++import { useTheme } from './ThemeContext'
++import { aiApi } from '../services/api'
++import { parseVoiceCommand, voiceHelpText, type VoiceIntent } from '../voice/commandParser'
++import {
++  clickElementByLabel,
++  dictateIntoActiveElement,
++  fillFieldByLabel,
++  focusFirstEmptyField,
++} from '../voice/domActions'
++import {
++  getSpeechRecognitionCtor,
++  parseRecognitionResult,
++  speakText,
++  speechSupported,
++  stopSpeaking,
++  type SpeechRecognitionLike,
++} from '../voice/speech'
++
++export type VoicePageHandlers = {
++  openCreate?: () => void
++  save?: () => void
++  cancel?: () => void
++  refresh?: () => void
++  setSearch?: (query: string) => void
++  recordPayment?: () => void
++  /** Extra named actions, e.g. { preview: () => ... } */
++  custom?: Record<string, () => void>
++}
++
++type VoiceControlValue = {
++  supported: boolean
++  listening: boolean
++  interim: string
++  lastHeard: string
++  lastResult: string
++  speakEnabled: boolean
++  setSpeakEnabled: (v: boolean) => void
++  startListening: () => void
++  stopListening: () => void
++  toggleListening: () => void
++  executeTranscript: (text: string) => Promise<void>
++  registerPage: (handlers: VoicePageHandlers) => () => void
++  speak: (text: string) => void
++}
++
++const VoiceControlContext = createContext<VoiceControlValue | null>(null)
++
++export function VoiceControlProvider({ children }: { children: ReactNode }) {
++  const navigate = useNavigate()
++  const { logout } = useAuth()
++  const { lang, setLang, isUrdu, t } = useLanguage()
++  const { setTheme } = useTheme()
++
++  const [listening, setListening] = useState(false)
++  const [interim, setInterim] = useState('')
++  const [lastHeard, setLastHeard] = useState('')
++  const [lastResult, setLastResult] = useState('')
++  const [speakEnabled, setSpeakEnabled] = useState(true)
++
++  const handlersRef = useRef<VoicePageHandlers>({})
++  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
++  const speakEnabledRef = useRef(speakEnabled)
++  const pendingOpenCreateRef = useRef(false)
++
++  useEffect(() => { speakEnabledRef.current = speakEnabled }, [speakEnabled])
++
++  const speak = useCallback((text: string) => {
++    if (!speakEnabledRef.current) return
++    speakText(text, lang)
++  }, [lang])
++
++  const registerPage = useCallback((handlers: VoicePageHandlers) => {
++    handlersRef.current = handlers
++    if (pendingOpenCreateRef.current && handlers.openCreate) {
++      pendingOpenCreateRef.current = false
++      // Allow page mount/render to finish
++      setTimeout(() => {
++        handlers.openCreate?.()
++        setTimeout(() => focusFirstEmptyField(), 250)
++      }, 350)
++    }
++    return () => {
++      handlersRef.current = {}
++    }
++  }, [])
++
++  const runIntent = useCallback(async (intent: VoiceIntent, raw: string) => {
++    const h = handlersRef.current
++
++    switch (intent.type) {
++      case 'help': {
++        const msg = voiceHelpText(isUrdu)
++        setLastResult(msg)
++        speak(msg)
++        toast(msg, { duration: 5000 })
++        return
++      }
++      case 'back': {
++        navigate(-1)
++        setLastResult(isUrdu ? 'واپس جا رہے ہیں' : 'Going back')
++        speak(isUrdu ? 'واپس' : 'Going back')
++        return
++      }
++      case 'logout': {
++        logout()
++        setLastResult(isUrdu ? 'لاگ آؤٹ' : 'Logged out')
++        return
++      }
++      case 'language': {
++        setLang(intent.lang)
++        const msg = intent.lang === 'ur' ? 'زبان اردو کر دی گئی' : 'Language set to English'
++        setLastResult(msg)
++        speak(msg)
++        return
++      }
++      case 'theme': {
++        setTheme(intent.mode)
++        const msg = isUrdu ? `تھیم: ${intent.mode}` : `Theme: ${intent.mode}`
++        setLastResult(msg)
++        speak(msg)
++        return
++      }
++      case 'navigate': {
++        const wantsCreate = /\b(add|new|create|نیا|شامل|ایڈ)\b/i.test(raw)
++        if (wantsCreate) pendingOpenCreateRef.current = true
++        navigate(intent.path)
++        const msg = isUrdu ? `${intent.label} کھول رہے ہیں` : `Opening ${intent.label}`
++        setLastResult(msg)
++        speak(msg)
++        // If already on page, open create immediately
++        if (wantsCreate && window.location.pathname.replace(/\/$/, '') === intent.path) {
++          pendingOpenCreateRef.current = false
++          h.openCreate?.()
++          setTimeout(() => focusFirstEmptyField(), 250)
++        }
++        return
++      }
++      case 'page': {
++        if (intent.action === 'openCreate') {
++          if (h.openCreate) {
++            h.openCreate()
++            setTimeout(() => focusFirstEmptyField(), 250)
++            setLastResult(isUrdu ? 'فارم کھلا' : 'Form opened')
++            speak(isUrdu ? 'فارم کھلا، بول کر بھریں' : 'Form opened — speak to fill fields')
++          } else {
++            toast.error(isUrdu ? 'اس صفحے پر نیا فارم نہیں' : 'No add action on this page')
++          }
++          return
++        }
++        if (intent.action === 'save') {
++          if (h.save) {
++            h.save()
++            setLastResult(isUrdu ? 'محفوظ کر رہے ہیں' : 'Saving')
++            speak(isUrdu ? 'محفوظ' : 'Saving')
++          } else if (!clickElementByLabel(isUrdu ? 'محفوظ' : 'save')
++            && !clickElementByLabel('submit')
++            && !clickElementByLabel('create')) {
++            toast.error(isUrdu ? 'محفوظ بٹن نہیں ملا' : 'Save action not found')
++          }
++          return
++        }
++        if (intent.action === 'cancel') {
++          if (h.cancel) h.cancel()
++          else clickElementByLabel(isUrdu ? 'بند' : 'cancel') || clickElementByLabel('close')
++          setLastResult(isUrdu ? 'بند' : 'Cancelled')
++          return
++        }
++        if (intent.action === 'refresh') {
++          if (h.refresh) h.refresh()
++          else window.location.reload()
++          setLastResult(isUrdu ? 'ریفریش' : 'Refreshing')
++          return
++        }
++        if (intent.action === 'recordPayment') {
++          if (h.recordPayment) h.recordPayment()
++          else {
++            pendingOpenCreateRef.current = true
++            navigate('/payments')
++          }
++          setLastResult(isUrdu ? 'ادائیگی فارم' : 'Payment form')
++          speak(isUrdu ? 'ادائیگی فارم' : 'Opening payment form')
++          return
++        }
++        return
++      }
++      case 'search': {
++        if (h.setSearch) {
++          h.setSearch(intent.query)
++        }
++        window.dispatchEvent(new CustomEvent('rehmani:voice-search', { detail: { query: intent.query } }))
++        setLastResult(isUrdu ? `تلاش: ${intent.query}` : `Search: ${intent.query}`)
++        speak(isUrdu ? `تلاش ${intent.query}` : `Searching ${intent.query}`)
++        return
++      }
++      case 'dictate': {
++        if (dictateIntoActiveElement(intent.text)) {
++          setLastResult(isUrdu ? 'لکھ دیا گیا' : 'Typed into field')
++          speak(isUrdu ? 'لکھ دیا' : 'Done')
++        } else {
++          toast.error(isUrdu ? 'پہلے کسی خانے پر کلک کریں' : 'Tap a field first, then speak')
++        }
++        return
++      }
++      case 'fill': {
++        if (fillFieldByLabel(intent.field, intent.value)) {
++          setLastResult(isUrdu ? `${intent.field} بھر دیا` : `Filled ${intent.field}`)
++          speak(isUrdu ? 'بھر دیا' : `Filled ${intent.field}`)
++        } else if (dictateIntoActiveElement(intent.value)) {
++          setLastResult(isUrdu ? 'فعال خانے میں لکھا' : 'Filled active field')
++        } else {
++          toast.error(isUrdu ? 'خانہ نہیں ملا' : `Could not find field: ${intent.field}`)
++        }
++        return
++      }
++      case 'click': {
++        // Page custom actions first
++        const key = intent.label.toLowerCase().replace(/\s+/g, '')
++        const customHit = h.custom
++          && Object.entries(h.custom).find(([name]) =>
++            name.toLowerCase().replace(/\s+/g, '').includes(key)
++            || key.includes(name.toLowerCase().replace(/\s+/g, '')),
++          )
++        if (customHit) {
++          customHit[1]()
++          setLastResult(isUrdu ? `کیا: ${intent.label}` : `Ran: ${intent.label}`)
++          speak(isUrdu ? 'ہو گیا' : 'Done')
++          return
++        }
++        if (clickElementByLabel(intent.label)) {
++          setLastResult(isUrdu ? `کلک: ${intent.label}` : `Clicked ${intent.label}`)
++          speak(isUrdu ? 'ہو گیا' : 'Done')
++        } else {
++          // Fall through to AI for unanswered commands
++          try {
++            const res = await aiApi.chat(raw, { language: lang })
++            const reply = res.data?.data?.reply?.trim()
++            if (reply) {
++              setLastResult(reply)
++              speak(reply)
++              toast(reply, { duration: 4000 })
++            } else {
++              toast.error(isUrdu ? 'سمجھ نہیں آیا' : `Could not find: ${intent.label}`)
++            }
++          } catch {
++            toast.error(isUrdu ? 'سمجھ نہیں آیا — مدد کہیں' : 'Not understood — say "help"')
++          }
++        }
++        return
++      }
++      case 'ai': {
++        try {
++          const res = await aiApi.chat(intent.text, { language: lang })
++          const reply = res.data?.data?.reply?.trim() || t('aiError')
++          setLastResult(reply)
++          speak(reply)
++          toast(reply, { duration: 4500 })
++        } catch {
++          const err = t('aiError')
++          setLastResult(err)
++          speak(err)
++        }
++        return
++      }
++      default:
++        return
++    }
++  }, [isUrdu, lang, logout, navigate, setLang, setTheme, speak, t])
++
++  const executeTranscript = useCallback(async (text: string) => {
++    const trimmed = text.trim()
++    if (!trimmed) return
++    setLastHeard(trimmed)
++    setInterim('')
++    const intent = parseVoiceCommand(trimmed)
++    await runIntent(intent, trimmed)
++  }, [runIntent])
++
++  const stopListening = useCallback(() => {
++    try { recognitionRef.current?.stop() } catch { /* ignore */ }
++    setListening(false)
++  }, [])
++
++  const startListening = useCallback(() => {
++    const Ctor = getSpeechRecognitionCtor()
++    if (!Ctor) {
++      toast.error(isUrdu ? 'اس براؤزر میں آواز سپورٹ نہیں (Chrome استعمال کریں)' : 'Voice not supported — try Chrome')
++      return
++    }
++    stopSpeaking()
++    try { recognitionRef.current?.abort?.() } catch { /* ignore */ }
++
++    const recognition = new Ctor()
++    recognition.lang = lang === 'ur' ? 'ur-PK' : 'en-US'
++    recognition.continuous = false
++    recognition.interimResults = true
++    recognition.onresult = (event) => {
++      const { finalText, interimText } = parseRecognitionResult(event)
++      if (interimText) setInterim(interimText)
++      if (finalText.trim()) {
++        setInterim('')
++        void executeTranscript(finalText.trim())
++      }
++    }
++    recognition.onerror = (event) => {
++      setListening(false)
++      if (event.error !== 'aborted' && event.error !== 'no-speech') {
++        toast.error(isUrdu ? 'آواز سننے میں مسئلہ' : `Voice error: ${event.error}`)
++      }
++    }
++    recognition.onend = () => setListening(false)
++    recognitionRef.current = recognition
++    try {
++      recognition.start()
++      setListening(true)
++    } catch {
++      toast.error(isUrdu ? 'مائیک شروع نہیں ہو سکا' : 'Could not start microphone')
++    }
++  }, [executeTranscript, isUrdu, lang])
++
++  const toggleListening = useCallback(() => {
++    if (listening) stopListening()
++    else startListening()
++  }, [listening, startListening, stopListening])
++
++  useEffect(() => () => {
++    stopListening()
++    stopSpeaking()
++  }, [stopListening])
++
++  const value = useMemo<VoiceControlValue>(() => ({
++    supported: speechSupported(),
++    listening,
++    interim,
++    lastHeard,
++    lastResult,
++    speakEnabled,
++    setSpeakEnabled,
++    startListening,
++    stopListening,
++    toggleListening,
++    executeTranscript,
++    registerPage,
++    speak,
++  }), [
++    listening, interim, lastHeard, lastResult, speakEnabled,
++    startListening, stopListening, toggleListening, executeTranscript, registerPage, speak,
++  ])
++
++  return (
++    <VoiceControlContext.Provider value={value}>
++      {children}
++    </VoiceControlContext.Provider>
++  )
++}
++
++export function useVoiceControl() {
++  const ctx = useContext(VoiceControlContext)
++  if (!ctx) throw new Error('useVoiceControl must be used within VoiceControlProvider')
++  return ctx
++}
++
++/** Register page-level voice handlers (auto-cleaned on unmount). */
++export function useVoicePageActions(handlers: VoicePageHandlers) {
++  const { registerPage } = useVoiceControl()
++  const ref = useRef(handlers)
++  ref.current = handlers
++
++  useEffect(() => registerPage({
++    openCreate: () => ref.current.openCreate?.(),
++    save: () => ref.current.save?.(),
++    cancel: () => ref.current.cancel?.(),
++    refresh: () => ref.current.refresh?.(),
++    setSearch: (q) => ref.current.setSearch?.(q),
++    recordPayment: () => ref.current.recordPayment?.(),
++    get custom() { return ref.current.custom },
++  }), [registerPage])
++}
+diff --git a/frontend/src/i18n/translations.ts b/frontend/src/i18n/translations.ts
+index d4225d2..4668dc7 100644
+--- a/frontend/src/i18n/translations.ts
++++ b/frontend/src/i18n/translations.ts
+@@ -64,13 +64,20 @@ export const translations = {
+     aiTitle: 'AI Assistant',
+     aiSubtitle: 'Voice + chat · business & world',
+     aiPlaceholder: 'Type or tap the mic to speak...',
+-    aiWelcome: "Hello! I'm your Rhmani assistant. Ask by text or voice about stock, sales, payments — or any world topic. Tap the mic to talk; replies can be read aloud.",
++    aiWelcome: "Hello! I'm your Rhmani assistant. Use the big Voice button (corner) to control the whole app by speech — open pages, add records, fill fields, save — or ask me anything here.",
+     aiError: "I couldn't reach the server. Please ensure the backend is running, then try again.",
+     aiListening: 'Listening… speak now',
+     aiStartVoice: 'Start voice',
+     aiStopVoice: 'Stop voice',
+     aiVoiceOn: 'Read replies aloud',
+     aiVoiceOff: 'Mute spoken replies',
++    voiceStart: 'Voice control — tap and speak',
++    voiceStop: 'Stop listening',
++    voiceListening: 'Listening — speak a command',
++    voiceReady: 'Voice control',
++    voiceYouSaid: 'You said:',
++    voiceHint: 'Say: go to farmers, add new, search Ali, fill name with Ali, save, help…',
++    voiceDictateField: 'Speak to fill this field',
+     dashboardWelcome: 'live business overview',
+     allRights: 'All rights reserved.',
+     goBack: 'Back',
+@@ -139,13 +146,20 @@ export const translations = {
+     aiTitle: 'اے آئی اسسٹنٹ',
+     aiSubtitle: 'آواز + چیٹ · کاروبار اور دنیا',
+     aiPlaceholder: 'لکھیں یا مائیک دبا کر بولیں...',
+-    aiWelcome: 'السلام علیکم! میں رحمانی اسسٹنٹ ہوں۔ متن یا آواز سے اسٹاک، فروخت، ادائیگی یا دنیا کا کوئی سوال پوچھیں۔ مائیک دبائیں؛ جواب سن کر بھی سنائے جا سکتے ہیں۔',
++    aiWelcome: 'السلام علیکم! میں رحمانی اسسٹنٹ ہوں۔ کونے میں بڑا آواز بٹن پورے سسٹم کو بول کر چلا سکتا ہے — صفحے کھولیں، ریکارڈ شامل کریں، خانے بھریں، محفوظ کریں — یا یہاں کوئی سوال پوچھیں۔',
+     aiError: 'سرور سے رابطہ نہیں ہو سکا۔ براہ کرم بیک اینڈ چالو رکھیں اور دوبارہ کوشش کریں۔',
+     aiListening: 'سن رہا ہوں… اب بولیں',
+     aiStartVoice: 'آواز شروع',
+     aiStopVoice: 'آواز بند',
+     aiVoiceOn: 'جواب زور سے سنائیں',
+     aiVoiceOff: 'آواز بند کریں',
++    voiceStart: 'آواز کنٹرول — دبا کر بولیں',
++    voiceStop: 'سننا بند کریں',
++    voiceListening: 'سن رہا ہوں — کمانڈ بولیں',
++    voiceReady: 'آواز کنٹرول',
++    voiceYouSaid: 'آپ نے کہا:',
++    voiceHint: 'کہیں: کسان کھولو، نیا شامل کرو، تلاش علی، نام میں علی لکھو، محفوظ، مدد…',
++    voiceDictateField: 'اس خانے میں بول کر بھریں',
+     dashboardWelcome: 'لائیو کاروباری جائزہ',
+     allRights: 'جملہ حقوق محفوظ ہیں۔',
+     goBack: 'واپس',
+diff --git a/frontend/src/pages/ArhatSalePage.tsx b/frontend/src/pages/ArhatSalePage.tsx
+index 0269635..2d1462c 100644
+--- a/frontend/src/pages/ArhatSalePage.tsx
++++ b/frontend/src/pages/ArhatSalePage.tsx
+@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
+ import { arhatApi, buyerApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
+ import { formatCurrency, formatNumber } from '../utils/format'
+ import type { Buyer, Dheri, Farmer, PriceCalculationResult, Product } from '../types'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ 
+ const emptyResult: PriceCalculationResult = {
+   totalWeight: 0,
+@@ -171,6 +172,10 @@ export default function ArhatSalePage() {
+     { label: mode === 'BUYER_SALE' ? 'Buyer Amount' : 'Farmer Payable', value: formatCurrency(mode === 'BUYER_SALE' ? result.totalAmount : result.farmerFinalBalance), highlight: true },
+   ]
+ 
++  useVoicePageActions({
++    save: () => { void handleSave() },
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader title="Arhat Sale" description="Sell to buyer or post farmer payable" />
+diff --git a/frontend/src/pages/BuyersPage.tsx b/frontend/src/pages/BuyersPage.tsx
+index efbfd25..9cb236e 100644
+--- a/frontend/src/pages/BuyersPage.tsx
++++ b/frontend/src/pages/BuyersPage.tsx
+@@ -12,6 +12,7 @@ import { TableSkeleton } from '../components/ui/Skeleton'
+ import PaymentModal from '../components/payments/PaymentModal'
+ import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { buyerApi } from '../services/api'
+ import { formatCurrency } from '../utils/format'
+ import type { Buyer, Sale } from '../types'
+@@ -116,6 +117,14 @@ export default function BuyersPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate,
++    save: () => { void handleSave() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++    setSearch,
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/DheriesPage.tsx b/frontend/src/pages/DheriesPage.tsx
+index c55e105..6080f3e 100644
+--- a/frontend/src/pages/DheriesPage.tsx
++++ b/frontend/src/pages/DheriesPage.tsx
+@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { dheriApi, farmerApi, settingsApi } from '../services/api'
+ import { formatCurrency } from '../utils/format'
+ import type { Dheri, Farmer, Product } from '../types'
+@@ -91,6 +92,14 @@ export default function DheriesPage() {
+     return map[status] || 'bg-gray-100 text-gray-700'
+   }
+ 
++  useVoicePageActions({
++    openCreate: () => setModalOpen(true),
++    save: () => { void handleCreate() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/FarmerProductPage.tsx b/frontend/src/pages/FarmerProductPage.tsx
+index 0c4783e..02c1712 100644
+--- a/frontend/src/pages/FarmerProductPage.tsx
++++ b/frontend/src/pages/FarmerProductPage.tsx
+@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
+ import { arhatApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
+ import { formatCurrency, formatNumber } from '../utils/format'
+ import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ 
+ const emptyResult: PriceCalculationResult = {
+   totalWeight: 0,
+@@ -142,6 +143,10 @@ export default function FarmerProductPage() {
+     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+   ]
+ 
++  useVoicePageActions({
++    save: () => { void handleSave() },
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader title="Farmer Product" description="Enter products and view farmer product records" />
+diff --git a/frontend/src/pages/FarmersPage.tsx b/frontend/src/pages/FarmersPage.tsx
+index 6117471..e3b0be4 100644
+--- a/frontend/src/pages/FarmersPage.tsx
++++ b/frontend/src/pages/FarmersPage.tsx
+@@ -12,6 +12,7 @@ import { TableSkeleton } from '../components/ui/Skeleton'
+ import PaymentModal from '../components/payments/PaymentModal'
+ import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { farmerApi } from '../services/api'
+ import { formatCurrency } from '../utils/format'
+ import type { Farmer } from '../types'
+@@ -120,6 +121,14 @@ export default function FarmersPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate,
++    save: () => { void handleSave() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++    setSearch,
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/OwnerPage.tsx b/frontend/src/pages/OwnerPage.tsx
+index 998c977..1a3a23a 100644
+--- a/frontend/src/pages/OwnerPage.tsx
++++ b/frontend/src/pages/OwnerPage.tsx
+@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
+ import { useAuth } from '../context/AuthContext'
+ import { auditApi, backupApi, userApi } from '../services/api'
+ import type { SystemUser } from '../types'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ 
+ export default function OwnerPage() {
+   const { user } = useAuth()
+@@ -109,6 +110,14 @@ export default function OwnerPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate: () => setModalOpen(true),
++    save: () => { void createUser() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/PaymentsPage.tsx b/frontend/src/pages/PaymentsPage.tsx
+index 68d9454..0f6635d 100644
+--- a/frontend/src/pages/PaymentsPage.tsx
++++ b/frontend/src/pages/PaymentsPage.tsx
+@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import PaymentModal from '../components/payments/PaymentModal'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { buyerApi, farmerApi, paymentApi } from '../services/api'
+ import { formatCurrency, formatDateTime } from '../utils/format'
+ import type { Buyer, Farmer, Payment, Sale } from '../types'
+@@ -224,6 +225,15 @@ export default function PaymentsPage() {
+         label: `${b.name} (${b.buyerId}) — due ${formatCurrency(b.outstandingBalance || 0)}`,
+       }))
+ 
++  useVoicePageActions({
++    openCreate: () => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) },
++    cancel: () => { setPayOpen(false); setPayFlow(null); setNewOpen(false); setViewPayment(null) },
++    refresh: () => load(),
++    setSearch,
++    recordPayment: () => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) },
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/PriceCalculatorPage.tsx b/frontend/src/pages/PriceCalculatorPage.tsx
+index 3e8651b..a136f3e 100644
+--- a/frontend/src/pages/PriceCalculatorPage.tsx
++++ b/frontend/src/pages/PriceCalculatorPage.tsx
+@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
+ import { calculatorApi, dheriApi } from '../services/api'
+ import { formatCurrency, formatNumber } from '../utils/format'
+ import type { Dheri, PriceCalculationResult } from '../types'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ 
+ const emptyResult: PriceCalculationResult = {
+   totalWeight: 0,
+@@ -102,6 +103,10 @@ export default function PriceCalculatorPage() {
+     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+   ]
+ 
++  useVoicePageActions({
++    save: () => { void handleSave() },
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader title="Price Calculator" description="Calculate product amount and farmer payable" />
+diff --git a/frontend/src/pages/QueuePage.tsx b/frontend/src/pages/QueuePage.tsx
+index a36b178..3f59ccd 100644
+--- a/frontend/src/pages/QueuePage.tsx
++++ b/frontend/src/pages/QueuePage.tsx
+@@ -7,6 +7,7 @@ import Select from '../components/ui/Select'
+ import Modal from '../components/ui/Modal'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { queueApi, dheriApi } from '../services/api'
+ import type { Dheri, QueueEntry } from '../types'
+ 
+@@ -113,6 +114,14 @@ export default function QueuePage() {
+     </div>
+   )
+ 
++  useVoicePageActions({
++    openCreate: () => setModalOpen(true),
++    save: () => { void handleAdd() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/ReportsPage.tsx b/frontend/src/pages/ReportsPage.tsx
+index 8a17f6c..c1c87cd 100644
+--- a/frontend/src/pages/ReportsPage.tsx
++++ b/frontend/src/pages/ReportsPage.tsx
+@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
+ import Button from '../components/ui/Button'
+ import Input from '../components/ui/Input'
+ import { useBusiness } from '../context/BusinessContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { reportApi } from '../services/api'
+ import { formatCurrency, formatNumber } from '../utils/format'
+ import { buildReportHtml, openReportPrint } from '../utils/reportPrint'
+@@ -126,6 +127,17 @@ export default function ReportsPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    custom: {
++      preview: () => { void loadPreview(active || 'sales') },
++      sales: () => { void loadPreview('sales') },
++      commission: () => { void loadPreview('commission') },
++      stock: () => { void loadPreview('stock') },
++      profit: () => { void loadPreview('profit') },
++      print: () => { void printReport(active || 'sales', 'en') },
++    },
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/SalesPage.tsx b/frontend/src/pages/SalesPage.tsx
+index c10d786..05cfaae 100644
+--- a/frontend/src/pages/SalesPage.tsx
++++ b/frontend/src/pages/SalesPage.tsx
+@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
+ import ConfirmDialog from '../components/ui/ConfirmDialog'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { buyerApi, dheriApi, farmerApi, saleApi, settingsApi, stockApi } from '../services/api'
+ import { formatCurrency, formatNumber } from '../utils/format'
+ import type { Buyer, Dheri, Farmer, Product, Sale, SaleItem, StockItem } from '../types'
+@@ -137,6 +138,13 @@ export default function SalesPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate,
++    save: () => { void handleSave() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/SettingsPage.tsx b/frontend/src/pages/SettingsPage.tsx
+index 071559e..c40e02f 100644
+--- a/frontend/src/pages/SettingsPage.tsx
++++ b/frontend/src/pages/SettingsPage.tsx
+@@ -10,6 +10,7 @@ import { useBusiness } from '../context/BusinessContext'
+ import { useLanguage } from '../context/LanguageContext'
+ import type { BusinessSettings, WeatherCalendar } from '../types'
+ import type { Lang } from '../i18n/translations'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ 
+ const CITY_PRESETS: { label: string; lat: number; lon: number; tz: string }[] = [
+   { label: 'Lahore', lat: 31.5204, lon: 74.3587, tz: 'Asia/Karachi' },
+@@ -191,6 +192,11 @@ export default function SettingsPage() {
+     )
+   }
+ 
++  useVoicePageActions({
++    save: () => { void handleSave() },
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/StockPage.tsx b/frontend/src/pages/StockPage.tsx
+index 07458a3..ef8b68d 100644
+--- a/frontend/src/pages/StockPage.tsx
++++ b/frontend/src/pages/StockPage.tsx
+@@ -8,6 +8,7 @@ import Select from '../components/ui/Select'
+ import Modal from '../components/ui/Modal'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { stockApi, settingsApi } from '../services/api'
+ import { formatNumber, formatDateTime } from '../utils/format'
+ import type { Product, StockItem, StockTransaction } from '../types'
+@@ -62,6 +63,14 @@ export default function StockPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate: () => setModalOpen(true),
++    save: () => { void handleAdjust() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader
+diff --git a/frontend/src/pages/TrucksPage.tsx b/frontend/src/pages/TrucksPage.tsx
+index 6a6e5e1..7bcddd7 100644
+--- a/frontend/src/pages/TrucksPage.tsx
++++ b/frontend/src/pages/TrucksPage.tsx
+@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
+ import { TableSkeleton } from '../components/ui/Skeleton'
+ import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+ import { useLiveReload } from '../context/SyncContext'
++import { useVoicePageActions } from '../context/VoiceControlContext'
+ import { truckApi, farmerApi } from '../services/api'
+ import type { Farmer, Truck } from '../types'
+ 
+@@ -80,6 +81,14 @@ export default function TrucksPage() {
+     }
+   }
+ 
++  useVoicePageActions({
++    openCreate: () => setModalOpen(true),
++    save: () => { void handleCreate() },
++    cancel: () => setModalOpen(false),
++    refresh: () => load(),
++  })
++
++
+   return (
+     <div className="space-y-6">
+       <PageHeader title="Truck Management" description="Each truck is linked to exactly one farmer"
+diff --git a/frontend/src/voice/commandParser.ts b/frontend/src/voice/commandParser.ts
+new file mode 100644
+index 0000000..f52c1af
+--- /dev/null
++++ b/frontend/src/voice/commandParser.ts
+@@ -0,0 +1,195 @@
++export type VoiceIntent =
++  | { type: 'navigate'; path: string; label: string }
++  | { type: 'page'; action: 'openCreate' | 'save' | 'cancel' | 'refresh' | 'recordPayment' }
++  | { type: 'search'; query: string }
++  | { type: 'dictate'; text: string }
++  | { type: 'click'; label: string }
++  | { type: 'fill'; field: string; value: string }
++  | { type: 'language'; lang: 'en' | 'ur' }
++  | { type: 'theme'; mode: 'light' | 'dark' | 'system' }
++  | { type: 'logout' }
++  | { type: 'back' }
++  | { type: 'help' }
++  | { type: 'ai'; text: string }
++
++const ROUTES: { path: string; label: string; keys: string[] }[] = [
++  { path: '/dashboard', label: 'Dashboard', keys: ['dashboard', 'home', 'ڈیش بورڈ', 'ڈیشبورڈ', 'ہوم'] },
++  { path: '/farmers', label: 'Farmers', keys: ['farmers', 'farmer', 'کسان', 'کسانوں'] },
++  { path: '/buyers', label: 'Buyers', keys: ['buyers', 'buyer', 'خریدار', 'خریداروں'] },
++  { path: '/trucks', label: 'Trucks', keys: ['trucks', 'truck', 'ٹرک', 'ٹرکس'] },
++  { path: '/dheris', label: 'Dheris', keys: ['dheris', 'dheri', 'ڈھیری', 'ڈھیریاں', 'ڈھیریوں'] },
++  { path: '/stock', label: 'Stock', keys: ['stock', 'inventory', 'اسٹاک'] },
++  { path: '/calculator', label: 'Calculator', keys: ['calculator', 'price calculator', 'کیلکولیٹر', 'قیمت'] },
++  { path: '/farmer-product', label: 'Farmer Product', keys: ['farmer product', 'کسان پروڈکٹ'] },
++  { path: '/arhat-sale', label: 'Arhat Sale', keys: ['arhat sale', 'arhat', 'آرھٹ', 'آرہٹ'] },
++  { path: '/queue', label: 'Queue', keys: ['queue', 'قطار'] },
++  { path: '/sales', label: 'Sales', keys: ['sales', 'sale', 'فروخت', 'سیلز'] },
++  { path: '/payments', label: 'Payments', keys: ['payments', 'payment', 'ادائیگی', 'ادائیگیاں'] },
++  { path: '/records', label: 'Records', keys: ['records', 'record', 'ریکارڈ', 'ریکارڈز'] },
++  { path: '/reports', label: 'Reports', keys: ['reports', 'report', 'رپورٹ', 'رپورٹس'] },
++  { path: '/settings', label: 'Settings', keys: ['settings', 'setting', 'ترتیبات', 'سیٹنگ'] },
++  { path: '/owner', label: 'Owner Panel', keys: ['owner', 'owner panel', 'مالک', 'یوزر'] },
++]
++
++function norm(s: string): string {
++  return s
++    .toLowerCase()
++    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
++    .replace(/\s+/g, ' ')
++    .trim()
++}
++
++function includesAny(text: string, phrases: string[]): boolean {
++  return phrases.some((p) => text.includes(norm(p)))
++}
++
++function extractAfter(text: string, starters: string[]): string | null {
++  for (const s of starters) {
++    const n = norm(s)
++    const idx = text.indexOf(n)
++    if (idx >= 0) {
++      const rest = text.slice(idx + n.length).trim()
++      if (rest) return rest
++    }
++  }
++  return null
++}
++
++/** Parse free-form speech into a voice intent (EN + UR). */
++export function parseVoiceCommand(raw: string): VoiceIntent {
++  const text = norm(raw)
++  if (!text) return { type: 'help' }
++
++  if (includesAny(text, ['help', 'commands', 'what can i say', 'مدد', 'کمانڈ', 'کیا بولوں'])) {
++    return { type: 'help' }
++  }
++
++  if (includesAny(text, ['go back', 'back', 'previous', 'واپس', 'پیچھے'])) {
++    return { type: 'back' }
++  }
++
++  if (includesAny(text, ['log out', 'logout', 'sign out', 'لاگ آؤٹ', 'سائن آؤٹ'])) {
++    return { type: 'logout' }
++  }
++
++  if (includesAny(text, ['switch to urdu', 'urdu', 'اردو'])) {
++    return { type: 'language', lang: 'ur' }
++  }
++  if (includesAny(text, ['switch to english', 'english', 'انگریزی'])) {
++    return { type: 'language', lang: 'en' }
++  }
++
++  if (includesAny(text, ['dark mode', 'dark theme', 'ڈارک'])) {
++    return { type: 'theme', mode: 'dark' }
++  }
++  if (includesAny(text, ['light mode', 'light theme', 'لائٹ'])) {
++    return { type: 'theme', mode: 'light' }
++  }
++  if (includesAny(text, ['system theme', 'system mode'])) {
++    return { type: 'theme', mode: 'system' }
++  }
++
++  const dictate = extractAfter(text, ['type', 'dictate', 'write', 'لکھو', 'لکھیں', 'ٹائپ'])
++  if (dictate) return { type: 'dictate', text: dictate }
++
++  const search = extractAfter(text, [
++    'search for', 'search', 'find', 'look for', 'تلاش', 'ڈھونڈو', 'تلاش کرو',
++  ])
++  if (search) return { type: 'search', query: search }
++
++  const fillMatch = text.match(/^(?:fill|set|enter|بھرو|ڈالو)\s+(.+?)\s+(?:with|to|کو|=)\s+(.+)$/i)
++    || text.match(/^(.+?)\s+(?:میں|کو)\s+(.+?)\s+(?:لکھو|ڈالو|بھرو)$/)
++  if (fillMatch) {
++    return { type: 'fill', field: fillMatch[1].trim(), value: fillMatch[2].trim() }
++  }
++
++  if (includesAny(text, [
++    'add new', 'add', 'create', 'new', 'open form', 'نیا', 'شامل', 'بنائیں', 'بناؤ', 'ایڈ',
++  ]) && !includesAny(text, ['add to queue'])) {
++    // "add farmer" → navigate + openCreate handled by page after navigate if needed
++    for (const route of ROUTES) {
++      if (route.keys.some((k) => text.includes(norm(k)))) {
++        return { type: 'navigate', path: route.path, label: route.label }
++      }
++    }
++    return { type: 'page', action: 'openCreate' }
++  }
++
++  if (includesAny(text, ['save', 'submit', 'confirm', 'محفوظ', 'محفوظ کرو', 'سیو', 'جمع'])) {
++    return { type: 'page', action: 'save' }
++  }
++
++  if (includesAny(text, ['cancel', 'close', 'dismiss', 'بند', 'منسوخ'])) {
++    return { type: 'page', action: 'cancel' }
++  }
++
++  if (includesAny(text, ['refresh', 'reload', 'تازہ', 'ریفریش'])) {
++    return { type: 'page', action: 'refresh' }
++  }
++
++  if (includesAny(text, ['record payment', 'new payment', 'add payment', 'ادائیگی ریکارڈ', 'نیا ادائیگی'])) {
++    return { type: 'page', action: 'recordPayment' }
++  }
++
++  const click = extractAfter(text, ['click', 'press', 'tap', 'open', 'دباؤ', 'کلک', 'کھولو', 'کھولیں'])
++  if (click) {
++    // Prefer navigation if the click target is a known page
++    for (const route of ROUTES) {
++      if (route.keys.some((k) => click.includes(norm(k)) || norm(k).includes(click))) {
++        return { type: 'navigate', path: route.path, label: route.label }
++      }
++    }
++    return { type: 'click', label: click }
++  }
++
++  for (const prefix of ['go to', 'open', 'show', 'navigate to', 'جاؤ', 'جاو', 'کھولو', 'دکھاؤ', 'پر جاؤ']) {
++    const rest = extractAfter(text, [prefix])
++    if (rest) {
++      for (const route of ROUTES) {
++        if (route.keys.some((k) => rest.includes(norm(k)) || norm(k).includes(rest))) {
++          return { type: 'navigate', path: route.path, label: route.label }
++        }
++      }
++    }
++  }
++
++  for (const route of ROUTES) {
++    if (route.keys.some((k) => text === norm(k) || text.startsWith(`${norm(k)} `))) {
++      return { type: 'navigate', path: route.path, label: route.label }
++    }
++  }
++
++  // Bare page name anywhere
++  for (const route of ROUTES) {
++    if (route.keys.some((k) => text.includes(norm(k)))) {
++      // If also sounds like create, open create after nav — caller may openCreate when already on page
++      if (includesAny(text, ['add', 'new', 'create', 'نیا', 'شامل'])) {
++        return { type: 'navigate', path: route.path, label: route.label }
++      }
++      if (text.split(' ').length <= 3) {
++        return { type: 'navigate', path: route.path, label: route.label }
++      }
++    }
++  }
++
++  // Questions / unknown → AI
++  if (
++    includesAny(text, ['what', 'how', 'why', 'when', 'who', 'tell me', 'explain', 'کیا', 'کیسے', 'بتاؤ', 'بتائیں'])
++    || text.endsWith('?')
++  ) {
++    return { type: 'ai', text: raw.trim() }
++  }
++
++  // Default: try click by spoken words, else AI
++  if (text.split(' ').length <= 4) {
++    return { type: 'click', label: raw.trim() }
++  }
++  return { type: 'ai', text: raw.trim() }
++}
++
++export function voiceHelpText(isUrdu: boolean): string {
++  if (isUrdu) {
++    return 'آپ کہہ سکتے ہیں: ڈیش بورڈ، کسان کھولو، نیا شامل کرو، تلاش احمد، نام میں علی لکھو، محفوظ کرو، بند کرو، ادائیگیاں، رپورٹس، اردو، انگریزی، یا کوئی سوال پوچھیں۔'
++  }
++  return 'Try: go to farmers, add new, search Ahmed, type Ali, fill name with Ali, save, cancel, open payments, click Preview, Urdu, English, or ask a question.'
++}
+diff --git a/frontend/src/voice/domActions.ts b/frontend/src/voice/domActions.ts
+new file mode 100644
+index 0000000..f0a6516
+--- /dev/null
++++ b/frontend/src/voice/domActions.ts
+@@ -0,0 +1,158 @@
++function visible(el: HTMLElement): boolean {
++  const style = window.getComputedStyle(el)
++  if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') return false
++  const rect = el.getBoundingClientRect()
++  return rect.width > 0 && rect.height > 0
++}
++
++function normalize(s: string): string {
++  return s.toLowerCase().replace(/\s+/g, ' ').trim()
++}
++
++function elementLabel(el: HTMLElement): string {
++  return normalize(
++    [
++      el.getAttribute('aria-label'),
++      el.getAttribute('title'),
++      el.getAttribute('placeholder'),
++      el.getAttribute('name'),
++      el.getAttribute('id'),
++      el.textContent,
++    ]
++      .filter(Boolean)
++      .join(' '),
++  )
++}
++
++function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
++  const proto = el instanceof HTMLTextAreaElement
++    ? window.HTMLTextAreaElement.prototype
++    : window.HTMLInputElement.prototype
++  const desc = Object.getOwnPropertyDescriptor(proto, 'value')
++  desc?.set?.call(el, value)
++  el.dispatchEvent(new Event('input', { bubbles: true }))
++  el.dispatchEvent(new Event('change', { bubbles: true }))
++}
++
++/** Insert or replace text in the currently focused field. */
++export function dictateIntoActiveElement(text: string, mode: 'replace' | 'append' = 'replace'): boolean {
++  const el = document.activeElement
++  if (!el) return false
++  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
++    const next = mode === 'append' && el.value ? `${el.value} ${text}` : text
++    setNativeValue(el, next)
++    return true
++  }
++  if ((el as HTMLElement).isContentEditable) {
++    ;(el as HTMLElement).textContent = mode === 'append'
++      ? `${(el as HTMLElement).textContent || ''} ${text}`.trim()
++      : text
++    el.dispatchEvent(new Event('input', { bubbles: true }))
++    return true
++  }
++  return false
++}
++
++/** Find an input/textarea by label / placeholder / name and fill it. */
++export function fillFieldByLabel(field: string, value: string): boolean {
++  const target = normalize(field)
++  const nodes = Array.from(
++    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea, select'),
++  ).filter((el) => visible(el) && !el.disabled && el.type !== 'hidden')
++
++  let best: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null = null
++  let bestScore = 0
++
++  for (const el of nodes) {
++    const labelText = (() => {
++      const id = el.getAttribute('id')
++      if (id) {
++        const lab = document.querySelector(`label[for="${CSS.escape(id)}"]`)
++        if (lab?.textContent) return lab.textContent
++      }
++      const parentLabel = el.closest('label')
++      if (parentLabel?.textContent) return parentLabel.textContent
++      const wrap = el.closest('div')
++      const siblingLabel = wrap?.querySelector('label')
++      return siblingLabel?.textContent || ''
++    })()
++
++    const hay = normalize(
++      [labelText, el.getAttribute('placeholder'), el.getAttribute('name'), el.getAttribute('aria-label'), el.id]
++        .filter(Boolean)
++        .join(' '),
++    )
++    if (!hay) continue
++    let score = 0
++    if (hay === target) score = 100
++    else if (hay.includes(target)) score = 80
++    else if (target.includes(hay) && hay.length > 2) score = 60
++    else if (hay.split(' ').some((w) => w === target)) score = 70
++    if (score > bestScore) {
++      bestScore = score
++      best = el
++    }
++  }
++
++  if (!best || bestScore < 60) return false
++
++  if (best instanceof HTMLSelectElement) {
++    const opt = Array.from(best.options).find((o) => normalize(o.textContent || '').includes(normalize(value)))
++    if (opt) {
++      best.value = opt.value
++      best.dispatchEvent(new Event('change', { bubbles: true }))
++      return true
++    }
++    return false
++  }
++
++  best.focus()
++  setNativeValue(best, value)
++  return true
++}
++
++/** Click the best matching visible button/link by spoken label. */
++export function clickElementByLabel(label: string): boolean {
++  const target = normalize(label)
++  if (!target) return false
++
++  const candidates = Array.from(
++    document.querySelectorAll<HTMLElement>('button, a, [role="button"], input[type="submit"], input[type="button"]'),
++  ).filter((el) => visible(el) && !(el as HTMLButtonElement).disabled)
++
++  let best: HTMLElement | null = null
++  let bestScore = 0
++
++  for (const el of candidates) {
++    const hay = elementLabel(el)
++    if (!hay) continue
++    let score = 0
++    if (hay === target) score = 100
++    else if (hay.includes(target)) score = 85
++    else if (target.includes(hay) && hay.length > 2) score = 70
++    else {
++      const words = target.split(' ').filter((w) => w.length > 2)
++      const hits = words.filter((w) => hay.includes(w)).length
++      if (hits && hits === words.length) score = 75
++      else if (hits) score = 40 + hits * 10
++    }
++    if (score > bestScore) {
++      bestScore = score
++      best = el
++    }
++  }
++
++  if (!best || bestScore < 50) return false
++  best.click()
++  return true
++}
++
++/** Focus the first empty visible text field (useful after opening a form). */
++export function focusFirstEmptyField(): boolean {
++  const el = Array.from(
++    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea'),
++  ).find((n) => visible(n) && !n.disabled && !n.readOnly && !n.value)
++  if (!el) return false
++  el.focus()
++  return true
++}
+diff --git a/frontend/src/voice/speech.ts b/frontend/src/voice/speech.ts
+new file mode 100644
+index 0000000..551a00b
+--- /dev/null
++++ b/frontend/src/voice/speech.ts
+@@ -0,0 +1,71 @@
++export type SpeechRecognitionLike = {
++  lang: string
++  continuous: boolean
++  interimResults: boolean
++  start: () => void
++  stop: () => void
++  abort?: () => void
++  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null
++  onerror: ((event: { error: string }) => void) | null
++  onend: (() => void) | null
++}
++
++export type SpeechRecognitionResultEventLike = {
++  results: {
++    length: number
++    [index: number]: {
++      isFinal: boolean
++      [index: number]: { transcript: string }
++    }
++  }
++}
++
++export function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
++  const w = window as unknown as {
++    SpeechRecognition?: new () => SpeechRecognitionLike
++    webkitSpeechRecognition?: new () => SpeechRecognitionLike
++  }
++  return w.SpeechRecognition || w.webkitSpeechRecognition || null
++}
++
++export function speechSupported(): boolean {
++  return Boolean(getSpeechRecognitionCtor())
++}
++
++export function parseRecognitionResult(event: SpeechRecognitionResultEventLike): {
++  finalText: string
++  interimText: string
++} {
++  let finalText = ''
++  let interimText = ''
++  for (let i = 0; i < event.results.length; i++) {
++    const row = event.results[i]
++    if (!row) continue
++    const piece = row[0]?.transcript || ''
++    if (row.isFinal) finalText += piece
++    else interimText += piece
++  }
++  return { finalText, interimText }
++}
++
++export function speakText(text: string, lang: 'en' | 'ur') {
++  if (typeof window === 'undefined' || !window.speechSynthesis) return
++  const clean = text.replace(/\*\*/g, '').replace(/[#`>_]/g, ' ').replace(/\s+/g, ' ').trim()
++  if (!clean) return
++  window.speechSynthesis.cancel()
++  const utter = new SpeechSynthesisUtterance(clean.slice(0, 1200))
++  utter.lang = lang === 'ur' ? 'ur-PK' : 'en-US'
++  utter.rate = 1
++  const voices = window.speechSynthesis.getVoices()
++  const preferred = voices.find((v) =>
++    lang === 'ur'
++      ? v.lang.toLowerCase().startsWith('ur')
++      : v.lang.toLowerCase().startsWith('en'),
++  )
++  if (preferred) utter.voice = preferred
++  window.speechSynthesis.speak(utter)
++}
++
++export function stopSpeaking() {
++  window.speechSynthesis?.cancel()
++}

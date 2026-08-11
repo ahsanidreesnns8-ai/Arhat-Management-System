@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { truckApi, farmerApi } from '../services/api'
 import type { Farmer, Truck } from '../types'
 
@@ -79,6 +80,14 @@ export default function TrucksPage() {
       setSaving(false)
     }
   }
+
+  useVoicePageActions({
+    openCreate: () => setModalOpen(true),
+    save: () => { void handleCreate() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
+
 
   return (
     <div className="space-y-6">

@@ -12,6 +12,7 @@ import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { farmerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Farmer } from '../types'
@@ -119,6 +120,14 @@ export default function FarmersPage() {
       toast.error('Failed to delete farmer')
     }
   }
+
+  useVoicePageActions({
+    openCreate,
+    save: () => { void handleSave() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+    setSearch,
+  })
 
   return (
     <div className="space-y-6">

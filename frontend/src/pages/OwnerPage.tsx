@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
 import { useAuth } from '../context/AuthContext'
 import { auditApi, backupApi, userApi } from '../services/api'
 import type { SystemUser } from '../types'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 
 export default function OwnerPage() {
   const { user } = useAuth()
@@ -108,6 +109,14 @@ export default function OwnerPage() {
       toast.error('JSON backup failed')
     }
   }
+
+  useVoicePageActions({
+    openCreate: () => setModalOpen(true),
+    save: () => { void createUser() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
+
 
   return (
     <div className="space-y-6">

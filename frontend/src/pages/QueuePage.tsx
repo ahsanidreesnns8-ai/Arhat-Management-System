@@ -7,6 +7,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { queueApi, dheriApi } from '../services/api'
 import type { Dheri, QueueEntry } from '../types'
 
@@ -112,6 +113,14 @@ export default function QueuePage() {
       </table>
     </div>
   )
+
+  useVoicePageActions({
+    openCreate: () => setModalOpen(true),
+    save: () => { void handleAdd() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
+
 
   return (
     <div className="space-y-6">

@@ -5,6 +5,7 @@ import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import AmbientScene from './AmbientScene'
 import AiAssistantPanel from '../ai/AiAssistantPanel'
+import GlobalVoiceControl from '../voice/GlobalVoiceControl'
 import { useBusiness } from '../../context/BusinessContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { pageVariants } from '../../utils/motion'
@@ -58,6 +59,7 @@ export default function AppLayout() {
           . {t('allRights')}
         </motion.footer>
       </motion.div>
+      <GlobalVoiceControl />
       <AiAssistantPanel />
     </div>
   )

@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { BusinessProvider } from './context/BusinessContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { SyncProvider } from './context/SyncContext'
+import { VoiceControlProvider } from './context/VoiceControlContext'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import MarketingLayout from './components/marketing/MarketingLayout'
@@ -117,19 +118,21 @@ export default function App() {
           <AuthProvider>
             <SyncProvider>
               <BrowserRouter>
-                <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    style: {
-                      background: 'rgba(11, 29, 54, 0.94)',
-                      color: '#F3EFE6',
-                      border: '1px solid rgba(197, 160, 89, 0.35)',
-                      backdropFilter: 'blur(12px)',
-                      boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                    },
-                  }}
-                />
-                <AppRoutes />
+                <VoiceControlProvider>
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      style: {
+                        background: 'rgba(11, 29, 54, 0.94)',
+                        color: '#F3EFE6',
+                        border: '1px solid rgba(197, 160, 89, 0.35)',
+                        backdropFilter: 'blur(12px)',
+                        boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                      },
+                    }}
+                  />
+                  <AppRoutes />
+                </VoiceControlProvider>
               </BrowserRouter>
             </SyncProvider>
           </AuthProvider>

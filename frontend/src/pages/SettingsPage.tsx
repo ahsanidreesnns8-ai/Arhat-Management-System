@@ -10,6 +10,7 @@ import { useBusiness } from '../context/BusinessContext'
 import { useLanguage } from '../context/LanguageContext'
 import type { BusinessSettings, WeatherCalendar } from '../types'
 import type { Lang } from '../i18n/translations'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 
 const CITY_PRESETS: { label: string; lat: number; lon: number; tz: string }[] = [
   { label: 'Lahore', lat: 31.5204, lon: 74.3587, tz: 'Asia/Karachi' },
@@ -190,6 +191,11 @@ export default function SettingsPage() {
       </div>
     )
   }
+
+  useVoicePageActions({
+    save: () => { void handleSave() },
+  })
+
 
   return (
     <div className="space-y-6">

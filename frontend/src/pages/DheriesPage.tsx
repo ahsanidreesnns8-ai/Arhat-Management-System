@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Product } from '../types'
@@ -90,6 +91,14 @@ export default function DheriesPage() {
     }
     return map[status] || 'bg-gray-100 text-gray-700'
   }
+
+  useVoicePageActions({
+    openCreate: () => setModalOpen(true),
+    save: () => { void handleCreate() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
+
 
   return (
     <div className="space-y-6">

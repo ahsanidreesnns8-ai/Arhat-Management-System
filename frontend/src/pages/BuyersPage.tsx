@@ -12,6 +12,7 @@ import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { buyerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Buyer, Sale } from '../types'
@@ -115,6 +116,14 @@ export default function BuyersPage() {
       toast.error('Failed to delete buyer')
     }
   }
+
+  useVoicePageActions({
+    openCreate,
+    save: () => { void handleSave() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+    setSearch,
+  })
 
   return (
     <div className="space-y-6">

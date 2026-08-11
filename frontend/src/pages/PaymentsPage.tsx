@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { buyerApi, farmerApi, paymentApi } from '../services/api'
 import { formatCurrency, formatDateTime } from '../utils/format'
 import type { Buyer, Farmer, Payment, Sale } from '../types'
@@ -223,6 +224,15 @@ export default function PaymentsPage() {
         value: String(b.id),
         label: `${b.name} (${b.buyerId}) — due ${formatCurrency(b.outstandingBalance || 0)}`,
       }))
+
+  useVoicePageActions({
+    openCreate: () => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) },
+    cancel: () => { setPayOpen(false); setPayFlow(null); setNewOpen(false); setViewPayment(null) },
+    refresh: () => load(),
+    setSearch,
+    recordPayment: () => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) },
+  })
+
 
   return (
     <div className="space-y-6">

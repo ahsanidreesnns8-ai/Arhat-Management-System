@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Search, Loader2 } from 'lucide-react'
 import { searchApi } from '../../services/api'
 import { useLanguage } from '../../context/LanguageContext'
+import VoiceFieldMic from '../voice/VoiceFieldMic'
 import type { SearchResult } from '../../types'
 import { easeOutExpo } from '../../utils/motion'
 
@@ -46,6 +47,18 @@ export default function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  useEffect(() => {
+    const onVoiceSearch = (e: Event) => {
+      const query = (e as CustomEvent<{ query?: string }>).detail?.query
+      if (typeof query === 'string' && query.trim()) {
+        setQuery(query.trim())
+        setOpen(true)
+      }
+    }
+    window.addEventListener('rehmani:voice-search', onVoiceSearch)
+    return () => window.removeEventListener('rehmani:voice-search', onVoiceSearch)
+  }, [])
+
   const handleSelect = (result: SearchResult) => {
     navigate(result.link)
     setQuery('')
@@ -71,9 +84,12 @@ export default function GlobalSearch() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
-          className={`input-field w-full pl-10 pr-10 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
+          className={`input-field w-full pl-10 pr-16 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
         />
-        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+          <VoiceFieldMic onText={(text) => { setQuery(text); setOpen(true) }} />
+        </div>
       </div>
 
       <AnimatePresence>

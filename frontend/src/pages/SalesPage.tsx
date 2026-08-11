@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { buyerApi, dheriApi, farmerApi, saleApi, settingsApi, stockApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Buyer, Dheri, Farmer, Product, Sale, SaleItem, StockItem } from '../types'
@@ -136,6 +137,13 @@ export default function SalesPage() {
       toast.error('Failed to delete sale')
     }
   }
+
+  useVoicePageActions({
+    openCreate,
+    save: () => { void handleSave() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
 
   return (
     <div className="space-y-6">

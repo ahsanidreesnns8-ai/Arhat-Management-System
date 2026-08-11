@@ -8,6 +8,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { stockApi, settingsApi } from '../services/api'
 import { formatNumber, formatDateTime } from '../utils/format'
 import type { Product, StockItem, StockTransaction } from '../types'
@@ -61,6 +62,14 @@ export default function StockPage() {
       setSaving(false)
     }
   }
+
+  useVoicePageActions({
+    openCreate: () => setModalOpen(true),
+    save: () => { void handleAdjust() },
+    cancel: () => setModalOpen(false),
+    refresh: () => load(),
+  })
+
 
   return (
     <div className="space-y-6">
