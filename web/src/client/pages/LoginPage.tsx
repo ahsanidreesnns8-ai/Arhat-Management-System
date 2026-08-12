@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 're
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { Eye, EyeOff, Check } from 'lucide-react'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useBusiness } from '../context/BusinessContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -73,20 +73,8 @@ export default function LoginPage() {
     <div
       ref={sceneRef}
       onMouseMove={onMouseMove}
-      className="login-pro relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10"
+      className="login-pro relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-8"
     >
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: 'rgba(11, 29, 54, 0.94)',
-            color: '#F3EFE6',
-            border: '1px solid rgba(197, 160, 89, 0.35)',
-            backdropFilter: 'blur(12px)',
-          },
-        }}
-      />
-
       <div className="login-pro-glow login-pro-glow-a" />
       <div className="login-pro-glow login-pro-glow-b" />
       <div className="login-pro-glow login-pro-glow-c" />
@@ -136,29 +124,19 @@ export default function LoginPage() {
       </div>
 
       <motion.div
-        className="login-glass relative z-10 w-full max-w-[420px] rounded-[22px] px-7 py-8 sm:px-8 sm:py-9"
+        className="login-glass relative z-10 w-full max-w-[400px] rounded-[22px] px-6 py-7 sm:px-8 sm:py-8"
         initial={{ opacity: 0, scale: 0.95, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="flex flex-col items-center mb-7">
-          <motion.div
-            className="login-logo-glow rounded-2xl bg-white px-5 py-3 mb-5"
-            animate={{
-              boxShadow: [
-                '0 0 0 0 rgba(197,160,89,0.12), 0 0 22px rgba(0,45,98,0.28)',
-                '0 0 0 8px rgba(197,160,89,0.08), 0 0 36px rgba(197,160,89,0.28)',
-                '0 0 0 0 rgba(197,160,89,0.12), 0 0 22px rgba(0,45,98,0.28)',
-              ],
-            }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          >
+        <div className="flex flex-col items-center mb-6">
+          <div className="rounded-2xl bg-white px-4 py-2.5 mb-4 shadow-md">
             <RhmaniLogo variant="full" size="md" />
-          </motion.div>
-          <h1 className={`login-heading text-3xl font-extrabold tracking-[0.04em] text-center ${isUrdu ? 'font-urdu' : ''}`}>
+          </div>
+          <h1 className={`login-heading text-2xl font-extrabold tracking-[0.04em] text-center ${isUrdu ? 'font-urdu' : ''}`}>
             {t('welcomeBack')}
           </h1>
-          <p className={`mt-2 text-sm text-slate-400 text-center ${isUrdu ? 'font-urdu' : ''}`}>
+          <p className={`mt-1.5 text-sm text-slate-400 text-center ${isUrdu ? 'font-urdu' : ''}`}>
             {t('signInSubtitle')}
           </p>
         </div>

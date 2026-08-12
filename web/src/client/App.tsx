@@ -120,15 +120,22 @@ export default function App() {
               <BrowserRouter>
                 <VoiceControlProvider>
                   <Toaster
-                    position="top-right"
+                    position="top-center"
+                    gutter={8}
                     toastOptions={{
+                      duration: 3000,
                       style: {
-                        background: 'rgba(11, 29, 54, 0.94)',
+                        background: 'rgba(11, 29, 54, 0.96)',
                         color: '#F3EFE6',
                         border: '1px solid rgba(197, 160, 89, 0.35)',
                         backdropFilter: 'blur(12px)',
                         boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                        fontSize: '13px',
+                        maxWidth: 'min(92vw, 22rem)',
+                        padding: '10px 14px',
                       },
+                      success: { duration: 3000 },
+                      error: { duration: 3000 },
                     }}
                   />
                   <AppRoutes />

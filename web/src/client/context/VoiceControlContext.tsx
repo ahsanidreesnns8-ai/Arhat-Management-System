@@ -106,7 +106,7 @@ export function VoiceControlProvider({ children }: { children: ReactNode }) {
         const msg = voiceHelpText(isUrdu)
         setLastResult(msg)
         speak(msg)
-        toast(msg, { duration: 5000 })
+        toast(msg, { duration: 3000 })
         return
       }
       case 'back': {
@@ -251,7 +251,7 @@ export function VoiceControlProvider({ children }: { children: ReactNode }) {
             if (reply) {
               setLastResult(reply)
               speak(reply)
-              toast(reply, { duration: 4000 })
+              toast(reply, { duration: 3000 })
             } else {
               toast.error(isUrdu ? 'سمجھ نہیں آیا' : `Could not find: ${intent.label}`)
             }
@@ -267,7 +267,7 @@ export function VoiceControlProvider({ children }: { children: ReactNode }) {
           const reply = res.data?.data?.reply?.trim() || t('aiError')
           setLastResult(reply)
           speak(reply)
-          toast(reply, { duration: 4500 })
+          toast(reply, { duration: 3000 })
         } catch {
           const err = t('aiError')
           setLastResult(err)

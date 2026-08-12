@@ -1111,3 +1111,35 @@ html.lang-ur .login-pro {
   background: #001226;
   color: #cbd5e1;
 }
+
+/* ── Welcome gate (pre-login mobile home) ───────────────────────── */
+.welcome-gate {
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-gate-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 420px at 50% -10%, rgba(0, 45, 98, 0.1), transparent 55%),
+    radial-gradient(700px 360px at 100% 100%, rgba(197, 160, 89, 0.12), transparent 50%),
+    #F5F7FA;
+  pointer-events: none;
+}
+
+.welcome-logo img {
+  max-height: 7.5rem;
+  width: auto;
+}
+
+.welcome-module {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 45, 98, 0.08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.dark .welcome-module {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(197, 160, 89, 0.14);
+}
