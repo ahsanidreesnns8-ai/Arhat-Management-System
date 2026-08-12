@@ -125,18 +125,18 @@ export default function WeatherWidget() {
 
   if (failed && !data) {
     return (
-      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
-        <Cloud className="h-3.5 w-3.5" />
-        {t('weatherUnavailable')}
+      <div className="flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg bg-white/50 dark:bg-white/5 border border-white/10 text-[11px] text-slate-500">
+        <Cloud className="h-3 w-3 flex-shrink-0" />
+        <span className="truncate">{t('weatherUnavailable')}</span>
       </div>
     )
   }
 
   if (!data) {
     return (
-      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/10 text-xs text-slate-500">
-        <Cloud className="h-3.5 w-3.5 animate-pulse" />
-        {t('weatherLoading')}
+      <div className="flex items-center gap-1.5 w-full px-2.5 py-1 rounded-lg bg-white/50 dark:bg-white/5 border border-white/10 text-[11px] text-slate-500">
+        <Cloud className="h-3 w-3 animate-pulse flex-shrink-0" />
+        <span className="truncate">{t('weatherLoading')}</span>
       </div>
     )
   }
@@ -150,29 +150,29 @@ export default function WeatherWidget() {
 
   return (
     <div
-      className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10 max-w-[22rem]"
+      className="flex items-center gap-1.5 sm:gap-2 w-full px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10"
       title={`${condition} · ${area} · ${hijri}`}
     >
       {data.weatherAvailable !== false && data.temperatureC != null ? (
         <>
-          <Icon className="h-3.5 w-3.5 text-cyan-500 flex-shrink-0" />
-          <span className="text-slate-800 dark:text-slate-100 whitespace-nowrap">
+          <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-cyan-500 flex-shrink-0" />
+          <span className="text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">
             {data.temperatureC}°C
           </span>
-          <span className={`text-slate-500 truncate max-w-[4.5rem] ${isUrdu ? 'font-urdu' : ''}`}>
+          <span className={`text-slate-500 truncate max-w-[4.5rem] hidden xs:inline sm:inline ${isUrdu ? 'font-urdu' : ''}`}>
             {condition}
           </span>
-          <span className="text-slate-300 dark:text-slate-600">·</span>
-          <span className={`text-slate-600 dark:text-slate-300 truncate max-w-[4rem] ${isUrdu ? 'font-urdu' : ''}`}>
+          <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
+          <span className={`text-slate-600 dark:text-slate-300 truncate max-w-[4.5rem] hidden sm:inline ${isUrdu ? 'font-urdu' : ''}`}>
             {area}
           </span>
         </>
       ) : (
-        <span className="text-slate-500">{t('weatherUnavailable')}</span>
+        <span className="text-slate-500 truncate">{t('weatherUnavailable')}</span>
       )}
-      <span className="text-slate-300 dark:text-slate-600">|</span>
-      <MoonStar className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-      <span className={`text-slate-700 dark:text-slate-200 truncate ${isUrdu ? 'font-urdu' : ''}`} dir={isUrdu ? 'rtl' : 'ltr'}>
+      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">|</span>
+      <MoonStar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-500 flex-shrink-0" />
+      <span className={`text-slate-700 dark:text-slate-200 truncate min-w-0 ${isUrdu ? 'font-urdu' : ''}`} dir={isUrdu ? 'rtl' : 'ltr'}>
         {hijri}
       </span>
     </div>

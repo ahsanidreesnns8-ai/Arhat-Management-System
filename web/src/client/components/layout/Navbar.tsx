@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
 import GlobalSearch from './GlobalSearch'
+import WeatherWidget from './WeatherWidget'
 import type { ThemeMode } from '../../types'
 
 interface NavbarProps {
@@ -41,8 +42,8 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
 
   return (
-    <header className="app-navbar sticky top-0 z-30 h-14 safe-top">
-      <div className="flex items-center justify-between h-full px-3 gap-2">
+    <header className="app-navbar sticky top-0 z-30 safe-top">
+      <div className="flex items-center justify-between h-14 px-3 gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <motion.button
             type="button"
@@ -76,7 +77,10 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
           </motion.button>
 
           <div className="flex items-center gap-1 pl-1.5 border-l border-slate-200/70 dark:border-white/10">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#002D62]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center">
+            <div
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-[#002D62]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center"
+              title={user?.username || ''}
+            >
               <User className="h-4 w-4 text-[#C5A059]" />
             </div>
             <motion.button
@@ -91,7 +95,6 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
             </motion.button>
           </div>
 
-          {/* Hamburger — top right as requested */}
           <motion.button
             type="button"
             onClick={onToggleMenu}
@@ -103,6 +106,10 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </motion.button>
         </div>
+      </div>
+
+      <div className="px-3 pb-2">
+        <WeatherWidget />
       </div>
     </header>
   )
