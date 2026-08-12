@@ -1,76 +1,47 @@
 # Project Structure
 
 ```
-Arhat-Management-System-/
-├── README.md                 # Quick start & overview
-├── PROJECT_STRUCTURE.md      # This file
-├── docker-compose.yml        # MySQL + backend + frontend
-├── .gitignore
+Arhat-Management-System/
+├── README.md
+├── DEPLOY.md
+├── PROJECT_STRUCTURE.md
+├── docker-compose.yml          # Legacy Java stack
+├── render.yaml                 # Legacy Render blueprint
 │
-├── backend/                  # Spring Boot 3 REST API (Java 17)
-│   ├── Dockerfile
-│   ├── pom.xml
-│   ├── README.md
-│   └── src/main/
-│       ├── java/com/rehmani/trading/
-│       │   ├── RehmaniTradingApplication.java
-│       │   ├── config/         # Security, CORS, OpenAPI, etc.
-│       │   ├── controller/     # REST endpoints
-│       │   ├── dto/            # Request/response models
-│       │   ├── entity/         # JPA entities
-│       │   ├── exception/      # API error handling
-│       │   ├── repository/     # Spring Data JPA
-│       │   ├── security/       # JWT auth filters
-│       │   └── service/        # Business logic
-│       └── resources/
-│           ├── application.yml
-│           ├── application-dev.yml
-│           ├── db/migration/   # Flyway SQL (runtime source of truth)
-│           └── static/
-│
-├── frontend/                 # React + Vite + Tailwind SPA
-│   ├── Dockerfile
-│   ├── nginx.conf
+├── web/                        # ★ Vercel app (Next.js + TypeScript)
 │   ├── package.json
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   ├── README.md
-│   ├── public/               # Static assets (logos)
+│   ├── vercel.json
+│   ├── prisma/
+│   │   ├── schema.prisma       # PostgreSQL models
+│   │   └── seed.ts
 │   └── src/
-│       ├── App.tsx
-│       ├── main.tsx
-│       ├── index.css
-│       ├── components/
-│       │   ├── ai/           # AI assistant panel
-│       │   ├── auth/         # Protected routes
-│       │   ├── brand/        # Logo
-│       │   ├── forms/
-│       │   ├── layout/       # Shell, sidebar, navbar, ambient scene
-│       │   ├── motion/
-│       │   ├── payments/
-│       │   └── ui/           # Buttons, cards, modals, etc.
-│       ├── context/          # Auth, theme, language, business
-│       ├── i18n/             # EN / UR translations
-│       ├── pages/            # Route screens
-│       ├── services/         # API client
-│       ├── types/
-│       └── utils/
+│       ├── app/
+│       │   ├── api/[...path]/  # TypeScript REST API (replaces Java)
+│       │   ├── [[...slug]]/    # SPA shell (React Router UI)
+│       │   ├── layout.tsx
+│       │   └── globals.css
+│       ├── client/             # Ported React UI (from frontend/)
+│       └── server/             # Auth, Prisma services, money/ID helpers
 │
-└── database/                 # MySQL Workbench pack (docs + queries)
-    ├── README.md
-    ├── migrations/           # Copy of Flyway V1–V6 for inspection
-    ├── schema/               # Create-database helpers
-    ├── queries/              # Ready SQL reports
-    └── seed/                 # Seed notes
+├── backend/                    # Legacy Spring Boot 3 (Java 17)
+├── frontend/                   # Legacy React + Vite SPA
+├── database/                   # MySQL Workbench pack
+└── deploy/                     # Legacy all-in-one Docker
 ```
 
-## How the three folders relate
+## Languages
+
+| Path | Language / runtime |
+|------|--------------------|
+| `web/` | **TypeScript** (Next.js, Prisma, React) |
+| `backend/` | Java (Spring Boot) — legacy |
+| `frontend/` | TypeScript/TSX (Vite) — legacy |
+| `database/` | SQL |
+
+## How folders relate
 
 | Folder | Role |
 |--------|------|
-| `backend/` | API server; applies Flyway from `backend/src/main/resources/db/migration/` |
-| `frontend/` | Browser UI talking to `/api` |
-| `database/` | Human-friendly SQL pack for MySQL Workbench (mirrors migrations + reports) |
-
-Keep `database/migrations/` in sync when you add a new Flyway file under the backend.
+| `web/` | Single deployable app for Vercel (`*.vercel.app`) |
+| `backend/` + `frontend/` | Original split stack (optional / Docker) |
+| `database/` | MySQL docs mirroring Flyway migrations |

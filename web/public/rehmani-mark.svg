@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="RTC">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8C87A"/>
+      <stop offset="50%" stop-color="#C5A059"/>
+      <stop offset="100%" stop-color="#9A7430"/>
+    </linearGradient>
+    <linearGradient id="n" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0A3A75"/>
+      <stop offset="100%" stop-color="#002D62"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="36" fill="#FFFFFF"/>
+  <path d="M34 98 A66 66 0 0 1 100 34" fill="none" stroke="url(#n)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M100 34 A66 66 0 0 1 166 96" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M28 122 C58 148, 82 156, 100 152 C82 132, 55 120, 28 122 Z" fill="url(#n)"/>
+  <path d="M172 122 C142 148, 118 156, 100 152 C118 132, 145 120, 172 122 Z" fill="url(#g)"/>
+  <!-- wheat -->
+  <g transform="translate(142,52) rotate(16)">
+    <path d="M4 10 C5 40, 5 70, 4 98" fill="none" stroke="url(#g)" stroke-width="3"/>
+    <ellipse cx="4" cy="10" rx="4" ry="7" fill="url(#g)"/>
+    <ellipse cx="-2" cy="22" rx="3.5" ry="6.5" fill="url(#g)" transform="rotate(-25 -2 22)"/>
+    <ellipse cx="10" cy="22" rx="3.5" ry="6.5" fill="url(#g)" transform="rotate(25 10 22)"/>
+    <ellipse cx="-3" cy="36" rx="3.5" ry="6.5" fill="url(#g)" transform="rotate(-28 -3 36)"/>
+    <ellipse cx="11" cy="36" rx="3.5" ry="6.5" fill="url(#g)" transform="rotate(28 11 36)"/>
+    <ellipse cx="-2" cy="50" rx="3.2" ry="6" fill="url(#g)" transform="rotate(-24 -2 50)"/>
+    <ellipse cx="10" cy="50" rx="3.2" ry="6" fill="url(#g)" transform="rotate(24 10 50)"/>
+  </g>
+  <!-- leaves -->
+  <path d="M48 88 C38 76, 36 62, 42 52 C50 64, 54 76, 56 88 Z" fill="url(#g)"/>
+  <path d="M56 98 C44 88, 40 74, 44 62 C54 74, 58 86, 60 98 Z" fill="url(#g)"/>
+  <text x="52" y="118" font-family="Georgia, serif" font-size="48" font-weight="700" fill="url(#n)">R</text>
+  <text x="88" y="110" font-family="Georgia, serif" font-size="34" font-weight="700" fill="url(#g)">T</text>
+  <text x="114" y="118" font-family="Georgia, serif" font-size="48" font-weight="700" fill="url(#n)">C</text>
+</svg>

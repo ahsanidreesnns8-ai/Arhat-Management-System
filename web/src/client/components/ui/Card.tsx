@@ -1,0 +1,27 @@
+import { clsx } from 'clsx'
+import type { ReactNode } from 'react'
+
+interface CardProps {
+  children: ReactNode
+  className?: string
+  title?: string
+  subtitle?: string
+  action?: ReactNode
+}
+
+export default function Card({ children, className, title, subtitle, action }: CardProps) {
+  return (
+    <div className={clsx('card', className)}>
+      {(title || action) && (
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/70 dark:border-white/10">
+          <div>
+            {title && <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>}
+            {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}

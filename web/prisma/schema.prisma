@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  SUPERVISOR
+  OPERATOR
+  VIEWER
+}
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum SellingStatus {
+  PENDING
+  IN_QUEUE
+  SELLING
+  SOLD
+  CANCELLED
+}
+
+enum QueueStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentType {
+  FARMER
+  BUYER
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum PaymentApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SaleSourceType {
+  FARMER
+  BUSINESS_STOCK
+}
+
+enum StockTransactionType {
+  INCOMING
+  OUTGOING
+  TRANSFER
+  ADJUSTMENT
+  SALE
+}
+
+model User {
+  id                  BigInt           @id @default(autoincrement())
+  username            String           @unique @db.VarChar(100)
+  email               String           @unique @db.VarChar(255)
+  password            String           @db.VarChar(255)
+  fullName            String           @map("full_name") @db.VarChar(255)
+  role                UserRole         @default(OPERATOR)
+  themePreference     ThemePreference  @default(SYSTEM) @map("theme_preference")
+  active              Boolean          @default(true)
+  deleted             Boolean          @default(false)
+  failedLoginAttempts Int              @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?        @map("locked_until")
+  lastLoginAt         DateTime?        @map("last_login_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  auditLogs           AuditLog[]
+  stockTransactions   StockTransaction[]
+  sales               Sale[]
+  payments            Payment[]
+
+  @@map("users")
+}
+
+model BusinessSettings {
+  id                           BigInt   @id @default(autoincrement())
+  companyName                  String   @default("Rehmani Trading Company") @map("company_name") @db.VarChar(255)
+  companyLogoUrl               String?  @map("company_logo_url") @db.VarChar(500)
+  address                      String?
+  phone                        String?  @db.VarChar(50)
+  email                        String?  @db.VarChar(255)
+  defaultCommissionPercentage  Decimal  @default(4.00) @map("default_commission_percentage") @db.Decimal(5, 2)
+  supervisorSharePercentage    Decimal  @default(0.70) @map("supervisor_share_percentage") @db.Decimal(5, 2)
+  laborSharePercentage         Decimal  @default(0.30) @map("labor_share_percentage") @db.Decimal(5, 2)
+  arhatSharePercentage         Decimal  @default(3.00) @map("arhat_share_percentage") @db.Decimal(5, 2)
+  lowStockThreshold            Decimal  @default(100.00) @map("low_stock_threshold") @db.Decimal(12, 2)
+  backupReminderDays           Int      @default(7) @map("backup_reminder_days")
+  paymentReminderDays          Int      @default(3) @map("payment_reminder_days")
+  geminiApiKey                 String?  @map("gemini_api_key") @db.VarChar(255)
+  weatherLatitude              Decimal  @default(31.520400) @map("weather_latitude") @db.Decimal(10, 6)
+  weatherLongitude             Decimal  @default(74.358700) @map("weather_longitude") @db.Decimal(10, 6)
+  weatherLocationLabel         String   @default("Lahore") @map("weather_location_label") @db.VarChar(120)
+  weatherTimezone              String   @default("Asia/Karachi") @map("weather_timezone") @db.VarChar(64)
+  hijriAdjustmentDays          Int      @default(0) @map("hijri_adjustment_days")
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+
+  @@map("business_settings")
+}
+
+model Product {
+  id               BigInt   @id @default(autoincrement())
+  productCode      String   @unique @map("product_code") @db.VarChar(50)
+  name             String   @db.VarChar(255)
+  unit             String   @default("BAG") @db.VarChar(50)
+  defaultBagWeight Decimal  @default(40.00) @map("default_bag_weight") @db.Decimal(10, 2)
+  description      String?
+  active           Boolean  @default(true)
+  deleted          Boolean  @default(false)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  stock            Stock?
+  dheris           Dheri[]
+  saleItems        SaleItem[]
+  stockTransactions StockTransaction[]
+
+  @@map("products")
+}
+
+model Farmer {
+  id                 BigInt   @id @default(autoincrement())
+  farmerId           String   @unique @map("farmer_id") @db.VarChar(20)
+  name               String   @db.VarChar(255)
+  cnic               String?  @db.VarChar(20)
+  phone              String?  @db.VarChar(20)
+  address            String?
+  city               String?  @db.VarChar(100)
+  outstandingBalance Decimal  @default(0.00) @map("outstanding_balance") @db.Decimal(15, 2)
+  notes              String?
+  active             Boolean  @default(true)
+  deleted            Boolean  @default(false)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  trucks             Truck[]
+  dheris             Dheri[]
+  payments           Payment[]
+  saleItems          SaleItem[]
+
+  @@map("farmers")
+}
+
+model Buyer {
+  id                 BigInt   @id @default(autoincrement())
+  buyerId            String   @unique @map("buyer_id") @db.VarChar(20)
+  name               String   @db.VarChar(255)
+  cnic               String?  @db.VarChar(20)
+  phone              String?  @db.VarChar(20)
+  address            String?
+  city               String?  @db.VarChar(100)
+  outstandingBalance Decimal  @default(0.00) @map("outstanding_balance") @db.Decimal(15, 2)
+  notes              String?
+  active             Boolean  @default(true)
+  deleted            Boolean  @default(false)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  sales              Sale[]
+  payments           Payment[]
+
+  @@map("buyers")
+}
+
+model Truck {
+  id                 BigInt   @id @default(autoincrement())
+  truckId            String   @unique @map("truck_id") @db.VarChar(20)
+  registrationNumber String   @map("registration_number") @db.VarChar(50)
+  driverName         String?  @map("driver_name") @db.VarChar(255)
+  driverPhone        String?  @map("driver_phone") @db.VarChar(20)
+  farmerId           BigInt   @map("farmer_id")
+  capacity           Decimal? @db.Decimal(10, 2)
+  notes              String?
+  active             Boolean  @default(true)
+  deleted            Boolean  @default(false)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  farmer             Farmer   @relation(fields: [farmerId], references: [id])
+  dheris             Dheri[]
+
+  @@map("trucks")
+}
+
+model Dheri {
+  id                   BigInt        @id @default(autoincrement())
+  dheriId              String        @unique @map("dheri_id") @db.VarChar(20)
+  farmerId             BigInt        @map("farmer_id")
+  truckId              BigInt?       @map("truck_id")
+  productId            BigInt        @map("product_id")
+  queueNumber          Int?          @map("queue_number")
+  numberOfBags         Int           @default(0) @map("number_of_bags")
+  weightPerBag         Decimal       @default(40.00) @map("weight_per_bag") @db.Decimal(10, 2)
+  partialBagWeight     Decimal       @default(0.00) @map("partial_bag_weight") @db.Decimal(10, 2)
+  totalWeight          Decimal       @default(0.00) @map("total_weight") @db.Decimal(12, 2)
+  marketRate           Decimal       @default(0.00) @map("market_rate") @db.Decimal(12, 2)
+  commissionPercentage Decimal       @default(4.00) @map("commission_percentage") @db.Decimal(5, 2)
+  totalPrice           Decimal       @default(0.00) @map("total_price") @db.Decimal(15, 2)
+  commissionAmount     Decimal       @default(0.00) @map("commission_amount") @db.Decimal(15, 2)
+  farmerReceivable     Decimal       @default(0.00) @map("farmer_receivable") @db.Decimal(15, 2)
+  supervisorShare      Decimal       @default(0.00) @map("supervisor_share") @db.Decimal(15, 2)
+  laborShare           Decimal       @default(0.00) @map("labor_share") @db.Decimal(15, 2)
+  arhatShare           Decimal       @default(0.00) @map("arhat_share") @db.Decimal(15, 2)
+  sellingStatus        SellingStatus @default(PENDING) @map("selling_status")
+  payablePosted        Boolean       @default(false) @map("payable_posted")
+  notes                String?
+  deleted              Boolean       @default(false)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  farmer               Farmer        @relation(fields: [farmerId], references: [id])
+  truck                Truck?        @relation(fields: [truckId], references: [id])
+  product              Product       @relation(fields: [productId], references: [id])
+  queueEntry           QueueEntry?
+  saleItems            SaleItem[]
+  payments             Payment[]
+
+  @@map("dheris")
+}
+
+model Stock {
+  id            BigInt   @id @default(autoincrement())
+  productId     BigInt   @unique @map("product_id")
+  quantity      Decimal  @default(0.00) @db.Decimal(15, 2)
+  lowStockAlert Boolean  @default(false) @map("low_stock_alert")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@map("stock")
+}
+
+model StockTransaction {
+  id               BigInt               @id @default(autoincrement())
+  productId        BigInt               @map("product_id")
+  transactionType  StockTransactionType @map("transaction_type")
+  quantity         Decimal              @db.Decimal(15, 2)
+  previousQuantity Decimal              @map("previous_quantity") @db.Decimal(15, 2)
+  newQuantity      Decimal              @map("new_quantity") @db.Decimal(15, 2)
+  referenceType    String?              @map("reference_type") @db.VarChar(50)
+  referenceId      BigInt?              @map("reference_id")
+  notes            String?
+  createdById      BigInt?              @map("created_by")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  product          Product              @relation(fields: [productId], references: [id])
+  createdBy        User?                @relation(fields: [createdById], references: [id])
+
+  @@map("stock_transactions")
+}
+
+model QueueEntry {
+  id          BigInt      @id @default(autoincrement())
+  queueNumber Int         @map("queue_number")
+  dheriId     BigInt      @unique @map("dheri_id")
+  status      QueueStatus @default(PENDING)
+  position    Int
+  startedAt   DateTime?   @map("started_at")
+  completedAt DateTime?   @map("completed_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  dheri       Dheri       @relation(fields: [dheriId], references: [id])
+
+  @@map("queue_entries")
+}
+
+model Sale {
+  id            BigInt        @id @default(autoincrement())
+  invoiceNumber String        @unique @map("invoice_number") @db.VarChar(30)
+  buyerId       BigInt        @map("buyer_id")
+  saleDate      DateTime      @map("sale_date") @db.Date
+  totalBags     Int           @default(0) @map("total_bags")
+  totalWeight   Decimal       @default(0.00) @map("total_weight") @db.Decimal(15, 2)
+  totalAmount   Decimal       @default(0.00) @map("total_amount") @db.Decimal(15, 2)
+  paidAmount    Decimal       @default(0.00) @map("paid_amount") @db.Decimal(15, 2)
+  paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  notes         String?
+  deleted       Boolean       @default(false)
+  createdById   BigInt?       @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  buyer         Buyer         @relation(fields: [buyerId], references: [id])
+  createdBy     User?         @relation(fields: [createdById], references: [id])
+  items         SaleItem[]
+  payments      Payment[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id               BigInt         @id @default(autoincrement())
+  saleId           BigInt         @map("sale_id")
+  productId        BigInt         @map("product_id")
+  sourceType       SaleSourceType @map("source_type")
+  farmerId         BigInt?        @map("farmer_id")
+  dheriId          BigInt?        @map("dheri_id")
+  numberOfBags     Int            @default(0) @map("number_of_bags")
+  weightPerBag     Decimal        @default(40.00) @map("weight_per_bag") @db.Decimal(10, 2)
+  partialBagWeight Decimal        @default(0.00) @map("partial_bag_weight") @db.Decimal(10, 2)
+  totalWeight      Decimal        @default(0.00) @map("total_weight") @db.Decimal(12, 2)
+  rate             Decimal        @default(0.00) @db.Decimal(12, 2)
+  amount           Decimal        @default(0.00) @db.Decimal(15, 2)
+  sale             Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product          Product        @relation(fields: [productId], references: [id])
+  farmer           Farmer?        @relation(fields: [farmerId], references: [id])
+  dheri            Dheri?         @relation(fields: [dheriId], references: [id])
+
+  @@map("sale_items")
+}
+
+model Payment {
+  id              BigInt                 @id @default(autoincrement())
+  paymentType     PaymentType            @map("payment_type")
+  farmerId        BigInt?                @map("farmer_id")
+  buyerId         BigInt?                @map("buyer_id")
+  saleId          BigInt?                @map("sale_id")
+  dheriId         BigInt?                @map("dheri_id")
+  amount          Decimal                @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod          @default(CASH) @map("payment_method")
+  paymentDate     DateTime               @map("payment_date") @db.Date
+  referenceNumber String?                @map("reference_number") @db.VarChar(100)
+  notes           String?
+  status          PaymentApprovalStatus  @default(APPROVED)
+  createdById     BigInt?                @map("created_by")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  farmer          Farmer?                @relation(fields: [farmerId], references: [id])
+  buyer           Buyer?                 @relation(fields: [buyerId], references: [id])
+  sale            Sale?                  @relation(fields: [saleId], references: [id])
+  dheri           Dheri?                 @relation(fields: [dheriId], references: [id])
+  createdBy       User?                  @relation(fields: [createdById], references: [id])
+
+  @@map("payments")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt?  @map("user_id")
+  action     String   @db.VarChar(100)
+  entityType String   @map("entity_type") @db.VarChar(100)
+  entityId   BigInt?  @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SyncState {
+  id        Int      @id
+  revision  BigInt   @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sync_state")
+}

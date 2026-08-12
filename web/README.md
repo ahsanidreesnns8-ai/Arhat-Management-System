@@ -1,0 +1,45 @@
+# Arhat Management System — Vercel / Next.js app
+
+TypeScript full-stack port of the Java + Vite ERP, ready for **Vercel**.
+
+## Stack
+
+- **Next.js 15** (App Router) + **TypeScript**
+- **Prisma** + **PostgreSQL** (Neon / Vercel Postgres / any Postgres)
+- Same React UI (ported from Vite SPA)
+
+## Local development
+
+1. Create a Postgres database and set `DATABASE_URL` in `.env` (copy from `.env.example`).
+2. Install & prepare DB:
+
+```bash
+cd web
+npm install
+npx prisma db push
+npm run db:seed
+npm run dev
+```
+
+App: http://localhost:3000  
+API: http://localhost:3000/api  
+
+Default login: `owner` / `admin123`
+
+## Deploy to Vercel (get a `*.vercel.app` link)
+
+1. Push this repo to GitHub.
+2. Go to [vercel.com/new](https://vercel.com/new) → import the repo.
+3. Set **Root Directory** to `web`.
+4. Add env vars:
+   - `DATABASE_URL` — Postgres connection string ([Neon](https://neon.tech) free tier works)
+   - `JWT_SECRET` — long random string
+   - optional: `GEMINI_API_KEY`, `GROQ_API_KEY`
+5. Deploy. Build uses `npm run vercel-build` (generate + db push + seed + next build).
+6. Open the provided `https://….vercel.app` link.
+
+### One-time Neon setup
+
+1. Create a free project at neon.tech  
+2. Copy the connection string → Vercel project env `DATABASE_URL`  
+3. Redeploy if needed

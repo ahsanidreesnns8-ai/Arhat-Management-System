@@ -2,104 +2,86 @@
 
 Full-stack grain trading & commission agency (**arhat**) management system.
 
-**Repo:** https://github.com/ahsanidreesnns8-ai/Arhat-Management-System-
+**Repo:** https://github.com/ahsanidreesnns8-ai/Arhat-Management-System
 
-**Stack:** React + Vite + Tailwind · Java Spring Boot 3 · MySQL · JWT · Flyway
+## Deploy on Vercel (recommended)
+
+The production app lives in **`web/`** — **Next.js + TypeScript** (UI + API), ready for `*.vercel.app`.
+
+| Step | Action |
+|------|--------|
+| 1 | Import this GitHub repo in [vercel.com/new](https://vercel.com/new) |
+| 2 | Set **Root Directory** → `web` |
+| 3 | Add env `DATABASE_URL` (Postgres, e.g. free [Neon](https://neon.tech)) and `JWT_SECRET` |
+| 4 | Deploy → open your `https://….vercel.app` link |
+
+Details: [`web/README.md`](web/README.md)
+
+**Default login:** `owner` / `admin123`
 
 ---
 
-## Repository layout
+## Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Vercel app** | Next.js 15 · TypeScript · Prisma · PostgreSQL |
+| Legacy (optional) | `frontend/` React+Vite · `backend/` Java Spring Boot · MySQL |
 
 ```
-├── backend/      Spring Boot REST API (Java 17)
-├── frontend/     React (Vite) SPA — marketing site + ERP app
+├── web/          ← deploy this to Vercel (TypeScript full-stack)
+├── backend/      Legacy Spring Boot API (Java 17)
+├── frontend/     Legacy Vite SPA
 ├── database/     MySQL schema pack + Workbench SQL queries
 ├── docker-compose.yml
 └── PROJECT_STRUCTURE.md
 ```
 
-### Website structure (inspired by [Pakka Khata](https://pakkakhata.com/))
+### Website routes
 
 | URL | Purpose |
 |-----|---------|
-| `/` | Public landing — hero, features, AI munshi, audiences, steps |
-| `/features` | Full mandi feature catalog |
-| `/how-it-works` | Day workflow from login to bills |
-| `/about` | Mission, vision, business details |
-| `/contact` | Demo / support form + phone/email |
+| `/` | Public landing |
+| `/features` `/how-it-works` `/about` `/contact` | Marketing |
 | `/login` | Staff login |
-| `/dashboard` … | Authenticated ERP (farmers, arhat, payments, …) |
-
-See **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** for the full tree.  
-Folder guides: [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md) · [database/README.md](database/README.md)
+| `/dashboard` … | Authenticated ERP |
 
 ---
 
-## Quick start
+## Local quick start (Vercel / TypeScript app)
 
-### Prerequisites
-- Java 17+
-- Node.js 18+
-- MySQL 8+ *(or Docker Compose)*
-
-### 1) Database
 ```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS rehmani_trading;"
-```
-Or open `database/schema/01_create_database.sql` in MySQL Workbench.
-
-### 2) Backend
-```bash
-cd backend
-mvn spring-boot:run
-```
-- API: `http://localhost:8080/api`
-- Health: `http://localhost:8080/api/health`
-
-### 3) Frontend
-```bash
-cd frontend
+cd web
+cp .env.example .env   # set DATABASE_URL to your Postgres
 npm install
+npx prisma db push
+npm run db:seed
 npm run dev
 ```
-- App: `http://localhost:5173`
 
-### Default login
+- App: http://localhost:3000
 
-| Field | Value |
-|-------|-------|
-| Username | `owner` |
-| Password | `admin123` |
+## Legacy stack (Java + Vite + MySQL)
 
-Change this password immediately in production.
+See previous docs / Docker:
 
-### Docker Compose (MySQL + API + UI)
 ```bash
 docker compose up -d --build
 ```
+
 | Service | URL |
 |---------|-----|
 | UI | http://localhost:5173 |
 | API | http://localhost:8080/api |
-| MySQL | localhost:3306 (`root` / `root`) |
-
----
-
-## Deploy
-
-See **[DEPLOY.md](DEPLOY.md)** for Render Blueprint / Docker production deploy.
+| MySQL | localhost:3306 |
 
 ## Modules
-Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Arhat Sale · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant (voice) · Global Search · Bilingual bills
 
-## AI Assistant
-Server-side keys only (not in Settings UI):
+Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Arhat Sale · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant · Global Search · Bilingual bills
+
+## AI keys (server env only)
 
 ```bash
-export GEMINI_API_KEY=your_key_here
-# optional:
-export GROQ_API_KEY=your_groq_key
+GEMINI_API_KEY=...
+GROQ_API_KEY=...   # optional
 ```
-
-## Database / MySQL Workbench
-See [`database/README.md`](database/README.md) for migrations, seed notes, and ready queries (`queries/01` … `07`).

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 560" role="img" aria-label="Rehmani Trading Company">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8C87A"/>
+      <stop offset="45%" stop-color="#C5A059"/>
+      <stop offset="100%" stop-color="#9A7430"/>
+    </linearGradient>
+    <linearGradient id="navy" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0A3A75"/>
+      <stop offset="100%" stop-color="#002D62"/>
+    </linearGradient>
+    <linearGradient id="goldSoft" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#B8923F"/>
+      <stop offset="100%" stop-color="#E4C36E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Emblem circle arcs -->
+  <path d="M110 210 A140 140 0 0 1 260 80" fill="none" stroke="url(#navy)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M260 80 A140 140 0 0 1 400 200" fill="none" stroke="url(#gold)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Base swooshes -->
+  <path d="M95 275 C150 330, 210 345, 260 340 C220 300, 160 275, 95 275 Z" fill="url(#navy)"/>
+  <path d="M425 275 C370 330, 310 345, 260 340 C300 300, 360 275, 425 275 Z" fill="url(#gold)"/>
+  <path d="M120 290 C175 340, 230 352, 260 348 C225 318, 175 298, 120 290 Z" fill="#0A3A75" opacity="0.35"/>
+  <path d="M400 290 C345 340, 290 352, 260 348 C295 318, 345 298, 400 290 Z" fill="#E8C87A" opacity="0.35"/>
+
+  <!-- Left leaves -->
+  <g fill="url(#goldSoft)">
+    <path d="M145 195 C125 175, 118 150, 128 132 C145 155, 155 175, 160 195 Z"/>
+    <path d="M158 210 C135 195, 122 170, 130 150 C150 172, 162 190, 168 210 Z"/>
+    <path d="M168 225 C148 212, 138 190, 142 172 C160 190, 170 208, 174 225 Z"/>
+  </g>
+
+  <!-- Right wheat stalk -->
+  <g transform="translate(355,125) rotate(18)">
+    <path d="M8 20 C10 70, 10 120, 8 175" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/>
+    <g fill="url(#gold)">
+      <ellipse cx="8" cy="18" rx="7" ry="12"/>
+      <ellipse cx="-2" cy="34" rx="6" ry="11" transform="rotate(-25 -2 34)"/>
+      <ellipse cx="18" cy="34" rx="6" ry="11" transform="rotate(25 18 34)"/>
+      <ellipse cx="-4" cy="54" rx="6" ry="11" transform="rotate(-28 -4 54)"/>
+      <ellipse cx="20" cy="54" rx="6" ry="11" transform="rotate(28 20 54)"/>
+      <ellipse cx="-5" cy="74" rx="6" ry="11" transform="rotate(-30 -5 74)"/>
+      <ellipse cx="21" cy="74" rx="6" ry="11" transform="rotate(30 21 74)"/>
+      <ellipse cx="-4" cy="94" rx="6" ry="11" transform="rotate(-28 -4 94)"/>
+      <ellipse cx="20" cy="94" rx="6" ry="11" transform="rotate(28 20 94)"/>
+      <ellipse cx="-2" cy="114" rx="5.5" ry="10" transform="rotate(-22 -2 114)"/>
+      <ellipse cx="18" cy="114" rx="5.5" ry="10" transform="rotate(22 18 114)"/>
+      <ellipse cx="8" cy="132" rx="5" ry="10"/>
+    </g>
+  </g>
+
+  <!-- RTC letters -->
+  <text x="168" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="700" fill="url(#navy)">R</text>
+  <text x="232" y="238" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="700" fill="url(#gold)">T</text>
+  <text x="278" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="700" fill="url(#navy)">C</text>
+
+  <!-- Wordmark -->
+  <text x="260" y="410" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="url(#navy)" letter-spacing="4">REHMANI</text>
+
+  <line x1="118" y1="438" x2="168" y2="438" stroke="url(#gold)" stroke-width="2.5"/>
+  <text x="260" y="444" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600" fill="url(#gold)" letter-spacing="5">TRADING COMPANY</text>
+  <line x1="352" y1="438" x2="402" y2="438" stroke="url(#gold)" stroke-width="2.5"/>
+
+  <!-- Divider + ornament -->
+  <line x1="150" y1="475" x2="235" y2="475" stroke="#002D62" stroke-width="1.5"/>
+  <g transform="translate(260,475)" fill="url(#gold)">
+    <polygon points="0,-8 2,-2 8,0 2,2 0,8 -2,2 -8,0 -2,-2"/>
+  </g>
+  <line x1="285" y1="475" x2="370" y2="475" stroke="#002D62" stroke-width="1.5"/>
+
+  <!-- Motto -->
+  <text x="260" y="515" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#002D62" letter-spacing="3">TRUST · QUALITY · GROWTH</text>
+</svg>
