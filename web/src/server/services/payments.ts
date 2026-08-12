@@ -296,9 +296,10 @@ export async function updatePayment(
         })
         if (previousSale) {
           const total = d(previousSale.totalAmount.toString())
-          const paid = d(previousSale.paidAmount.toString())
-            .sub(oldAmount)
-            .max(0)
+          const reversedPaid = d(previousSale.paidAmount.toString()).sub(
+            oldAmount,
+          )
+          const paid = reversedPaid.lt(0) ? d(0) : reversedPaid
           await tx.sale.update({
             where: { id: previousSale.id },
             data: {
@@ -392,7 +393,8 @@ export async function deletePayment(id: number | bigint, userId?: bigint) {
         })
         if (sale) {
           const total = d(sale.totalAmount.toString())
-          const paid = d(sale.paidAmount.toString()).sub(amount).max(0)
+          const reversedPaid = d(sale.paidAmount.toString()).sub(amount)
+          const paid = reversedPaid.lt(0) ? d(0) : reversedPaid
           await tx.sale.update({
             where: { id: sale.id },
             data: {
