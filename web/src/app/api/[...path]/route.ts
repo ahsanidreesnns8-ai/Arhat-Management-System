@@ -25,7 +25,7 @@ import * as backup from '@/server/services/backup'
 import * as arhat from '@/server/services/arhat'
 
 type RouteContext = {
-  params: Promise<{ path: string[] }> | { path: string[] }
+  params: Promise<{ path: string[] }>
 }
 
 type DispatchResult = {
