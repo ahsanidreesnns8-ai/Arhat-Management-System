@@ -18,12 +18,9 @@ async function ensureSettings(workspace: 'live' | 'demo', companyName: string) {
       workspace,
       companyName,
       companyLogoUrl: null,
-      address:
-        workspace === 'demo'
-          ? 'Demo sandbox — changes do not affect live data'
-          : 'Main Market, Grain Trading Hub',
+      address: 'Main Market, Grain Trading Hub',
       phone: '+92-300-0000000',
-      email: workspace === 'demo' ? 'demo@rehmanitrading.com' : 'info@rehmanitrading.com',
+      email: 'info@rehmanitrading.com',
       defaultCommissionPercentage: '4.00',
       arhatSharePercentage: '3.00',
       supervisorSharePercentage: '0.70',
@@ -125,7 +122,7 @@ async function main() {
   }
 
   await ensureSettings('live', 'Rehmani Trading Company')
-  await ensureSettings('demo', 'Rehmani Trading Company (Demo)')
+  await ensureSettings('demo', 'Rehmani Trading Company')
   await ensureProducts('live')
   await ensureProducts('demo')
   await ensureSync(1, 'live')
