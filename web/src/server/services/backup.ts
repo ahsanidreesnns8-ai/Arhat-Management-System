@@ -96,13 +96,19 @@ export async function restoreBackup(data: Record<string, unknown>) {
       const code = String(item.productCode ?? '')
       if (!code) continue
       await tx.product.upsert({
-        where: { productCode: code },
+        where: {
+          workspace_productCode: {
+            workspace: 'live',
+            productCode: code,
+          },
+        },
         update: {
           name: String(item.name ?? code),
           active: true,
           deleted: false,
         },
         create: {
+          workspace: 'live',
           productCode: code,
           name: String(item.name ?? code),
           active: true,
@@ -113,7 +119,12 @@ export async function restoreBackup(data: Record<string, unknown>) {
       const farmerId = String(item.farmerId ?? '')
       if (!farmerId) continue
       await tx.farmer.upsert({
-        where: { farmerId },
+        where: {
+          workspace_farmerId: {
+            workspace: 'live',
+            farmerId,
+          },
+        },
         update: {
           name: String(item.name ?? farmerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -123,6 +134,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
           active: true,
         },
         create: {
+          workspace: 'live',
           farmerId,
           name: String(item.name ?? farmerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -135,7 +147,12 @@ export async function restoreBackup(data: Record<string, unknown>) {
       const buyerId = String(item.buyerId ?? '')
       if (!buyerId) continue
       await tx.buyer.upsert({
-        where: { buyerId },
+        where: {
+          workspace_buyerId: {
+            workspace: 'live',
+            buyerId,
+          },
+        },
         update: {
           name: String(item.name ?? buyerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -145,6 +162,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
           active: true,
         },
         create: {
+          workspace: 'live',
           buyerId,
           name: String(item.name ?? buyerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -160,8 +178,8 @@ export async function restoreBackup(data: Record<string, unknown>) {
       if (!product) continue
       await tx.stock.upsert({
         where: { productId },
-        update: { quantity: String(item.quantity ?? 0) },
-        create: { productId, quantity: String(item.quantity ?? 0) },
+        update: { quantity: String(item.quantity ?? 0), workspace: 'live' },
+        create: { workspace: 'live', productId, quantity: String(item.quantity ?? 0) },
       })
     }
   })

@@ -4,6 +4,8 @@ export interface User {
   fullName: string
   email: string
   role: string
+  workspace?: string
+  isDemo?: boolean
   themePreference: 'LIGHT' | 'DARK' | 'SYSTEM'
   companyName: string
   token: string

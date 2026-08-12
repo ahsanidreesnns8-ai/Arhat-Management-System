@@ -3,6 +3,7 @@ import { requireAuth, requireRoles, type AuthUser } from '@/server/auth'
 import { fail, html, ok } from '@/server/http'
 import { clientIp, rateLimit } from '@/server/rate-limit'
 import { bumpRevision, getPulse } from '@/server/sync'
+import { runWithWorkspace } from '@/server/workspace'
 import * as authService from '@/server/services/auth-service'
 import * as farmers from '@/server/services/farmers'
 import * as buyers from '@/server/services/buyers'
@@ -67,12 +68,16 @@ async function authenticate(
   path: string[],
 ) {
   if (isPublic(method, path)) return undefined
-  if (
-    path[0] === 'users' ||
-    path[0] === 'audit' ||
-    path[0] === 'backup' ||
-    (path[0] === 'settings' && method === 'PUT')
-  ) {
+
+  // Demo sandbox may edit its own settings; live settings stay owner/admin-only
+  if (path[0] === 'settings' && method === 'PUT') {
+    const user = await requireAuth(request)
+    if (user.workspace === 'demo') return user
+    if (user.role === 'OWNER' || user.role === 'ADMIN') return user
+    throw new Error('Access denied')
+  }
+
+  if (path[0] === 'users' || path[0] === 'audit' || path[0] === 'backup') {
     return requireRoles(request, 'OWNER', 'ADMIN')
   }
   return requireAuth(request)
@@ -522,14 +527,28 @@ async function handle(request: NextRequest, context: RouteContext) {
   const { path } = await context.params
   try {
     const user = await authenticate(request, method, path)
-    const dispatched = await dispatch(request, method, path, user)
-    if (dispatched instanceof Response) return dispatched
+
+    // Demo sandbox cannot manage accounts, audit logs, or backups
     if (
-      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
-      path.join('/') !== 'auth/login'
+      user?.workspace === 'demo' &&
+      (path[0] === 'users' || path[0] === 'audit' || path[0] === 'backup')
     ) {
-      await bumpRevision()
+      throw new Error('Demo account cannot change live settings, users, or backups')
     }
+
+    const dispatched = await runWithWorkspace(user?.workspace ?? 'live', async () => {
+      const result = await dispatch(request, method, path, user)
+      if (
+        !(result instanceof Response) &&
+        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
+        path.join('/') !== 'auth/login'
+      ) {
+        await bumpRevision()
+      }
+      return result
+    })
+
+    if (dispatched instanceof Response) return dispatched
     return ok(
       dispatched.data,
       dispatched.message,
@@ -548,7 +567,8 @@ async function handle(request: NextRequest, context: RouteContext) {
       message.startsWith('This account is suspended') ||
       message.startsWith('Too many login attempts')
         ? 401
-        : message === 'Access denied'
+        : message === 'Access denied' ||
+            message.startsWith('Demo account cannot')
           ? 403
           : message.startsWith('API route not found')
             ? 404

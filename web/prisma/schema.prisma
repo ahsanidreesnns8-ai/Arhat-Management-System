@@ -80,6 +80,7 @@ model User {
   password            String           @db.VarChar(255)
   fullName            String           @map("full_name") @db.VarChar(255)
   role                UserRole         @default(OPERATOR)
+  workspace           String           @default("live") @db.VarChar(20)
   themePreference     ThemePreference  @default(SYSTEM) @map("theme_preference")
   active              Boolean          @default(true)
   deleted             Boolean          @default(false)
@@ -98,6 +99,7 @@ model User {
 
 model BusinessSettings {
   id                           BigInt   @id @default(autoincrement())
+  workspace                    String   @unique @default("live") @db.VarChar(20)
   companyName                  String   @default("Rehmani Trading Company") @map("company_name") @db.VarChar(255)
   companyLogoUrl               String?  @map("company_logo_url") @db.VarChar(500)
   address                      String?
@@ -124,7 +126,8 @@ model BusinessSettings {
 
 model Product {
   id               BigInt   @id @default(autoincrement())
-  productCode      String   @unique @map("product_code") @db.VarChar(50)
+  workspace        String   @default("live") @db.VarChar(20)
+  productCode      String   @map("product_code") @db.VarChar(50)
   name             String   @db.VarChar(255)
   unit             String   @default("BAG") @db.VarChar(50)
   defaultBagWeight Decimal  @default(40.00) @map("default_bag_weight") @db.Decimal(10, 2)
@@ -138,12 +141,15 @@ model Product {
   saleItems        SaleItem[]
   stockTransactions StockTransaction[]
 
+  @@unique([workspace, productCode])
+  @@index([workspace])
   @@map("products")
 }
 
 model Farmer {
   id                 BigInt   @id @default(autoincrement())
-  farmerId           String   @unique @map("farmer_id") @db.VarChar(20)
+  workspace          String   @default("live") @db.VarChar(20)
+  farmerId           String   @map("farmer_id") @db.VarChar(20)
   name               String   @db.VarChar(255)
   cnic               String?  @db.VarChar(20)
   phone              String?  @db.VarChar(20)
@@ -160,12 +166,15 @@ model Farmer {
   payments           Payment[]
   saleItems          SaleItem[]
 
+  @@unique([workspace, farmerId])
+  @@index([workspace])
   @@map("farmers")
 }
 
 model Buyer {
   id                 BigInt   @id @default(autoincrement())
-  buyerId            String   @unique @map("buyer_id") @db.VarChar(20)
+  workspace          String   @default("live") @db.VarChar(20)
+  buyerId            String   @map("buyer_id") @db.VarChar(20)
   name               String   @db.VarChar(255)
   cnic               String?  @db.VarChar(20)
   phone              String?  @db.VarChar(20)
@@ -180,12 +189,15 @@ model Buyer {
   sales              Sale[]
   payments           Payment[]
 
+  @@unique([workspace, buyerId])
+  @@index([workspace])
   @@map("buyers")
 }
 
 model Truck {
   id                 BigInt   @id @default(autoincrement())
-  truckId            String   @unique @map("truck_id") @db.VarChar(20)
+  workspace          String   @default("live") @db.VarChar(20)
+  truckId            String   @map("truck_id") @db.VarChar(20)
   registrationNumber String   @map("registration_number") @db.VarChar(50)
   driverName         String?  @map("driver_name") @db.VarChar(255)
   driverPhone        String?  @map("driver_phone") @db.VarChar(20)
@@ -199,12 +211,15 @@ model Truck {
   farmer             Farmer   @relation(fields: [farmerId], references: [id])
   dheris             Dheri[]
 
+  @@unique([workspace, truckId])
+  @@index([workspace])
   @@map("trucks")
 }
 
 model Dheri {
   id                   BigInt        @id @default(autoincrement())
-  dheriId              String        @unique @map("dheri_id") @db.VarChar(20)
+  workspace            String        @default("live") @db.VarChar(20)
+  dheriId              String        @map("dheri_id") @db.VarChar(20)
   farmerId             BigInt        @map("farmer_id")
   truckId              BigInt?       @map("truck_id")
   productId            BigInt        @map("product_id")
@@ -234,11 +249,14 @@ model Dheri {
   saleItems            SaleItem[]
   payments             Payment[]
 
+  @@unique([workspace, dheriId])
+  @@index([workspace])
   @@map("dheris")
 }
 
 model Stock {
   id            BigInt   @id @default(autoincrement())
+  workspace     String   @default("live") @db.VarChar(20)
   productId     BigInt   @unique @map("product_id")
   quantity      Decimal  @default(0.00) @db.Decimal(15, 2)
   lowStockAlert Boolean  @default(false) @map("low_stock_alert")
@@ -246,11 +264,13 @@ model Stock {
   updatedAt     DateTime @updatedAt @map("updated_at")
   product       Product  @relation(fields: [productId], references: [id])
 
+  @@index([workspace])
   @@map("stock")
 }
 
 model StockTransaction {
   id               BigInt               @id @default(autoincrement())
+  workspace        String               @default("live") @db.VarChar(20)
   productId        BigInt               @map("product_id")
   transactionType  StockTransactionType @map("transaction_type")
   quantity         Decimal              @db.Decimal(15, 2)
@@ -264,11 +284,13 @@ model StockTransaction {
   product          Product              @relation(fields: [productId], references: [id])
   createdBy        User?                @relation(fields: [createdById], references: [id])
 
+  @@index([workspace])
   @@map("stock_transactions")
 }
 
 model QueueEntry {
   id          BigInt      @id @default(autoincrement())
+  workspace   String      @default("live") @db.VarChar(20)
   queueNumber Int         @map("queue_number")
   dheriId     BigInt      @unique @map("dheri_id")
   status      QueueStatus @default(PENDING)
@@ -279,12 +301,14 @@ model QueueEntry {
   updatedAt   DateTime    @updatedAt @map("updated_at")
   dheri       Dheri       @relation(fields: [dheriId], references: [id])
 
+  @@index([workspace])
   @@map("queue_entries")
 }
 
 model Sale {
   id            BigInt        @id @default(autoincrement())
-  invoiceNumber String        @unique @map("invoice_number") @db.VarChar(30)
+  workspace     String        @default("live") @db.VarChar(20)
+  invoiceNumber String        @map("invoice_number") @db.VarChar(30)
   buyerId       BigInt        @map("buyer_id")
   saleDate      DateTime      @map("sale_date") @db.Date
   totalBags     Int           @default(0) @map("total_bags")
@@ -302,11 +326,14 @@ model Sale {
   items         SaleItem[]
   payments      Payment[]
 
+  @@unique([workspace, invoiceNumber])
+  @@index([workspace])
   @@map("sales")
 }
 
 model SaleItem {
   id               BigInt         @id @default(autoincrement())
+  workspace        String         @default("live") @db.VarChar(20)
   saleId           BigInt         @map("sale_id")
   productId        BigInt         @map("product_id")
   sourceType       SaleSourceType @map("source_type")
@@ -323,11 +350,13 @@ model SaleItem {
   farmer           Farmer?        @relation(fields: [farmerId], references: [id])
   dheri            Dheri?         @relation(fields: [dheriId], references: [id])
 
+  @@index([workspace])
   @@map("sale_items")
 }
 
 model Payment {
   id              BigInt                 @id @default(autoincrement())
+  workspace       String                 @default("live") @db.VarChar(20)
   paymentType     PaymentType            @map("payment_type")
   farmerId        BigInt?                @map("farmer_id")
   buyerId         BigInt?                @map("buyer_id")
@@ -348,11 +377,13 @@ model Payment {
   dheri           Dheri?                 @relation(fields: [dheriId], references: [id])
   createdBy       User?                  @relation(fields: [createdById], references: [id])
 
+  @@index([workspace])
   @@map("payments")
 }
 
 model AuditLog {
   id         BigInt   @id @default(autoincrement())
+  workspace  String   @default("live") @db.VarChar(20)
   userId     BigInt?  @map("user_id")
   action     String   @db.VarChar(100)
   entityType String   @map("entity_type") @db.VarChar(100)
@@ -363,11 +394,13 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
   user       User?    @relation(fields: [userId], references: [id])
 
+  @@index([workspace])
   @@map("audit_logs")
 }
 
 model SyncState {
   id        Int      @id
+  workspace String   @unique @default("live") @db.VarChar(20)
   revision  BigInt   @default(1)
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -266,7 +266,35 @@ export default function LoginPage() {
                 <span className="login-cta-shine" />
               </motion.button>
 
-              <p className={`text-center text-sm text-slate-400 pt-2 ${isUrdu ? 'font-urdu' : ''}`}>
+              <div
+                className={`rounded-xl border border-[#C5A059]/25 bg-[#C5A059]/10 px-3 py-2.5 text-center ${isUrdu ? 'font-urdu' : ''}`}
+              >
+                <p className="text-[11px] uppercase tracking-wide text-[#C5A059]/90 mb-1">
+                  {isUrdu ? 'شیئر ڈیمو لاگ اِن' : 'Share this demo login'}
+                </p>
+                <p className="text-sm text-slate-200">
+                  <span className="font-semibold text-white">demo</span>
+                  {' / '}
+                  <span className="font-semibold text-white">demo123</span>
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400 leading-snug">
+                  {isUrdu
+                    ? 'مہمانوں کی تبدیلیاں اصل rehmani ڈیٹا پر اثر نہیں کریں گی'
+                    : 'Guest changes stay in a sandbox and never touch live rehmani data'}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 text-xs font-semibold text-[#E8C87A] underline underline-offset-2"
+                  onClick={() => {
+                    setUsername('demo')
+                    setPassword('demo123')
+                  }}
+                >
+                  {isUrdu ? 'ڈیمو بھریں' : 'Fill demo login'}
+                </button>
+              </div>
+
+              <p className={`text-center text-sm text-slate-400 pt-1 ${isUrdu ? 'font-urdu' : ''}`}>
                 Don&apos;t have an account?{' '}
                 <button
                   type="button"

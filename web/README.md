@@ -7,7 +7,7 @@
    - `JWT_SECRET` = any long random string
 4. Deploy → copy your permanent `https://….vercel.app` URL.
 
-Login: `owner` / `admin123`
+Login: `rehmani` / `rehmani123` (live) · share `demo` / `demo123` (sandbox)
 
 ---
 
@@ -37,7 +37,8 @@ npm run dev
 App: http://localhost:3000  
 API: http://localhost:3000/api  
 
-Default login: `owner` / `admin123`
+Default login: `rehmani` / `rehmani123`  
+Shared demo (isolated): `demo` / `demo123`
 
 ## Deploy to Vercel (get a `*.vercel.app` link)
 

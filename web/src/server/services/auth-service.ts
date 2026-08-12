@@ -1,10 +1,11 @@
 import type { ThemePreference } from '@prisma/client'
-import { prisma } from '@/server/db'
+import { prisma, getLiveSettingsCompanyName } from '@/server/db'
 import {
   signToken,
   updateTheme as persistTheme,
   verifyPassword,
 } from '@/server/auth'
+import { WORKSPACE_DEMO, runWithWorkspace } from '@/server/workspace'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -78,16 +79,32 @@ export async function login(username: string, password: string) {
       fullName: true,
       role: true,
       themePreference: true,
+      workspace: true,
     },
   })
-  const settings = await prisma.businessSettings.findFirst({
-    select: { companyName: true },
-  })
+
+  const workspace = authenticated.workspace === WORKSPACE_DEMO ? WORKSPACE_DEMO : 'live'
+  const settings = await runWithWorkspace(workspace, async () =>
+    prisma.businessSettings.findFirst({ select: { companyName: true } }),
+  )
+  // Live branding fallback if demo settings missing
+  const liveFallback =
+    !settings?.companyName && workspace === WORKSPACE_DEMO
+      ? await getLiveSettingsCompanyName()
+      : null
 
   return {
     ...authenticated,
-    companyName: settings?.companyName ?? 'Rehmani Trading Company',
-    token: await signToken(authenticated),
+    workspace,
+    isDemo: workspace === WORKSPACE_DEMO,
+    companyName:
+      settings?.companyName ??
+      liveFallback?.companyName ??
+      'Rehmani Trading Company',
+    token: await signToken({
+      ...authenticated,
+      workspace,
+    }),
   }
 }
 

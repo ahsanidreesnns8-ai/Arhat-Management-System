@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "vercel-build": "prisma generate && prisma db push && tsx prisma/seed.ts && next build"
+    "vercel-build": "prisma generate && prisma db push --accept-data-loss && tsx prisma/seed.ts && next build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

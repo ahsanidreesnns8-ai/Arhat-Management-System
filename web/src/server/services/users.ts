@@ -18,6 +18,7 @@ export function userDto(user: User) {
     email: user.email,
     fullName: user.fullName,
     role: user.role,
+    workspace: user.workspace,
     themePreference: user.themePreference,
     active: user.active,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
@@ -78,6 +79,7 @@ export async function createUser(input: UserInput) {
       password: await hashPassword(input.password),
       fullName: input.fullName!.trim(),
       role,
+      workspace: 'live',
       active: input.active ?? true,
     },
   })
@@ -125,7 +127,10 @@ export async function setUserActive(id: number | bigint, active: boolean) {
 }
 
 export async function deleteUser(id: number | bigint) {
-  await getUser(id)
+  const existing = await getUser(id)
+  if (existing.username === 'rehmani' || existing.username === 'demo') {
+    throw new Error('System accounts cannot be deleted')
+  }
   await prisma.user.update({
     where: { id: BigInt(id) },
     data: { deleted: true, active: false },

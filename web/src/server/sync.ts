@@ -1,17 +1,20 @@
 import { prisma } from '@/server/db'
+import { getWorkspace, syncStateId } from '@/server/workspace'
 
 async function ensureState() {
+  const id = syncStateId()
+  const workspace = getWorkspace()
   return prisma.syncState.upsert({
-    where: { id: 1 },
+    where: { id },
     update: {},
-    create: { id: 1, revision: 1 },
+    create: { id, workspace, revision: 1 },
   })
 }
 
 export async function bumpRevision() {
   await ensureState()
   return prisma.syncState.update({
-    where: { id: 1 },
+    where: { id: syncStateId() },
     data: { revision: { increment: 1 } },
   })
 }
@@ -22,5 +25,6 @@ export async function getPulse() {
     revision: Number(state.revision),
     serverTime: new Date().toISOString(),
     updatedAt: state.updatedAt?.toISOString() ?? null,
+    workspace: getWorkspace(),
   }
 }

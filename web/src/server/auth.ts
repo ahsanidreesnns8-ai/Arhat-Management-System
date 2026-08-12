@@ -17,13 +17,14 @@ function jwtSecretBytes() {
 
 export type AuthUser = Pick<
   User,
-  'id' | 'username' | 'email' | 'fullName' | 'role' | 'themePreference'
+  'id' | 'username' | 'email' | 'fullName' | 'role' | 'themePreference' | 'workspace'
 >
 
 export async function signToken(user: AuthUser): Promise<string> {
   return new SignJWT({
     username: user.username,
     role: user.role,
+    workspace: user.workspace || 'live',
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id.toString())
@@ -66,6 +67,7 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
         fullName: true,
         role: true,
         themePreference: true,
+        workspace: true,
       },
     })
     if (!user) throw new Error('User not found or inactive')

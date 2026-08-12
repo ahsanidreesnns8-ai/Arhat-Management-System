@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: data.data.fullName,
       email: data.data.email,
       role: data.data.role,
+      workspace: data.data.workspace || 'live',
+      isDemo: Boolean(data.data.isDemo || data.data.workspace === 'demo'),
       themePreference: data.data.themePreference,
       companyName: data.data.companyName,
       token: data.data.token,
