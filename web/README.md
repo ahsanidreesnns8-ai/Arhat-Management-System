@@ -1,3 +1,16 @@
+## One-click permanent Vercel link
+
+1. Open: https://vercel.com/new/clone?repository-url=https://github.com/ahsanidreesnns8-ai/Arhat-Management-System&project-name=arhat-management-system&root-directory=web
+2. Set **Root Directory** to `web` (if not prefilled).
+3. Add env vars:
+   - `DATABASE_URL` = your Neon Postgres URL (https://console.neon.tech)
+   - `JWT_SECRET` = any long random string
+4. Deploy → copy your permanent `https://….vercel.app` URL.
+
+Login: `owner` / `admin123`
+
+---
+
 # Arhat Management System — Vercel / Next.js app
 
 TypeScript full-stack port of the Java + Vite ERP, ready for **Vercel**.
