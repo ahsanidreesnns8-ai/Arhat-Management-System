@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
   Calculator, PackagePlus, Store, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield
@@ -30,64 +31,81 @@ const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: Translatio
 ]
 
 interface SidebarProps {
-  collapsed: boolean
+  open: boolean
+  onClose: () => void
 }
 
-export default function Sidebar({ collapsed }: SidebarProps) {
+export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth()
   const { t, isUrdu } = useLanguage()
   const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN'
+  const fromEdge = isUrdu ? '100%' : '-100%'
 
   return (
-    <motion.aside
-      className="sidebar-3d fixed top-0 h-full z-40 overflow-hidden"
-      style={{ [isUrdu ? 'right' : 'left']: 0 }}
-      animate={{ width: collapsed ? 80 : 256 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-    >
-      <div className="sidebar-3d-inner h-full flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-16 border-b border-white/10 relative">
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
-          <RhmaniLogo size="sm" showText={!collapsed} light />
-        </div>
-
-        <motion.nav
-          className="p-3 space-y-1.5 overflow-y-auto flex-1"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="show"
+    <AnimatePresence>
+      {open && (
+        <motion.aside
+          className="sidebar-3d fixed top-0 h-full z-50 w-[min(86vw,300px)] overflow-hidden"
+          style={{ [isUrdu ? 'right' : 'left']: 0 }}
+          initial={{ x: fromEdge }}
+          animate={{ x: 0 }}
+          exit={{ x: fromEdge }}
+          transition={{ type: 'spring', stiffness: 380, damping: 36 }}
         >
-          {navItems
-            .filter((item) => !item.ownerOnly || isOwner)
-            .map((item) => (
-              <motion.div key={item.to} variants={navItem}>
-                <NavLink
-                  to={item.to}
-                  end={item.to === '/dashboard'}
-                  className={({ isActive }) =>
-                    `sidebar-link relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium ${
-                      isActive ? 'sidebar-link-active' : ''
-                    } ${isUrdu ? 'font-urdu' : ''}`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <motion.span
-                          layoutId="sidebar-active-3d"
-                          className="absolute inset-0 rounded-xl sidebar-link-active-bg"
-                          transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-                        />
+          <div className="sidebar-3d-inner h-full flex flex-col">
+            <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-white/10 relative">
+              <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
+              <RhmaniLogo size="sm" showText light />
+              <button
+                type="button"
+                onClick={onClose}
+                className="nav-icon-btn text-slate-200"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <motion.nav
+              className="p-3 space-y-1 overflow-y-auto flex-1 overscroll-contain"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+            >
+              {navItems
+                .filter((item) => !item.ownerOnly || isOwner)
+                .map((item) => (
+                  <motion.div key={item.to} variants={navItem}>
+                    <NavLink
+                      to={item.to}
+                      end={item.to === '/dashboard'}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        `sidebar-link relative flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium min-h-[44px] ${
+                          isActive ? 'sidebar-link-active' : ''
+                        } ${isUrdu ? 'font-urdu' : ''}`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && (
+                            <motion.span
+                              layoutId="sidebar-active-mobile"
+                              className="absolute inset-0 rounded-xl sidebar-link-active-bg"
+                              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+                            />
+                          )}
+                          <item.icon className="relative h-5 w-5 flex-shrink-0" />
+                          <span className="relative truncate">{t(item.labelKey)}</span>
+                        </>
                       )}
-                      <item.icon className="relative h-5 w-5 flex-shrink-0" />
-                      {!collapsed && <span className="relative truncate">{t(item.labelKey)}</span>}
-                    </>
-                  )}
-                </NavLink>
-              </motion.div>
-            ))}
-        </motion.nav>
-      </div>
-    </motion.aside>
+                    </NavLink>
+                  </motion.div>
+                ))}
+            </motion.nav>
+          </div>
+        </motion.aside>
+      )}
+    </AnimatePresence>
   )
 }

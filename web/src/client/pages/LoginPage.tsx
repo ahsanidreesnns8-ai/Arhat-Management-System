@@ -59,8 +59,7 @@ export default function LoginPage() {
       if (remember) localStorage.setItem('rehmani_remember_user', user)
       else localStorage.removeItem('rehmani_remember_user')
       setSuccess(true)
-      toast.success(`${t('welcomeBack')} — ${companyName || t('brandName')}`)
-      setTimeout(() => navigate('/dashboard'), 900)
+      navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const axiosMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       const plainMsg = err instanceof Error ? err.message : undefined

@@ -1,10 +1,23 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Rehmani Trading — Arhat Management System',
   description: 'Grain trading & commission agency (arhat) ERP',
   icons: { icon: '/favicon.svg' },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Rehmani Trading',
+  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#002D62',
 }
 
 export default function RootLayout({

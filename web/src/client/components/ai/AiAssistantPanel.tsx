@@ -183,8 +183,8 @@ export default function AiAssistantPanel() {
           <motion.button
             key="ai-fab"
             onClick={() => setOpen(true)}
-            className={`ai-fab fixed bottom-6 z-40 w-14 h-14 rounded-full text-white flex items-center justify-center ${
-              isUrdu ? 'left-6' : 'right-6'
+            className={`ai-fab fixed bottom-4 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full text-white flex items-center justify-center ${
+              isUrdu ? 'right-4 sm:right-6' : 'left-4 sm:right-6 sm:left-auto'
             }`}
             title={t('aiTitle')}
             initial={{ scale: 0, opacity: 0 }}
@@ -208,8 +208,8 @@ export default function AiAssistantPanel() {
         {open && (
           <motion.div
             key="ai-panel"
-            className={`fixed bottom-6 z-50 w-96 max-w-[calc(100vw-3rem)] h-[32rem] card-3d flex flex-col shadow-glass overflow-hidden ${
-              isUrdu ? 'left-6' : 'right-6'
+            className={`fixed bottom-4 z-50 w-[min(100vw-1.5rem,24rem)] h-[min(70vh,32rem)] card-3d flex flex-col shadow-glass overflow-hidden ${
+              isUrdu ? 'right-3 sm:right-6' : 'left-3 sm:left-auto sm:right-6'
             }`}
             variants={slideFromRight}
             initial="hidden"

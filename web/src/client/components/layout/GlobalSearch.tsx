@@ -75,18 +75,19 @@ export default function GlobalSearch() {
   }
 
   return (
-    <div ref={ref} className="relative w-full max-w-md">
+    <div ref={ref} className="relative w-full max-w-full sm:max-w-md">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input
-          type="text"
+          type="search"
+          enterKeyHint="search"
           placeholder={t('searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
-          className={`input-field w-full pl-10 pr-16 py-2 text-sm ${isUrdu ? 'font-urdu' : ''}`}
+          className={`input-field w-full pl-9 pr-12 py-2 text-sm h-10 ${isUrdu ? 'font-urdu' : ''}`}
         />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
           {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
           <VoiceFieldMic onText={(text) => { setQuery(text); setOpen(true) }} />
         </div>
@@ -95,7 +96,7 @@ export default function GlobalSearch() {
       <AnimatePresence>
         {open && results.length > 0 && (
           <motion.div
-            className="absolute top-full mt-2 w-full card-3d z-50 max-h-80 overflow-y-auto origin-top"
+            className="absolute top-full mt-2 left-0 right-0 min-w-[min(100vw-1.5rem,24rem)] card-3d z-50 max-h-72 overflow-y-auto origin-top"
             initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
