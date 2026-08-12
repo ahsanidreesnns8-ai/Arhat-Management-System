@@ -533,7 +533,11 @@ async function handle(request: NextRequest, context: RouteContext) {
       message === 'Authentication required' ||
       message === 'Invalid or expired token' ||
       message === 'Access Denied' ||
-      message.startsWith('Account temporarily locked')
+      message === 'Invalid username or password' ||
+      message.startsWith('Invalid username or password') ||
+      message.startsWith('Account temporarily locked') ||
+      message.startsWith('Username and password are required') ||
+      message.startsWith('This account is suspended')
         ? 401
         : message === 'Access denied'
           ? 403

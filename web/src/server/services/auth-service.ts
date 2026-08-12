@@ -10,21 +10,34 @@ const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
 
 export async function login(username: string, password: string) {
+  const normalized = username.trim()
+  if (!normalized || !password) {
+    throw new Error('Username and password are required')
+  }
+
   const user = await prisma.user.findFirst({
-    where: { username, deleted: false },
+    where: { username: normalized, deleted: false },
   })
 
   if (
     user?.lockedUntil &&
     user.lockedUntil.getTime() > Date.now()
   ) {
-    throw new Error('Account temporarily locked. Try again later.')
+    const mins = Math.max(
+      1,
+      Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000),
+    )
+    throw new Error(
+      `Account temporarily locked after failed attempts. Try again in ${mins} minute(s).`,
+    )
+  }
+
+  if (user && !user.active) {
+    throw new Error('This account is suspended. Contact an owner/admin.')
   }
 
   const valid =
-    !!user &&
-    user.active &&
-    (await verifyPassword(password, user.password))
+    !!user && (await verifyPassword(password, user.password))
 
   if (!valid) {
     if (user) {
@@ -39,8 +52,16 @@ export async function login(username: string, password: string) {
               : null,
         },
       })
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        throw new Error(
+          `Account temporarily locked after ${MAX_FAILED_ATTEMPTS} failed attempts. Try again in ${LOCKOUT_MINUTES} minutes.`,
+        )
+      }
+      throw new Error(
+        `Invalid username or password (${attempts}/${MAX_FAILED_ATTEMPTS} attempts)`,
+      )
     }
-    throw new Error('Access Denied')
+    throw new Error('Invalid username or password')
   }
 
   const authenticated = await prisma.user.update({

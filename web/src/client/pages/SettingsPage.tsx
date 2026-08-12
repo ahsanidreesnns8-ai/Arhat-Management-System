@@ -183,6 +183,11 @@ export default function SettingsPage() {
     toast.success(next === 'ur' ? 'زبان اردو کر دی گئی' : 'Language set to English')
   }
 
+  // Hooks must run unconditionally (before any early return)
+  useVoicePageActions({
+    save: () => { void handleSave() },
+  })
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -192,10 +197,44 @@ export default function SettingsPage() {
     )
   }
 
-  useVoicePageActions({
-    save: () => { void handleSave() },
-  })
-
+  if (!settings) {
+    return (
+      <div className="card-3d p-6 space-y-3">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {t('settingsFailed')}
+        </p>
+        <Button
+          type="button"
+          onClick={() => {
+            setLoading(true)
+            Promise.allSettled([settingsApi.get(), weatherApi.get()])
+              .then(([settingsRes, weatherRes]) => {
+                if (settingsRes.status === 'fulfilled') {
+                  setSettings(settingsRes.value.data?.data ?? null)
+                } else {
+                  toast.error(t('settingsFailed'))
+                }
+                if (weatherRes.status === 'fulfilled') {
+                  const data = weatherRes.value.data?.data
+                  if (data) {
+                    setPreview(data)
+                    const h = data.hijri
+                    if (h) {
+                      setHijriDay(h.day)
+                      setHijriMonth(h.month)
+                      setHijriYear(h.year)
+                    }
+                  }
+                }
+              })
+              .finally(() => setLoading(false))
+          }}
+        >
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

@@ -47,18 +47,26 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (loading || success) return
+    const user = username.trim()
+    const pass = password
+    if (!user || !pass) {
+      toast.error(isUrdu ? 'صارف نام اور پاس ورڈ درکار ہیں' : 'Username and password are required')
+      return
+    }
     setLoading(true)
     try {
-      await login(username, password)
-      if (remember) localStorage.setItem('rehmani_remember_user', username)
+      await login(user, pass)
+      if (remember) localStorage.setItem('rehmani_remember_user', user)
       else localStorage.removeItem('rehmani_remember_user')
       setSuccess(true)
       toast.success(`${t('welcomeBack')} — ${companyName || t('brandName')}`)
       setTimeout(() => navigate('/dashboard'), 900)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Access Denied')
+      const axiosMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const plainMsg = err instanceof Error ? err.message : undefined
+      toast.error(axiosMsg || plainMsg || (isUrdu ? 'لاگ اِن ناکام' : 'Login failed'))
       setLoading(false)
+      setSuccess(false)
     }
   }
 

@@ -37,11 +37,11 @@ api.interceptors.response.use(
     const url = String(res.config?.url || '')
     const isBill = url.includes('/bills/')
 
-    // Vite SPA fallback must never be treated as an API/bill response
+    // SPA HTML must never be treated as an API/bill response
     if (typeof res.data === 'string') {
       const body = res.data
-      if (body.includes('id="root"') || body.includes('__next_placeholder__')) {
-        return Promise.reject(new Error('API unavailable — check server/database configuration'))
+      if (body.includes('id="root"') || body.includes('__next') || body.includes('/_next/')) {
+        return Promise.reject(new Error('API unavailable — refresh the page and try again'))
       }
       if (isBill && ct.includes('application/json')) {
         return Promise.reject(new Error('Bill endpoint returned JSON instead of HTML'))
@@ -51,13 +51,13 @@ api.interceptors.response.use(
     // Blob downloads (Excel/ZIP) can receive SPA HTML when proxy is down
     if (res.config?.responseType === 'blob' && res.data instanceof Blob) {
       if (ct.includes('text/html') || res.data.type.includes('text/html')) {
-        return Promise.reject(new Error('API unavailable — check server/database configuration'))
+        return Promise.reject(new Error('API unavailable — refresh the page and try again'))
       }
     }
 
     // Non-bill JSON APIs that somehow get HTML
     if (!isBill && ct.includes('text/html')) {
-      return Promise.reject(new Error('API unavailable — check server/database configuration'))
+      return Promise.reject(new Error('API unavailable — refresh the page and try again'))
     }
 
     return res
@@ -70,6 +70,11 @@ api.interceptors.response.use(
       if (!window.location.pathname.startsWith('/login')) {
         window.location.assign('/login')
       }
+    }
+    // Prefer server message for toast consumers
+    const serverMsg = error?.response?.data?.message
+    if (serverMsg && typeof serverMsg === 'string') {
+      error.message = serverMsg
     }
     return Promise.reject(error)
   },

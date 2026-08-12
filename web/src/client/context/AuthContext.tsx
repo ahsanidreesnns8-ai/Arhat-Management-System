@@ -31,9 +31,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const login = async (username: string, password: string) => {
-    const { data } = await authApi.login(username, password)
-    if (!data.success) throw new Error(data.message || 'Access Denied')
-    const userData = { ...data.data, token: data.data.token }
+    const { data } = await authApi.login(username.trim(), password)
+    if (!data?.success || !data.data?.token) {
+      throw new Error(data?.message || 'Invalid username or password')
+    }
+    const userData: User = {
+      id: Number(data.data.id),
+      username: data.data.username,
+      fullName: data.data.fullName,
+      email: data.data.email,
+      role: data.data.role,
+      themePreference: data.data.themePreference,
+      companyName: data.data.companyName,
+      token: data.data.token,
+    }
     setUser(userData)
     localStorage.setItem('rehmani_user', JSON.stringify(userData))
     applyServerTheme(userData.themePreference)
