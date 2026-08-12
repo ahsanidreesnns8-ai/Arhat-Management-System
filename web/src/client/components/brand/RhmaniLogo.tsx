@@ -47,11 +47,13 @@ export default function RhmaniLogo({
   const customLogo = settings?.companyLogoUrl?.trim() || ''
 
   const sources = useMemo(() => {
+    // Never force a large crest into the compact mark slot
+    const safeCustom =
+      customLogo && !/rehmani-logo\.svg$/i.test(customLogo) ? customLogo : undefined
     if (variant === 'full') {
       return uniqueSources(customLogo, FALLBACK_FULL, FALLBACK_MARK)
     }
-    // Sidebar/mark: prefer compact mark; still try custom URL first if user set one
-    return uniqueSources(customLogo, FALLBACK_MARK, FALLBACK_FULL)
+    return uniqueSources(safeCustom, FALLBACK_MARK, FALLBACK_FULL)
   }, [customLogo, variant])
 
   const [srcIndex, setSrcIndex] = useState(0)

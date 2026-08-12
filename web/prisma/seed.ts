@@ -16,7 +16,7 @@ async function main() {
     await prisma.businessSettings.create({
       data: {
         companyName: 'Rehmani Trading Company',
-        companyLogoUrl: '/rehmani-logo.svg',
+        companyLogoUrl: null,
         address: 'Main Market, Grain Trading Hub',
         phone: '+92-300-0000000',
         email: 'info@rehmanitrading.com',

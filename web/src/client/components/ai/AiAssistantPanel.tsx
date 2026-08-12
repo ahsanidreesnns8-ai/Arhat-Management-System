@@ -31,9 +31,22 @@ function getSpeechRecognition(): (new () => SpeechRecognitionType) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null
 }
 
-export default function AiAssistantPanel() {
+export default function AiAssistantPanel({
+  open: openProp,
+  onOpenChange,
+  docked = false,
+}: {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  docked?: boolean
+} = {}) {
   const { t, isUrdu, lang } = useLanguage()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = openProp ?? internalOpen
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next)
+    if (openProp === undefined) setInternalOpen(next)
+  }
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -179,27 +192,19 @@ export default function AiAssistantPanel() {
   return (
     <>
       <AnimatePresence>
-        {!open && (
+        {!open && !docked && (
           <motion.button
             key="ai-fab"
             onClick={() => setOpen(true)}
-            className={`ai-fab fixed bottom-4 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full text-white flex items-center justify-center ${
-              isUrdu ? 'right-4 sm:right-6' : 'left-4 sm:right-6 sm:left-auto'
-            }`}
+            className="ai-fab fixed bottom-24 right-4 z-40 w-12 h-12 rounded-full text-white flex items-center justify-center"
             title={t('aiTitle')}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
             transition={softSpring}
           >
-            <motion.span
-              className="absolute inset-0 rounded-full bg-cyan-400/40"
-              animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <MessageCircle className="relative h-6 w-6" />
+            <MessageCircle className="relative h-5 w-5" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -208,9 +213,7 @@ export default function AiAssistantPanel() {
         {open && (
           <motion.div
             key="ai-panel"
-            className={`fixed bottom-4 z-50 w-[min(100vw-1.5rem,24rem)] h-[min(70vh,32rem)] card-3d flex flex-col shadow-glass overflow-hidden ${
-              isUrdu ? 'right-3 sm:right-6' : 'left-3 sm:left-auto sm:right-6'
-            }`}
+            className="fixed inset-x-3 bottom-[4.75rem] z-50 mx-auto w-auto max-w-md h-[min(68vh,30rem)] card-3d flex flex-col shadow-glass overflow-hidden"
             variants={slideFromRight}
             initial="hidden"
             animate="show"

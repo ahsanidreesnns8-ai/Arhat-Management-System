@@ -37,7 +37,7 @@ export default function StatCard({ title, value, icon, trend, color = 'teal', to
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
           <AnimatedNumber
             value={value}
-            className="text-2xl font-bold text-slate-900 dark:text-white mt-1 block"
+            className="text-xl font-bold text-slate-900 dark:text-white mt-1 block"
           />
           {trend && <p className="text-xs text-slate-400 mt-1">{trend}</p>}
           {to && (
