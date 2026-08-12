@@ -2,5 +2,11 @@
   "buildCommand": "npm run vercel-build",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

@@ -14,7 +14,7 @@ const SyncContext = createContext<SyncContextType>({
   live: false,
 })
 
-const POLL_MS = 5000
+const POLL_MS = 15000
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()

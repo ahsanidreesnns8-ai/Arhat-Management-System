@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { requireAuth, requireRoles, type AuthUser } from '@/server/auth'
 import { fail, html, ok } from '@/server/http'
+import { clientIp, rateLimit } from '@/server/rate-limit'
 import { bumpRevision, getPulse } from '@/server/sync'
 import * as authService from '@/server/services/auth-service'
 import * as farmers from '@/server/services/farmers'
@@ -96,6 +97,13 @@ async function dispatch(
     })
   }
   if (path[0] === 'auth' && path[1] === 'login' && method === 'POST') {
+    const ip = clientIp(request)
+    const limited = rateLimit(`login:${ip}`, 20, 15 * 60_000)
+    if (!limited.ok) {
+      throw new Error(
+        `Too many login attempts. Try again in ${limited.retryAfterSec}s.`,
+      )
+    }
     return result(
       await authService.login(
         String(payload.username ?? ''),
@@ -537,14 +545,20 @@ async function handle(request: NextRequest, context: RouteContext) {
       message.startsWith('Invalid username or password') ||
       message.startsWith('Account temporarily locked') ||
       message.startsWith('Username and password are required') ||
-      message.startsWith('This account is suspended')
+      message.startsWith('This account is suspended') ||
+      message.startsWith('Too many login attempts')
         ? 401
         : message === 'Access denied'
           ? 403
           : message.startsWith('API route not found')
             ? 404
             : 400
-    return fail(message, status)
+    // Don't leak stack / internal details
+    const safeMessage =
+      message.startsWith('JWT_SECRET')
+        ? 'Server misconfigured'
+        : message.slice(0, 240)
+    return fail(safeMessage, status)
   }
 }
 

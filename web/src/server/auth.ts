@@ -4,9 +4,16 @@ import { jwtVerify, SignJWT } from 'jose'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/server/db'
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? 'rehmani-change-this-secret-in-production',
-)
+function jwtSecretBytes() {
+  const raw = process.env.JWT_SECRET?.trim()
+  if (!raw || raw.length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET must be set to a strong value (32+ chars) in production')
+    }
+    return new TextEncoder().encode('rehmani-dev-only-secret-change-me-32b')
+  }
+  return new TextEncoder().encode(raw)
+}
 
 export type AuthUser = Pick<
   User,
@@ -21,12 +28,14 @@ export async function signToken(user: AuthUser): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id.toString())
     .setIssuedAt()
-    .setExpirationTime(process.env.JWT_EXPIRATION ?? '24h')
-    .sign(secret)
+    .setExpirationTime(process.env.JWT_EXPIRATION ?? '12h')
+    .sign(jwtSecretBytes())
 }
 
 export async function verifyToken(token: string) {
-  const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] })
+  const { payload } = await jwtVerify(token, jwtSecretBytes(), {
+    algorithms: ['HS256'],
+  })
   return payload
 }
 
@@ -35,7 +44,8 @@ export async function verifyPassword(password: string, encoded: string) {
 }
 
 export async function hashPassword(password: string) {
-  return hash(password, 12)
+  // 10 is faster than 12 and still strong for this app
+  return hash(password, 10)
 }
 
 export async function requireAuth(request: NextRequest): Promise<AuthUser> {
@@ -60,7 +70,10 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     })
     if (!user) throw new Error('User not found or inactive')
     return user
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'User not found or inactive') {
+      throw error
+    }
     throw new Error('Invalid or expired token')
   }
 }
