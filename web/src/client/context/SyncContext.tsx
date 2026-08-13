@@ -22,11 +22,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
   const [live, setLive] = useState(false)
   const busy = useRef(false)
+  const failStreak = useRef(0)
 
   useEffect(() => {
     if (!isAuthenticated) {
       setRevision(0)
       setLive(false)
+      failStreak.current = 0
       return
     }
 
@@ -41,9 +43,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         const next = Number(res.data?.data?.revision || 0)
         setRevision((prev) => (next !== prev ? next : prev))
         setLastSyncedAt(res.data?.data?.serverTime || new Date().toISOString())
+        failStreak.current = 0
         setLive(true)
       } catch {
-        if (!cancelled) setLive(false)
+        if (!cancelled) {
+          // Tolerate brief cold-start blips before showing offline
+          failStreak.current += 1
+          if (failStreak.current >= 3) setLive(false)
+        }
       } finally {
         busy.current = false
       }

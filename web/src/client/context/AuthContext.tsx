@@ -50,11 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
     localStorage.setItem('rehmani_user', JSON.stringify(userData))
     applyServerTheme(userData.themePreference)
+    window.dispatchEvent(new Event('rehmani:auth-changed'))
   }
 
   const logout = () => {
     setUser(null)
     localStorage.removeItem('rehmani_user')
+    window.dispatchEvent(new Event('rehmani:auth-changed'))
   }
 
   return (

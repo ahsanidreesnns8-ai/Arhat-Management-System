@@ -10,8 +10,9 @@ function datasourceUrl() {
   const base = process.env.DATABASE_URL
   if (!base) return undefined
   const sep = base.includes('?') ? '&' : '?'
+  // Keep pool tiny for serverless; allow a couple statements to queue
   if (base.includes('connection_limit=')) return base
-  return `${base}${sep}connection_limit=1&pool_timeout=20&connect_timeout=10`
+  return `${base}${sep}connection_limit=1&pool_timeout=30&connect_timeout=15`
 }
 
 /** Models that belong to a live/demo workspace sandbox */
@@ -54,18 +55,29 @@ function stripWorkspaceMutation(data: unknown): unknown {
   return row
 }
 
-function modelKey(model: Prisma.ModelName) {
-  return (model.charAt(0).toLowerCase() + model.slice(1)) as Uncapitalize<Prisma.ModelName>
+function assertResultWorkspace<T>(result: T, workspace: string): T {
+  if (
+    result &&
+    typeof result === 'object' &&
+    'workspace' in result &&
+    (result as { workspace?: string }).workspace != null &&
+    (result as { workspace: string }).workspace !== workspace
+  ) {
+    throw new Error('Record not found')
+  }
+  return result
 }
 
-function createPrisma() {
-  const base = new PrismaClient({
+function createBaseClient() {
+  return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     datasources: datasourceUrl()
       ? { db: { url: datasourceUrl() } }
       : undefined,
   })
+}
 
+function createPrisma(base: PrismaClient) {
   return base.$extends({
     query: {
       $allModels: {
@@ -129,13 +141,12 @@ function createPrisma() {
           return query(args)
         },
         async update({ model, args, query }) {
+          // Do not pre-read via a separate client — that breaks Prisma transactions.
           if (isScoped(model)) {
-            const key = modelKey(model)
-            const existing = await (base as any)[key].findUnique({ where: args.where })
-            if (!existing || existing.workspace !== getWorkspace()) {
-              throw new Error('Record not found')
-            }
+            const workspace = getWorkspace()
             args.data = stripWorkspaceMutation(args.data) as typeof args.data
+            const result = await query(args)
+            return assertResultWorkspace(result, workspace)
           }
           return query(args)
         },
@@ -148,11 +159,9 @@ function createPrisma() {
         },
         async delete({ model, args, query }) {
           if (isScoped(model)) {
-            const key = modelKey(model)
-            const existing = await (base as any)[key].findUnique({ where: args.where })
-            if (!existing || existing.workspace !== getWorkspace()) {
-              throw new Error('Record not found')
-            }
+            const workspace = getWorkspace()
+            const result = await query(args)
+            return assertResultWorkspace(result, workspace)
           }
           return query(args)
         },
@@ -167,34 +176,21 @@ function createPrisma() {
           const workspace = getWorkspace()
           args.create = injectCreateData(args.create, workspace) as typeof args.create
           args.update = stripWorkspaceMutation(args.update) as typeof args.update
-
-          // Prefer workspace-safe findFirst when unique where is code-based
-          const where = args.where as Record<string, unknown>
-          if (where && typeof where === 'object') {
-            const compound = Object.values(where).find(
-              (v) => v && typeof v === 'object' && 'workspace' in (v as object),
-            ) as { workspace?: string } | undefined
-            if (compound && compound.workspace && compound.workspace !== workspace) {
-              throw new Error('Record not found')
-            }
-          }
-          return query(args)
+          const result = await query(args)
+          return assertResultWorkspace(result, workspace)
         },
       },
     },
   })
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrisma()
-export const basePrisma = globalForPrisma.basePrisma ?? new PrismaClient({
-  log: ['error'],
-  datasources: datasourceUrl()
-    ? { db: { url: datasourceUrl() } }
-    : undefined,
-})
+const basePrisma = globalForPrisma.basePrisma ?? createBaseClient()
+export const prisma = globalForPrisma.prisma ?? createPrisma(basePrisma)
 
-globalForPrisma.prisma = prisma
 globalForPrisma.basePrisma = basePrisma
+globalForPrisma.prisma = prisma
+
+export { basePrisma }
 
 /** Unscoped client for auth/user lookups and seed migrations */
 export function getLiveSettingsCompanyName() {

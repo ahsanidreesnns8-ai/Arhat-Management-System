@@ -50,24 +50,32 @@ export default function DashboardPage() {
 
   const [loadError, setLoadError] = useState(false)
 
-  const load = useCallback((soft = false) => {
+  const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
-    dashboardApi.getStats()
-      .then((res) => {
-        setStats(res.data?.data ?? null)
-        setLoadError(false)
-      })
-      .catch(() => {
-        if (!soft) {
+    try {
+      const res = await dashboardApi.getStats()
+      setStats(res.data?.data ?? null)
+      setLoadError(false)
+    } catch {
+      if (!soft) {
+        // One automatic retry after a short delay (covers Vercel/Neon cold start)
+        try {
+          await new Promise((r) => window.setTimeout(r, 700))
+          const res = await dashboardApi.getStats()
+          setStats(res.data?.data ?? null)
+          setLoadError(false)
+        } catch {
           setStats(null)
           setLoadError(true)
         }
-      })
-      .finally(() => { if (!soft) setLoading(false) })
+      }
+    } finally {
+      if (!soft) setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { load() }, [load])
-  useLiveReload(() => load(true))
+  useEffect(() => { void load() }, [load])
+  useLiveReload(() => { void load(true) })
 
   const emptyStats: DashboardStats = {
     todaySales: 0,

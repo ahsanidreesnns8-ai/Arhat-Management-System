@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { BusinessSettings } from '../types'
 import { settingsApi } from '../services/api'
 
@@ -17,7 +17,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<BusinessSettings | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const token = localStorage.getItem('rehmani_user')
       const res = token
@@ -27,21 +27,27 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       if (data) {
         setSettings(data)
         document.title = `${data.companyName || defaultName} — Mandi ERP`
-      } else {
-        setSettings(null)
-        document.title = `${defaultName} — Mandi ERP`
       }
     } catch {
-      setSettings(null)
-      document.title = `${defaultName} — Mandi ERP`
+      // Keep last known settings on transient API blips
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    refresh()
-  }, [])
+    void refresh()
+    const onAuth = () => { void refresh() }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'rehmani_user') void refresh()
+    }
+    window.addEventListener('rehmani:auth-changed', onAuth)
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.removeEventListener('rehmani:auth-changed', onAuth)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [refresh])
 
   return (
     <BusinessContext.Provider

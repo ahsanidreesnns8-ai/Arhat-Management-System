@@ -322,7 +322,7 @@ async function dispatch(
   }
 
   if (path[0] === 'queue') {
-    if (path[1] === 'pending' && method === 'GET') {
+    if ((!path[1] || path[1] === 'pending') && method === 'GET') {
       return result(await queue.listPendingQueue())
     }
     if (path[1] === 'active' && method === 'GET') {
@@ -337,15 +337,14 @@ async function dispatch(
         'Added to queue',
       )
     }
-    const id = numericId(path[1])
-    if (path[2] === 'activate' && method === 'POST') {
-      return result(await queue.activateQueue(id), 'Queue activated')
+    if (path[1] && path[2] === 'activate' && method === 'POST') {
+      return result(await queue.activateQueue(numericId(path[1])), 'Queue activated')
     }
-    if (path[2] === 'complete' && method === 'POST') {
-      return result(await queue.completeQueue(id), 'Queue completed')
+    if (path[1] && path[2] === 'complete' && method === 'POST') {
+      return result(await queue.completeQueue(numericId(path[1])), 'Queue completed')
     }
-    if (path[2] === 'cancel' && method === 'POST') {
-      return result(await queue.cancelQueue(id), 'Queue cancelled')
+    if (path[1] && path[2] === 'cancel' && method === 'POST') {
+      return result(await queue.cancelQueue(numericId(path[1])), 'Queue cancelled')
     }
   }
 
@@ -556,6 +555,17 @@ async function handle(request: NextRequest, context: RouteContext) {
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Request failed'
+    const lower = message.toLowerCase()
+    const isDbTransient =
+      lower.includes("can't reach database") ||
+      lower.includes('connection') ||
+      lower.includes('timed out') ||
+      lower.includes('pool') ||
+      lower.includes('p1001') ||
+      lower.includes('p1002') ||
+      lower.includes('p1017') ||
+      lower.includes('server has closed the connection')
+
     const status =
       message === 'Authentication required' ||
       message === 'Invalid or expired token' ||
@@ -572,15 +582,22 @@ async function handle(request: NextRequest, context: RouteContext) {
           ? 403
           : message.startsWith('API route not found')
             ? 404
-            : 400
+            : isDbTransient
+              ? 503
+              : 400
     // Don't leak stack / internal details
     const safeMessage =
       message.startsWith('JWT_SECRET')
         ? 'Server misconfigured'
-        : message.slice(0, 240)
+        : isDbTransient
+          ? 'Service temporarily unavailable — retrying…'
+          : message.slice(0, 240)
     return fail(safeMessage, status)
   }
 }
+
+export const maxDuration = 60
+export const runtime = 'nodejs'
 
 export const GET = handle
 export const POST = handle

@@ -9,7 +9,8 @@ import type {
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-  timeout: 20000,
+  // Cold starts on Vercel/Neon can exceed 20s; keep retries for GETs below
+  timeout: 45000,
 })
 
 api.interceptors.request.use((config) => {
@@ -30,6 +31,39 @@ api.interceptors.request.use((config) => {
   }
   return config
 })
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+function isRetryableMethod(method?: string) {
+  const m = (method || 'get').toLowerCase()
+  return m === 'get' || m === 'head' || m === 'options'
+}
+
+function isRetryableError(error: unknown) {
+  const err = error as {
+    code?: string
+    message?: string
+    response?: { status?: number }
+    config?: { url?: string }
+  }
+  const status = err?.response?.status
+  if (status === 408 || status === 425 || status === 429 || status === 502 || status === 503 || status === 504) {
+    return true
+  }
+  if (!err?.response) {
+    // Network / timeout / aborted while server wakes up
+    return true
+  }
+  const msg = String(err?.message || '').toLowerCase()
+  return (
+    msg.includes('timeout') ||
+    msg.includes('network') ||
+    msg.includes('temporarily unavailable') ||
+    msg.includes('api unavailable')
+  )
+}
 
 api.interceptors.response.use(
   (res) => {
@@ -62,20 +96,34 @@ api.interceptors.response.use(
 
     return res
   },
-  (error) => {
+  async (error) => {
+    const config = error?.config as
+      | { method?: string; url?: string; __retryCount?: number }
+      | undefined
     const status = error?.response?.status
-    const url = String(error?.config?.url || '')
+    const url = String(config?.url || '')
+
     if (status === 401 && !url.includes('/auth/login')) {
       localStorage.removeItem('rehmani_user')
       if (!window.location.pathname.startsWith('/login')) {
         window.location.assign('/login')
       }
+      return Promise.reject(error)
     }
+
     // Prefer server message for toast consumers
     const serverMsg = error?.response?.data?.message
     if (serverMsg && typeof serverMsg === 'string') {
       error.message = serverMsg
     }
+
+    const retryCount = config?.__retryCount ?? 0
+    if (config && isRetryableMethod(config.method) && isRetryableError(error) && retryCount < 3) {
+      config.__retryCount = retryCount + 1
+      await sleep(400 * 2 ** retryCount)
+      return api.request(config)
+    }
+
     return Promise.reject(error)
   },
 )

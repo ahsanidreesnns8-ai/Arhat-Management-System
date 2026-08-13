@@ -23,7 +23,7 @@ export async function getDashboardStats() {
     activity,
   ] = await Promise.all([
     prisma.sale.aggregate({
-      where: { deleted: false, saleDate: start },
+      where: { deleted: false, saleDate: { gte: start, lt: end } },
       _sum: { totalAmount: true },
     }),
     prisma.queueEntry.count({ where: { status: 'PENDING' } }),
