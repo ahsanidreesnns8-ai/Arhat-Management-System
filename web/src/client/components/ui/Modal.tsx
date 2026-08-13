@@ -23,10 +23,13 @@ const sizes = {
 export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   useEffect(() => {
     if (!open) return
-    const prev = document.body.style.overflow
+    const prevOverflow = document.body.style.overflow
+    const prevTouch = document.body.style.touchAction
     document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
     return () => {
-      document.body.style.overflow = prev
+      document.body.style.overflow = prevOverflow
+      document.body.style.touchAction = prevTouch
     }
   }, [open])
 
@@ -45,13 +48,13 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[200] flex items-stretch sm:items-center justify-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={title}
         >
           <motion.div
-            className="absolute inset-0 bg-[#0A0E17]/75 backdrop-blur-md"
+            className="absolute inset-0 bg-[#0A0E17]/80 backdrop-blur-md"
             variants={modalBackdrop}
             initial="hidden"
             animate="show"
@@ -61,10 +64,12 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
 
           <motion.div
             className={clsx(
-              'relative z-10 flex w-full min-h-0 flex-col card-3d shadow-glass overflow-hidden',
-              'max-h-[min(92dvh,92vh)] sm:max-h-[min(88dvh,88vh)]',
-              'rounded-t-2xl sm:rounded-2xl',
-              'mb-[max(0px,env(safe-area-inset-bottom))] sm:mb-0',
+              'relative z-10 flex min-h-0 w-full flex-col overflow-hidden',
+              'bg-white dark:bg-slate-900',
+              'h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[min(88dvh,88vh)]',
+              'rounded-none sm:rounded-2xl',
+              'border-0 sm:border sm:border-slate-200/80 dark:sm:border-white/10',
+              'shadow-none sm:shadow-glass',
               sizes[size],
             )}
             variants={modalPanel}
@@ -72,8 +77,13 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             animate="show"
             exit="exit"
           >
-            <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 px-4 py-3 sm:px-6 sm:py-4">
-              <h2 className="text-lg sm:text-xl font-bold page-title truncate pr-2">{title}</h2>
+            <div
+              className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-3 sm:px-6 sm:py-4"
+              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white truncate pr-2">
+                {title}
+              </h2>
               <motion.button
                 type="button"
                 onClick={onClose}
@@ -82,11 +92,14 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
                 whileTap={{ scale: 0.92 }}
                 aria-label="Close"
               >
-                <X className="h-5 w-5 text-slate-400" />
+                <X className="h-5 w-5 text-slate-500" />
               </motion.button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
+              style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+            >
               {children}
             </div>
           </motion.div>

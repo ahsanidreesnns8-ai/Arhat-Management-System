@@ -102,17 +102,15 @@ export const modalBackdrop: Variants = {
 }
 
 export const modalPanel: Variants = {
-  hidden: { opacity: 0, y: 24, scale: 0.97 },
+  hidden: { opacity: 0, y: 28 },
   show: {
     opacity: 1,
     y: 0,
-    scale: 1,
     transition: softSpring,
   },
   exit: {
     opacity: 0,
-    y: 12,
-    scale: 0.98,
+    y: 16,
     transition: { duration: 0.16 },
   },
 }
