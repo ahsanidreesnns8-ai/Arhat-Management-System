@@ -110,12 +110,13 @@ async function main() {
     ['sales', 'sales'],
     ['payments', 'payments'],
     ['search?q=wheat', 'search?q=wheat'],
-    ['reports/overview', 'reports/overview'],
-    ['reports/farmers', 'reports/farmers'],
-    ['reports/buyers', 'reports/buyers'],
     ['reports/stock', 'reports/stock'],
     ['reports/sales', 'reports/sales'],
     ['reports/commission', 'reports/commission'],
+    ['reports/profit', 'reports/profit'],
+    ['queue/pending', 'queue/pending'],
+    ['queue/active', 'queue/active'],
+    ['stock/history', 'stock/history'],
   ]
 
   for (const [name, path] of authed) {
