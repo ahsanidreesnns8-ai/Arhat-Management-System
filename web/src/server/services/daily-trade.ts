@@ -99,7 +99,17 @@ export async function getDailyBoard(sessionDate?: string | null) {
     listStockLots(),
   ])
 
-  const receivedBags = dheris.reduce((s, x) => s + x.numberOfBags, 0)
+  const farmerBags = dheris.reduce((s, x) => s + x.numberOfBags, 0)
+  const stockBagsSold = sales.reduce(
+    (sum, sale) =>
+      sum +
+      sale.items
+        .filter((item) => item.sourceType === 'BUSINESS_STOCK')
+        .reduce((s, item) => s + item.numberOfBags, 0),
+    0,
+  )
+  // Equality: farmer bags + bags formed from Extra KG stock = bags sold to buyer
+  const receivedBags = farmerBags + stockBagsSold
   const receivedWeight = dheris.reduce((s, x) => s + x.totalWeight.toNumber(), 0)
   const soldBags = sales.reduce((s, x) => s + x.totalBags, 0)
   const soldWeight = sales.reduce((s, x) => s + x.totalWeight.toNumber(), 0)
