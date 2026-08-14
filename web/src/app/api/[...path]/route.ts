@@ -25,6 +25,8 @@ import * as ai from '@/server/services/ai'
 import * as audit from '@/server/services/audit'
 import * as backup from '@/server/services/backup'
 import * as arhat from '@/server/services/arhat'
+import * as stockLots from '@/server/services/stock-lots'
+import * as dailyTrade from '@/server/services/daily-trade'
 
 type RouteContext = {
   params: Promise<{ path: string[] }>
@@ -355,11 +357,46 @@ async function dispatch(
     if (path[1] === 'history' && method === 'GET') {
       return result(await stock.listStockHistory())
     }
+    if (path[1] === 'lots' && method === 'GET') {
+      const productId = url.searchParams.get('productId')
+      return result(
+        await stockLots.listStockLots(
+          productId ? numericId(productId) : undefined,
+        ),
+      )
+    }
     if (path[1] === 'adjust' && method === 'POST') {
       return result(
         await stock.adjustStock(payload as stock.StockAdjustmentInput),
         'Stock updated',
       )
+    }
+  }
+
+  if (path[0] === 'daily-trade') {
+    if ((path.length === 1 || path[1] === 'board') && method === 'GET') {
+      return result(
+        await dailyTrade.getDailyBoard(url.searchParams.get('date')),
+      )
+    }
+    if (path[1] === 'history' && method === 'GET') {
+      return result(await dailyTrade.listDailyHistory())
+    }
+    if (path[1] === 'refresh' && method === 'POST') {
+      return result(
+        await dailyTrade.refreshDailyBoard(
+          (payload.date as string | undefined) ??
+            url.searchParams.get('date'),
+        ),
+        'Daily board archived and refreshed',
+      )
+    }
+    if (path[1] === 'batch-sell' && method === 'POST') {
+      const data = await dailyTrade.batchSellToBuyer(
+        payload as dailyTrade.BatchSellInput,
+        user?.id,
+      )
+      return result(data, data.message)
     }
   }
 
@@ -491,6 +528,23 @@ async function dispatch(
       return html(await bills.farmerBill(numericId(path[2]), lang))
     }
     if (path[1] === 'buyer' && path.length === 3) {
+      const itemsParam = url.searchParams.get('items')
+      if (itemsParam) {
+        const saleItemIds = itemsParam
+          .split(',')
+          .map((x) => Number(x.trim()))
+          .filter((x) => Number.isSafeInteger(x) && x > 0)
+        const groupSizeRaw = url.searchParams.get('groupSize')
+        const groupSize = groupSizeRaw ? Number(groupSizeRaw) : null
+        return html(
+          await bills.buyerBillSelected(
+            numericId(path[2]),
+            saleItemIds,
+            lang,
+            groupSize,
+          ),
+        )
+      }
       return html(await bills.buyerBill(numericId(path[2]), lang))
     }
     if (path[1] === 'sale' && path[3] === 'farmer') {

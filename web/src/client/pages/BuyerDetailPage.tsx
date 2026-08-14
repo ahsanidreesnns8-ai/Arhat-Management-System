@@ -21,6 +21,8 @@ export default function BuyerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [payOpen, setPayOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
+  const [selectedItems, setSelectedItems] = useState<number[]>([])
+  const [groupSize, setGroupSize] = useState('')
 
   const load = useCallback(() => {
     if (!buyerId) return
@@ -50,6 +52,26 @@ export default function BuyerDetailPage() {
     }
   }
 
+  const openSelectedBill = async (lang: 'en' | 'ur' = 'en') => {
+    if (!selectedItems.length) {
+      toast.error('Tick at least one purchase line')
+      return
+    }
+    try {
+      const gs = groupSize ? Number(groupSize) : undefined
+      const res = await buyerApi.getSelectedBillHtml(buyerId, selectedItems, lang, gs)
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), `Buyer Bill selected`)
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate selected bill'))
+    }
+  }
+
+  const toggleItem = (itemId: number) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId) ? prev.filter((x) => x !== itemId) : [...prev, itemId],
+    )
+  }
+
   if (loading) return <TableSkeleton rows={8} />
   if (!buyer) {
     return (
@@ -70,6 +92,7 @@ export default function BuyerDetailPage() {
   const productRows = sales.flatMap((sale) =>
     (sale.items || []).map((item, idx) => ({
       key: `${sale.id}-${item.id ?? idx}`,
+      itemId: item.id,
       invoice: sale.invoiceNumber,
       saleId: sale.id,
       saleDate: sale.saleDate,
@@ -181,40 +204,76 @@ export default function BuyerDetailPage() {
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">
-          Product history
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap items-center justify-between gap-2">
+          <span>Product history (tick lines → Generate bill)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              placeholder="Split size (e.g. 3)"
+              value={groupSize}
+              onChange={(e) => setGroupSize(e.target.value)}
+              className="w-36 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
+              title="Optional: split selected lines into separate bill sheets of this size"
+            />
+            <Button variant="secondary" onClick={() => void openSelectedBill('en')}>
+              <FileText className="h-4 w-4" /> Bill selected
+            </Button>
+            <button
+              type="button"
+              className="text-sm text-primary"
+              onClick={() =>
+                setSelectedItems(
+                  productRows.map((r) => r.itemId).filter((x): x is number => typeof x === 'number'),
+                )
+              }
+            >
+              Tick all
+            </button>
+          </div>
         </div>
         {productRows.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No products purchased yet</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
-              <tr>
-                <th className="px-4 py-2">Invoice</th>
-                <th className="px-4 py-2">Date</th>
-                <th className="px-4 py-2">Product</th>
-                <th className="px-4 py-2">Bags</th>
-                <th className="px-4 py-2">Weight</th>
-                <th className="px-4 py-2">Rate</th>
-                <th className="px-4 py-2">Amount</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {productRows.map((row) => (
-                <tr key={row.key}>
-                  <td className="px-4 py-2"><Link className="text-primary" to={`/sales/${row.saleId}`}>{row.invoice}</Link></td>
-                  <td className="px-4 py-2">{row.saleDate}</td>
-                  <td className="px-4 py-2 font-medium">{row.product}</td>
-                  <td className="px-4 py-2">{row.bags}</td>
-                  <td className="px-4 py-2">{row.weight}</td>
-                  <td className="px-4 py-2">{formatCurrency(row.rate)}</td>
-                  <td className="px-4 py-2">{formatCurrency(row.amount)}</td>
-                  <td className="px-4 py-2"><PaymentStatusBadge status={row.status} /></td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
+                <tr>
+                  <th className="px-4 py-2">Bill</th>
+                  <th className="px-4 py-2">Invoice</th>
+                  <th className="px-4 py-2">Date</th>
+                  <th className="px-4 py-2">Product</th>
+                  <th className="px-4 py-2">Bags</th>
+                  <th className="px-4 py-2">Weight</th>
+                  <th className="px-4 py-2">Rate</th>
+                  <th className="px-4 py-2">Amount</th>
+                  <th className="px-4 py-2">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {productRows.map((row) => (
+                  <tr key={row.key}>
+                    <td className="px-4 py-2">
+                      <input
+                        type="checkbox"
+                        disabled={row.itemId == null}
+                        checked={row.itemId != null && selectedItems.includes(row.itemId)}
+                        onChange={() => row.itemId != null && toggleItem(row.itemId)}
+                      />
+                    </td>
+                    <td className="px-4 py-2"><Link className="text-primary" to={`/sales/${row.saleId}`}>{row.invoice}</Link></td>
+                    <td className="px-4 py-2">{row.saleDate}</td>
+                    <td className="px-4 py-2 font-medium">{row.product}</td>
+                    <td className="px-4 py-2">{row.bags}</td>
+                    <td className="px-4 py-2">{row.weight}</td>
+                    <td className="px-4 py-2">{formatCurrency(row.rate)}</td>
+                    <td className="px-4 py-2">{formatCurrency(row.amount)}</td>
+                    <td className="px-4 py-2"><PaymentStatusBadge status={row.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

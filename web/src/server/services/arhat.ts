@@ -4,6 +4,7 @@ import { calculatePrice, saveCalculation, type PriceInput } from '@/server/servi
 import { createDheri, getDheri } from '@/server/services/dheris'
 import { recordPayment } from '@/server/services/payments'
 import { createSale } from '@/server/services/sales'
+import { intakeExtraKgToStock } from '@/server/services/stock-lots'
 
 export type ArhatSettlementInput = PriceInput & {
   settlementType?: string
@@ -15,6 +16,8 @@ export type ArhatSettlementInput = PriceInput & {
   paymentMethod?: string | null
   transactionDate?: string | null
   notes?: string | null
+  /** Extra KG deposited into stock lots (defaults to partialBagWeight). */
+  stockExtraKg?: number | string | null
 }
 
 export async function settle(
@@ -82,11 +85,65 @@ async function settleFarmer(input: ArhatSettlementInput, userId?: bigint) {
       userId,
     )
   }
+
+  const productId =
+    input.productId ??
+    (dheriId != null ? (await getDheri(dheriId)).productId : null)
+  const stockExtra = round2(
+    input.stockExtraKg ?? input.partialBagWeight ?? 0,
+  )
+  let stockLot = null
+  if (stockExtra.gt(0) && productId != null) {
+    const existingLot =
+      dheriId != null
+        ? await prisma.stockLot.findFirst({
+            where: { dheriId: BigInt(dheriId) },
+          })
+        : null
+    if (!existingLot) {
+      stockLot = await intakeExtraKgToStock({
+        productId: Number(productId),
+        farmerId: input.farmerId,
+        dheriId: dheriId != null ? Number(dheriId) : null,
+        extraKg: stockExtra.toNumber(),
+        ratePer40Kg: input.marketRate ?? 0,
+        bagWeightKg: input.weightPerBag ?? 40,
+        intakeDate: input.transactionDate,
+        notes: input.notes,
+        createdById: userId,
+      })
+      const day = input.transactionDate
+        ? new Date(`${String(input.transactionDate).slice(0, 10)}T00:00:00.000Z`)
+        : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z')
+      const session = await prisma.dailyTradeSession.findFirst({
+        where: { status: 'OPEN', sessionDate: day, productId: null },
+      })
+      if (session) {
+        await prisma.dailyTradeSession.update({
+          where: { id: session.id },
+          data: {
+            stockInKg: { increment: stockExtra.toFixed(2) },
+            highestRate: d(
+              Math.max(
+                session.highestRate.toNumber(),
+                Number(input.marketRate ?? 0),
+              ),
+            ).toFixed(2),
+          },
+        })
+      }
+    }
+  }
+
   const [dheri, farmer] = await Promise.all([
     getDheri(dheriId),
     prisma.farmer.findUnique({ where: { id: BigInt(input.farmerId) } }),
   ])
   const outstanding = farmer?.outstandingBalance.toNumber() ?? 0
+  const stockNote =
+    stockLot != null
+      ? ` Extra ${stockExtra.toFixed(2)} kg added to stock.`
+      : ''
   return {
     settlementType: 'FARMER_PAYABLE',
     dheriId: dheri.id,
@@ -97,8 +154,10 @@ async function settleFarmer(input: ArhatSettlementInput, userId?: bigint) {
     farmerPayable: calculation.farmerFinalBalance,
     paymentNow: paymentNow.toNumber(),
     partyOutstandingAfter: outstanding,
+    stockLot,
+    stockExtraKg: stockExtra.toNumber(),
     calculation,
-    message: `Farmer payable recorded for ${dheri.dheriId}. Remaining payable: PKR ${outstanding}`,
+    message: `Farmer payable recorded for ${dheri.dheriId}. Remaining payable: PKR ${outstanding}.${stockNote}`,
   }
 }
 

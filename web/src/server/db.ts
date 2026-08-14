@@ -31,6 +31,8 @@ const SCOPED_MODELS = new Set<Prisma.ModelName>([
   'Payment',
   'AuditLog',
   'SyncState',
+  'StockLot',
+  'DailyTradeSession',
 ])
 
 function isScoped(model: string | undefined): model is Prisma.ModelName {

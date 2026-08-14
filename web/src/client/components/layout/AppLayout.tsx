@@ -7,12 +7,14 @@ import AmbientScene from './AmbientScene'
 import MobileToolsDock from './MobileToolsDock'
 import { useBusiness } from '../../context/BusinessContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { usePrivacy } from '../../context/PrivacyContext'
 import { pageVariants } from '../../utils/motion'
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { companyName } = useBusiness()
   const { t, isUrdu } = useLanguage()
+  const { amountsHidden } = usePrivacy()
   const location = useLocation()
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function AppLayout() {
           <div className="content-stage content-stage-mobile">
             <AnimatePresence mode="wait">
               <motion.div
-                key={location.pathname}
+                key={`${location.pathname}:${amountsHidden ? 'h' : 's'}`}
                 variants={pageVariants}
                 initial="initial"
                 animate="animate"

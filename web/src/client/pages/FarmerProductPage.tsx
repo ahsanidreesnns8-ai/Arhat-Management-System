@@ -232,7 +232,16 @@ export default function FarmerProductPage() {
             />
             <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
             <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input label="Extra KG" type="number" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            <Input
+              label="Extra KG → Stock"
+              type="number"
+              step="0.01"
+              value={partialBagWeight}
+              onChange={(e) => setPartialBagWeight(e.target.value)}
+            />
+            <p className="-mt-2 text-xs text-slate-500">
+              0 if none. Priced at today’s rate and saved to stock with farmer details.
+            </p>
             <Input label="Market Rate / 40kg *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />

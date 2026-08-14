@@ -3,19 +3,23 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, Store,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar,
 } from 'recharts'
+import toast from 'react-hot-toast'
 import StatCard from '../components/ui/StatCard'
 import PageHeader from '../components/ui/PageHeader'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
 import { StatCardSkeleton, Skeleton } from '../components/ui/Skeleton'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 import { useLiveReload } from '../context/SyncContext'
-import { dashboardApi } from '../services/api'
-import { formatCurrency, formatDateTime } from '../utils/format'
+import { buyerApi, dailyTradeApi, dashboardApi, farmerApi } from '../services/api'
+import { formatCurrency, formatDateTime, formatNumber } from '../utils/format'
 import type { DashboardStats } from '../types'
 import { useBusiness } from '../context/BusinessContext'
 import { fadeUp } from '../utils/motion'
@@ -43,22 +47,48 @@ const activityLink = (entityType?: string) => {
   return '/records'
 }
 
+const emptyParty = { name: '', phone: '', city: '', address: '' }
+
 export default function DashboardPage() {
   const { companyName } = useBusiness()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-
   const [loadError, setLoadError] = useState(false)
+  const [board, setBoard] = useState<{
+    receivedBags: number
+    soldBags: number
+    stockKg: number
+    balanced: boolean
+  } | null>(null)
+  const [farmerOpen, setFarmerOpen] = useState(false)
+  const [buyerOpen, setBuyerOpen] = useState(false)
+  const [partyForm, setPartyForm] = useState(emptyParty)
+  const [savingParty, setSavingParty] = useState(false)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
     try {
-      const res = await dashboardApi.getStats()
-      setStats(res.data?.data ?? null)
+      const [statsRes, boardRes] = await Promise.all([
+        dashboardApi.getStats(),
+        dailyTradeApi.getBoard().catch(() => null),
+      ])
+      setStats(statsRes.data?.data ?? null)
+      if (boardRes?.data?.data) {
+        const s = boardRes.data.data.session as {
+          receivedBags: number
+          soldBags: number
+          balanced: boolean
+        }
+        setBoard({
+          receivedBags: Number(s.receivedBags || 0),
+          soldBags: Number(s.soldBags || 0),
+          stockKg: Number(boardRes.data.data.stockKgAvailable || 0),
+          balanced: Boolean(s.balanced),
+        })
+      }
       setLoadError(false)
     } catch {
       if (!soft) {
-        // One automatic retry after a short delay (covers Vercel/Neon cold start)
         try {
           await new Promise((r) => window.setTimeout(r, 700))
           const res = await dashboardApi.getStats()
@@ -76,6 +106,32 @@ export default function DashboardPage() {
 
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
+
+  const saveParty = async (kind: 'farmer' | 'buyer') => {
+    if (!partyForm.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+    setSavingParty(true)
+    try {
+      if (kind === 'farmer') {
+        await farmerApi.create(partyForm)
+        toast.success('Farmer added')
+        setFarmerOpen(false)
+      } else {
+        await buyerApi.create(partyForm)
+        toast.success('Buyer added')
+        setBuyerOpen(false)
+      }
+      setPartyForm(emptyParty)
+      void load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not save')
+    } finally {
+      setSavingParty(false)
+    }
+  }
 
   const emptyStats: DashboardStats = {
     todaySales: 0,
@@ -109,6 +165,47 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Welcome to ${companyName} — tap any card for full details`}
       />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Button
+          className="h-auto py-3 flex-col sm:flex-row gap-1.5"
+          onClick={() => { setPartyForm(emptyParty); setFarmerOpen(true) }}
+        >
+          <UserPlus className="h-4 w-4" /> Add Farmer
+        </Button>
+        <Button
+          className="h-auto py-3 flex-col sm:flex-row gap-1.5"
+          variant="secondary"
+          onClick={() => { setPartyForm(emptyParty); setBuyerOpen(true) }}
+        >
+          <ShoppingBag className="h-4 w-4" /> Add Buyer
+        </Button>
+        <Link to="/arhat-sale" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Store className="h-4 w-4" /> Arhat Sale
+          </Button>
+        </Link>
+        <Link to="/daily-trade" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Scale className="h-4 w-4" /> Daily Trade
+          </Button>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link to="/daily-trade" className="card-3d p-5 block hover:ring-1 hover:ring-primary/30 transition">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving today</p>
+          <p className="text-3xl font-bold mt-1 tabular-nums">{board?.receivedBags ?? 0}</p>
+          <p className="text-sm text-slate-500">bags from farmers · Extra stock {formatNumber(board?.stockKg ?? 0)} kg</p>
+        </Link>
+        <Link to="/daily-trade" className="card-3d p-5 block hover:ring-1 hover:ring-primary/30 transition">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Selling today</p>
+          <p className="text-3xl font-bold mt-1 tabular-nums">{board?.soldBags ?? 0}</p>
+          <p className={`text-sm mt-1 ${board?.balanced ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300'}`}>
+            {board?.balanced ? 'Equal with receiving' : `Need ${(board?.receivedBags ?? 0) - (board?.soldBags ?? 0)} more bags to balance`}
+          </p>
+        </Link>
+      </div>
 
       {loadError && !loading && (
         <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
@@ -247,10 +344,45 @@ export default function DashboardPage() {
           <p className="text-gray-500 text-sm">No recent activity yet.</p>
         )}
       </motion.div>
+
+      <Modal open={farmerOpen} onClose={() => setFarmerOpen(false)} title="Add Farmer">
+        <PartyForm
+          form={partyForm}
+          setForm={setPartyForm}
+          saving={savingParty}
+          onSave={() => void saveParty('farmer')}
+        />
+      </Modal>
+      <Modal open={buyerOpen} onClose={() => setBuyerOpen(false)} title="Add Buyer">
+        <PartyForm
+          form={partyForm}
+          setForm={setPartyForm}
+          saving={savingParty}
+          onSave={() => void saveParty('buyer')}
+        />
+      </Modal>
     </div>
   )
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-PK').format(value)
+function PartyForm({
+  form,
+  setForm,
+  saving,
+  onSave,
+}: {
+  form: typeof emptyParty
+  setForm: (v: typeof emptyParty) => void
+  saving: boolean
+  onSave: () => void
+}) {
+  return (
+    <div className="space-y-3">
+      <Input label="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <Input label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+      <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+      <Button onClick={onSave} loading={saving}>Save</Button>
+    </div>
+  )
 }

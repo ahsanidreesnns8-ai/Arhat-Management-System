@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { BusinessProvider } from './context/BusinessContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { SyncProvider } from './context/SyncContext'
+import { PrivacyProvider } from './context/PrivacyContext'
 import { VoiceControlProvider } from './context/VoiceControlContext'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
@@ -29,6 +30,7 @@ import StockPage from './pages/StockPage'
 import PriceCalculatorPage from './pages/PriceCalculatorPage'
 import FarmerProductPage from './pages/FarmerProductPage'
 import ArhatSalePage from './pages/ArhatSalePage'
+import DailyTradePage from './pages/DailyTradePage'
 import QueuePage from './pages/QueuePage'
 import SalesPage from './pages/SalesPage'
 import SaleDetailPage from './pages/SaleDetailPage'
@@ -50,7 +52,6 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public marketing site (Pakka Khata–style structure) */}
       <Route element={<MarketingLayout />}>
         <Route index element={<LandingPage />} />
         <Route path="features" element={<FeaturesPage />} />
@@ -68,7 +69,6 @@ function AppRoutes() {
         }
       />
 
-      {/* Authenticated ERP app */}
       <Route
         element={
           <ProtectedRoute>
@@ -89,6 +89,7 @@ function AppRoutes() {
         <Route path="calculator" element={<PriceCalculatorPage />} />
         <Route path="farmer-product" element={<FarmerProductPage />} />
         <Route path="arhat-sale" element={<ArhatSalePage />} />
+        <Route path="daily-trade" element={<DailyTradePage />} />
         <Route path="queue" element={<QueuePage />} />
         <Route path="sales" element={<SalesPage />} />
         <Route path="sales/:id" element={<SaleDetailPage />} />
@@ -117,33 +118,35 @@ export default function App() {
         <BusinessProvider>
           <AuthProvider>
             <SyncProvider>
-              <BrowserRouter>
-                <VoiceControlProvider>
-                  <Toaster
-                    position="top-center"
-                    gutter={8}
-                    toastOptions={{
-                      duration: 3000,
-                      style: {
-                        background: 'rgba(11, 29, 54, 0.96)',
-                        color: '#F3EFE6',
-                        border: '1px solid rgba(197, 160, 89, 0.35)',
-                        backdropFilter: 'blur(12px)',
-                        boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                        fontSize: '12px',
-                        maxWidth: 'min(92vw, 20rem)',
-                        padding: '9px 12px',
-                      },
-                      success: { duration: 3000 },
-                      error: { duration: 3000 },
-                      blank: { duration: 3000 },
-                      loading: { duration: 3000 },
-                      custom: { duration: 3000 },
-                    }}
-                  />
-                  <AppRoutes />
-                </VoiceControlProvider>
-              </BrowserRouter>
+              <PrivacyProvider>
+                <BrowserRouter>
+                  <VoiceControlProvider>
+                    <Toaster
+                      position="top-center"
+                      gutter={8}
+                      toastOptions={{
+                        duration: 3000,
+                        style: {
+                          background: 'rgba(11, 29, 54, 0.96)',
+                          color: '#F3EFE6',
+                          border: '1px solid rgba(197, 160, 89, 0.35)',
+                          backdropFilter: 'blur(12px)',
+                          boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                          fontSize: '12px',
+                          maxWidth: 'min(92vw, 20rem)',
+                          padding: '9px 12px',
+                        },
+                        success: { duration: 3000 },
+                        error: { duration: 3000 },
+                        blank: { duration: 3000 },
+                        loading: { duration: 3000 },
+                        custom: { duration: 3000 },
+                      }}
+                    />
+                    <AppRoutes />
+                  </VoiceControlProvider>
+                </BrowserRouter>
+              </PrivacyProvider>
             </SyncProvider>
           </AuthProvider>
         </BusinessProvider>

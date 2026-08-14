@@ -1,9 +1,10 @@
-import { ArrowLeft, Menu, X, Sun, Moon, Monitor, LogOut, User } from 'lucide-react'
+import { ArrowLeft, Menu, X, Sun, Moon, Monitor, LogOut, User, Eye, EyeOff } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { usePrivacy } from '../../context/PrivacyContext'
 import GlobalSearch from './GlobalSearch'
 import WeatherWidget from './WeatherWidget'
 import type { ThemeMode } from '../../types'
@@ -17,6 +18,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t, isUrdu } = useLanguage()
+  const { amountsHidden, toggleAmountsHidden } = usePrivacy()
   const navigate = useNavigate()
   const location = useLocation()
   const isHome = location.pathname === '/dashboard'
@@ -65,6 +67,17 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          <motion.button
+            type="button"
+            onClick={toggleAmountsHidden}
+            className="nav-icon-btn text-slate-600 dark:text-slate-300"
+            title={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+            whileTap={{ scale: 0.94 }}
+            aria-label={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+          >
+            {amountsHidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </motion.button>
+
           <motion.button
             type="button"
             onClick={cycleTheme}

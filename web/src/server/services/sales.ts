@@ -25,6 +25,8 @@ export type SaleItemInput = {
   weightPerBag?: number | string | null
   partialBagWeight?: number | string | null
   rate?: number | string | null
+  /** When true, skip stock qty deduction (already consumed via stock lots). */
+  skipStockDeduction?: boolean
 }
 
 export type SaleInput = {
@@ -245,7 +247,7 @@ export async function createSale(input: SaleInput, createdById?: bigint) {
             },
           })
         }
-      } else {
+      } else if (!item.request.skipStockDeduction) {
         const stock = await tx.stock.upsert({
           where: { productId: item.product.id },
           update: {},

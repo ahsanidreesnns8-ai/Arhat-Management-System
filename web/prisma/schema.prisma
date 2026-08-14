@@ -140,6 +140,8 @@ model Product {
   dheris           Dheri[]
   saleItems        SaleItem[]
   stockTransactions StockTransaction[]
+  stockLots        StockLot[]
+  dailyTradeSessions DailyTradeSession[]
 
   @@unique([workspace, productCode])
   @@index([workspace])
@@ -165,6 +167,7 @@ model Farmer {
   dheris             Dheri[]
   payments           Payment[]
   saleItems          SaleItem[]
+  stockLots          StockLot[]
 
   @@unique([workspace, farmerId])
   @@index([workspace])
@@ -248,6 +251,7 @@ model Dheri {
   queueEntry           QueueEntry?
   saleItems            SaleItem[]
   payments             Payment[]
+  stockLots            StockLot[]
 
   @@unique([workspace, dheriId])
   @@index([workspace])
@@ -278,6 +282,10 @@ model StockTransaction {
   newQuantity      Decimal              @map("new_quantity") @db.Decimal(15, 2)
   referenceType    String?              @map("reference_type") @db.VarChar(50)
   referenceId      BigInt?              @map("reference_id")
+  farmerId         BigInt?              @map("farmer_id")
+  dheriId          BigInt?              @map("dheri_id")
+  ratePer40Kg      Decimal?             @map("rate_per_40kg") @db.Decimal(12, 2)
+  amountValue      Decimal?             @map("amount_value") @db.Decimal(15, 2)
   notes            String?
   createdById      BigInt?              @map("created_by")
   createdAt        DateTime             @default(now()) @map("created_at")
@@ -405,4 +413,59 @@ model SyncState {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("sync_state")
+}
+
+enum DailyTradeStatus {
+  OPEN
+  ARCHIVED
+}
+
+/// Extra KG held as stock with farmer/rate provenance for batch selling
+model StockLot {
+  id            BigInt   @id @default(autoincrement())
+  workspace     String   @default("live") @db.VarChar(20)
+  productId     BigInt   @map("product_id")
+  farmerId      BigInt?  @map("farmer_id")
+  dheriId       BigInt?  @map("dheri_id")
+  remainingKg   Decimal  @map("remaining_kg") @db.Decimal(15, 2)
+  originalKg    Decimal  @map("original_kg") @db.Decimal(15, 2)
+  ratePer40Kg   Decimal  @map("rate_per_40kg") @db.Decimal(12, 2)
+  bagWeightKg   Decimal  @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
+  amountValue   Decimal  @default(0.00) @map("amount_value") @db.Decimal(15, 2)
+  intakeDate    DateTime @map("intake_date") @db.Date
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  product       Product  @relation(fields: [productId], references: [id])
+  farmer        Farmer?  @relation(fields: [farmerId], references: [id])
+  dheri         Dheri?   @relation(fields: [dheriId], references: [id])
+
+  @@index([workspace, productId])
+  @@index([workspace, intakeDate])
+  @@map("stock_lots")
+}
+
+/// Open daily receiving/selling board; archived on Refresh into history snapshot
+model DailyTradeSession {
+  id                BigInt           @id @default(autoincrement())
+  workspace         String           @default("live") @db.VarChar(20)
+  sessionDate       DateTime         @map("session_date") @db.Date
+  status            DailyTradeStatus @default(OPEN)
+  productId         BigInt?          @map("product_id")
+  receivedBags      Int              @default(0) @map("received_bags")
+  receivedWeightKg  Decimal          @default(0.00) @map("received_weight_kg") @db.Decimal(15, 2)
+  soldBags          Int              @default(0) @map("sold_bags")
+  soldWeightKg      Decimal          @default(0.00) @map("sold_weight_kg") @db.Decimal(15, 2)
+  stockInKg         Decimal          @default(0.00) @map("stock_in_kg") @db.Decimal(15, 2)
+  stockOutKg        Decimal          @default(0.00) @map("stock_out_kg") @db.Decimal(15, 2)
+  highestRate       Decimal          @default(0.00) @map("highest_rate") @db.Decimal(12, 2)
+  detailsJson       Json?            @map("details_json")
+  closedAt          DateTime?        @map("closed_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  product           Product?         @relation(fields: [productId], references: [id])
+
+  @@index([workspace, status])
+  @@index([workspace, sessionDate])
+  @@map("daily_trade_sessions")
 }

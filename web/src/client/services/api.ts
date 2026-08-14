@@ -128,9 +128,13 @@ api.interceptors.response.use(
   },
 )
 
-const billRequest = (path: string, lang: 'en' | 'ur' = 'en') =>
+const billRequest = (
+  path: string,
+  lang: 'en' | 'ur' = 'en',
+  extraParams?: Record<string, string>,
+) =>
   api.get<string>(path, {
-    params: { lang },
+    params: { lang, ...extraParams },
     responseType: 'text' as never,
     headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
   })
@@ -185,6 +189,16 @@ export const buyerApi = {
   getSales: (id: number) => api.get<ApiResponse<Sale[]>>(`/buyers/${id}/sales`),
   getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/buyer/${id}`, lang),
+  getSelectedBillHtml: (
+    id: number,
+    saleItemIds: number[],
+    lang: 'en' | 'ur' = 'en',
+    groupSize?: number,
+  ) =>
+    billRequest(`/bills/buyer/${id}`, lang, {
+      items: saleItemIds.join(','),
+      ...(groupSize ? { groupSize: String(groupSize) } : {}),
+    }),
 }
 
 export const billApi = {
@@ -212,7 +226,26 @@ export const dheriApi = {
 export const stockApi = {
   getAll: () => api.get<ApiResponse<StockItem[]>>('/stock'),
   getHistory: () => api.get<ApiResponse<StockTransaction[]>>('/stock/history'),
+  getLots: (productId?: number) =>
+    api.get<ApiResponse<unknown[]>>('/stock/lots', {
+      params: productId ? { productId } : undefined,
+    }),
   adjust: (data: Record<string, unknown>) => api.post<ApiResponse<StockItem>>('/stock/adjust', data),
+}
+
+export const dailyTradeApi = {
+  getBoard: (date?: string) =>
+    api.get<ApiResponse<any>>('/daily-trade/board', { params: date ? { date } : undefined }),
+  getHistory: () => api.get<ApiResponse<any[]>>('/daily-trade/history'),
+  refresh: (date?: string) =>
+    api.post<ApiResponse<any>>('/daily-trade/refresh', date ? { date } : {}),
+  batchSell: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      sale: Sale
+      breakdown: Record<string, unknown>
+      board: any
+      message: string
+    }>>('/daily-trade/batch-sell', data),
 }
 
 export const queueApi = {

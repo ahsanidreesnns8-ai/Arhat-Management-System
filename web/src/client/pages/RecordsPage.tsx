@@ -6,6 +6,7 @@ import {
   Package,
   PackagePlus,
   Receipt,
+  Scale,
   ShoppingBag,
   Store,
   Truck,
@@ -28,6 +29,12 @@ const sections = [
     icon: Store,
     title: 'Arhat Sale',
     description: 'Sell to buyer or post farmer payable',
+  },
+  {
+    to: '/daily-trade',
+    icon: Scale,
+    title: 'Daily Trade & Stock',
+    description: 'Extra KG stock, equal receive/sell boards, batch sell',
   },
   {
     to: '/farmers',

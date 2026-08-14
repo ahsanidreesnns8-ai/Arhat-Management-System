@@ -1,4 +1,15 @@
+const PRIVACY_KEY = 'rehmani_hide_amounts'
+
+export function areAmountsHidden(): boolean {
+  try {
+    return localStorage.getItem(PRIVACY_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function formatCurrency(value: number | undefined | null): string {
+  if (areAmountsHidden()) return '••••••'
   const num = value ?? 0
   return new Intl.NumberFormat('en-PK', {
     style: 'currency',
