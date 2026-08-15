@@ -359,11 +359,29 @@ async function dispatch(
     }
     if (path[1] === 'lots' && method === 'GET') {
       const productId = url.searchParams.get('productId')
+      const includeEmpty = url.searchParams.get('all') === '1'
       return result(
         await stockLots.listStockLots(
           productId ? numericId(productId) : undefined,
+          includeEmpty,
         ),
       )
+    }
+    if (path[1] === 'lots' && path[2] === 'top-up' && method === 'POST') {
+      const lot = await stockLots.topUpStockKg({
+        productId: Number(payload.productId),
+        extraKg: payload.extraKg as number | string,
+        ratePer40Kg: payload.ratePer40Kg as number | string | null | undefined,
+        bagWeightKg: payload.bagWeightKg as number | string | null | undefined,
+        notes: payload.notes as string | null | undefined,
+        createdById: user?.id,
+      })
+      return result(lot, 'Extra KG top-up added to stock', 201)
+    }
+    if (path[1] === 'lots' && path[2] === 'preview' && method === 'GET') {
+      const kg = Number(url.searchParams.get('kg') ?? 0)
+      const bag = Number(url.searchParams.get('bagWeight') ?? 40)
+      return result(stockLots.previewBagsFromKg(kg, bag))
     }
     if (path[1] === 'adjust' && method === 'POST') {
       return result(

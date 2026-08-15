@@ -10,7 +10,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
-import { buyerApi, dailyTradeApi, settingsApi } from '../services/api'
+import { buyerApi, dailyTradeApi, settingsApi, stockApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Buyer, Product } from '../types'
 
@@ -98,6 +98,8 @@ export default function DailyTradePage() {
   const [selling, setSelling] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [historyDetail, setHistoryDetail] = useState<HistoryRow | null>(null)
+  const [topUpKg, setTopUpKg] = useState('')
+  const [toppingUp, setToppingUp] = useState(false)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -141,22 +143,25 @@ export default function DailyTradePage() {
       : unsold
     const farmerBags = chosen.reduce((s, x) => s + x.bags, 0)
     const farmerAmount = chosen.reduce((s, x) => s + x.amount, 0)
+    const farmerExtraKg = chosen.reduce((s, x) => s + (x.partialBagWeight || 0), 0)
     const bw = parseFloat(bagWeight) || 65
     const pid = Number(productId)
-    const stockKg = (board?.stockLots || [])
-      .filter((l) => !pid || l.productId === pid)
-      .reduce((s, l) => s + l.remainingKg, 0)
+    const productLots = (board?.stockLots || []).filter((l) => !pid || l.productId === pid)
+    const stockKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
     const stockBags = includeStockBags ? Math.floor(stockKg / bw) : 0
     const highest = Math.max(
       board?.session.highestRate || 0,
       ...chosen.map((x) => x.rate),
-      ...(board?.stockLots || []).filter((l) => !pid || l.productId === pid).map((l) => l.ratePer40Kg),
+      ...productLots.map((l) => l.ratePer40Kg),
       0,
     )
     const stockKgUsed = stockBags * bw
+    const leftoverKg = Math.round((stockKg - stockKgUsed) * 100) / 100
+    const kgToNextBag = leftoverKg > 0 ? Math.round((bw - leftoverKg) * 100) / 100 : (stockKg === 0 ? bw : 0)
     const stockAmount = stockKgUsed > 0 ? (stockKgUsed / 40) * highest : 0
     return {
       farmerBags,
+      farmerExtraKg,
       stockBags,
       totalBags: farmerBags + stockBags,
       farmerAmount,
@@ -164,10 +169,43 @@ export default function DailyTradePage() {
       totalAmount: farmerAmount + stockAmount,
       stockKg,
       stockKgUsed,
-      leftoverKg: stockKg - stockKgUsed,
+      leftoverKg,
+      kgToNextBag,
       highest,
+      productLots,
+      batchCount: productLots.length,
     }
   }, [unsold, selectedDheris, bagWeight, includeStockBags, board, productId])
+
+  const handleTopUp = async () => {
+    const kg = parseFloat(topUpKg) || 0
+    if (!productId) {
+      toast.error('Select a product first')
+      return
+    }
+    if (kg <= 0) {
+      toast.error('Enter kg to add')
+      return
+    }
+    setToppingUp(true)
+    try {
+      await stockApi.topUpLot({
+        productId: Number(productId),
+        extraKg: kg,
+        bagWeightKg: parseFloat(bagWeight) || 65,
+        ratePer40Kg: preview.highest || undefined,
+        notes: `Top-up to complete bag (${kg} kg)`,
+      })
+      toast.success(`Added ${kg} kg to Extra KG stock`)
+      setTopUpKg('')
+      await load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Top-up failed')
+    } finally {
+      setToppingUp(false)
+    }
+  }
 
   const toggleDheri = (id: number) => {
     setSelectedDheris((prev) =>
@@ -332,8 +370,109 @@ export default function DailyTradePage() {
             checked={includeStockBags}
             onChange={(e) => setIncludeStockBags(e.target.checked)}
           />
-          Form bags from Extra KG stock (highest rate / 40kg)
+          Include Extra KG stock bags in this sale (priced at highest rate / 40kg)
         </label>
+
+        <div className="rounded-xl border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-950/20 p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-amber-600 text-white text-xs font-semibold px-2.5 py-1">
+              Extra KG from farmers
+            </span>
+            <span className="text-sm font-bold tabular-nums">
+              {formatNumber(preview.stockKg)} kg
+            </span>
+            <span className="text-xs text-slate-500">
+              · {preview.batchCount} separate batch{preview.batchCount === 1 ? '' : 'es'}
+            </span>
+            <Link to="/stock" className="text-xs text-primary underline ml-auto">
+              View batches in Stock
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
+              <p className="text-xs text-slate-500">Bags you can make now</p>
+              <p className="text-xl font-bold mt-0.5">{preview.stockBags}</p>
+              <p className="text-xs text-slate-500">@ {formatNumber(parseFloat(bagWeight) || 65)} kg / bag</p>
+            </div>
+            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
+              <p className="text-xs text-slate-500">Leftover after whole bags</p>
+              <p className="text-xl font-bold mt-0.5">{formatNumber(preview.leftoverKg)} kg</p>
+            </div>
+            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
+              <p className="text-xs text-slate-500">Add more kg for +1 bag</p>
+              <p className="text-xl font-bold mt-0.5 text-amber-800 dark:text-amber-200">
+                {preview.kgToNextBag > 0 ? `+${formatNumber(preview.kgToNextBag)} kg` : '—'}
+              </p>
+            </div>
+          </div>
+
+          {preview.kgToNextBag > 0 && (
+            <p className="text-xs text-amber-900 dark:text-amber-100">
+              You have {formatNumber(preview.stockKg)} kg from farmer Extra KG.
+              That makes <strong>{preview.stockBags}</strong> full bag{preview.stockBags === 1 ? '' : 's'}.
+              Add <strong>{formatNumber(preview.kgToNextBag)} kg</strong> more to complete one more bag
+              (total {preview.stockBags + 1}).
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[10rem] flex-1">
+              <Input
+                label="Add further kg (to complete bag)"
+                type="number"
+                step="0.01"
+                min="0"
+                value={topUpKg}
+                onChange={(e) => setTopUpKg(e.target.value)}
+                placeholder={preview.kgToNextBag > 0 ? String(preview.kgToNextBag) : '0'}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              loading={toppingUp}
+              onClick={() => void handleTopUp()}
+            >
+              Add to Extra KG stock
+            </Button>
+            {preview.kgToNextBag > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => setTopUpKg(String(preview.kgToNextBag))}
+              >
+                Fill {formatNumber(preview.kgToNextBag)} kg
+              </Button>
+            )}
+          </div>
+
+          {preview.productLots.length > 0 && (
+            <div className="overflow-x-auto">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Batches in this Extra KG</p>
+              <table className="w-full text-xs min-w-[520px]">
+                <thead>
+                  <tr className="text-left text-slate-500">
+                    <th className="py-1 pr-2">Date</th>
+                    <th className="py-1 pr-2">Farmer</th>
+                    <th className="py-1 pr-2">Dheri</th>
+                    <th className="py-1 pr-2">Remaining</th>
+                    <th className="py-1">Rate/40kg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.productLots.map((lot) => (
+                    <tr key={lot.id} className="border-t border-amber-100/80 dark:border-amber-900/30">
+                      <td className="py-1.5 pr-2">{lot.intakeDate}</td>
+                      <td className="py-1.5 pr-2">{lot.farmerName || 'Top-up'}</td>
+                      <td className="py-1.5 pr-2">{lot.dheriCode || '—'}</td>
+                      <td className="py-1.5 pr-2 font-semibold">{formatNumber(lot.remainingKg)} kg</td>
+                      <td className="py-1.5">{formatCurrency(lot.ratePer40Kg)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <Stat label="Farmer bags" value={String(preview.farmerBags)} />

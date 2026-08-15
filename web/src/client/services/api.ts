@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   ApiResponse, AiChatResponse, BusinessSettings, Buyer, DashboardStats,
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
-  ReportSummary, Sale, SearchResult, StockItem, StockTransaction,
+  ReportSummary, Sale, SearchResult, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar,
 } from '../types'
 
@@ -226,10 +226,15 @@ export const dheriApi = {
 export const stockApi = {
   getAll: () => api.get<ApiResponse<StockItem[]>>('/stock'),
   getHistory: () => api.get<ApiResponse<StockTransaction[]>>('/stock/history'),
-  getLots: (productId?: number) =>
-    api.get<ApiResponse<unknown[]>>('/stock/lots', {
-      params: productId ? { productId } : undefined,
+  getLots: (productId?: number, all = false) =>
+    api.get<ApiResponse<StockLot[]>>('/stock/lots', {
+      params: {
+        ...(productId ? { productId } : {}),
+        ...(all ? { all: '1' } : {}),
+      },
     }),
+  topUpLot: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<StockLot>>('/stock/lots/top-up', data),
   adjust: (data: Record<string, unknown>) => api.post<ApiResponse<StockItem>>('/stock/adjust', data),
 }
 

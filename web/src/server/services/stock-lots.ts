@@ -50,16 +50,74 @@ export function stockLotDto(row: {
   }
 }
 
-export async function listStockLots(productId?: number) {
+export async function listStockLots(productId?: number, includeEmpty = false) {
   const rows = await prisma.stockLot.findMany({
     where: {
-      remainingKg: { gt: 0 },
+      ...(includeEmpty ? {} : { remainingKg: { gt: 0 } }),
       ...(productId != null && { productId: BigInt(productId) }),
     },
     include: { product: true, farmer: true, dheri: true },
-    orderBy: [{ intakeDate: 'asc' }, { id: 'asc' }],
+    orderBy: [{ intakeDate: 'desc' }, { id: 'desc' }],
   })
   return rows.map(stockLotDto)
+}
+
+/** Manual top-up kg so leftover Extra KG can form another whole bag */
+export async function topUpStockKg(input: {
+  productId: number
+  extraKg: number | string
+  ratePer40Kg?: number | string | null
+  bagWeightKg?: number | string | null
+  notes?: string | null
+  createdById?: bigint
+}) {
+  const productId = input.productId
+  if (productId == null) throw new Error('Product is required')
+  const extraKg = round2(input.extraKg ?? 0)
+  if (extraKg.lte(0)) throw new Error('Top-up kg must be greater than zero')
+
+  const existing = await prisma.stockLot.findMany({
+    where: { productId: BigInt(productId), remainingKg: { gt: 0 } },
+    orderBy: [{ intakeDate: 'desc' }, { id: 'desc' }],
+    take: 1,
+  })
+  const rate = round2(
+    input.ratePer40Kg ?? existing[0]?.ratePer40Kg?.toNumber() ?? 0,
+  )
+  const bagWeight = round2(
+    input.bagWeightKg ?? existing[0]?.bagWeightKg?.toNumber() ?? 40,
+  )
+
+  return intakeExtraKgToStock({
+    productId,
+    farmerId: null,
+    dheriId: null,
+    extraKg: extraKg.toNumber(),
+    ratePer40Kg: rate.toNumber(),
+    bagWeightKg: bagWeight.toNumber(),
+    notes:
+      input.notes ||
+      `Top-up Extra KG to complete bag(s) @ ${bagWeight.toFixed(2)} kg/bag`,
+    createdById: input.createdById,
+  })
+}
+
+export function previewBagsFromKg(totalKg: number, bagWeightKg: number) {
+  const bw = bagWeightKg > 0 ? bagWeightKg : 40
+  const wholeBags = Math.floor(totalKg / bw)
+  const usedKg = wholeBags * bw
+  const remainderKg = Math.round((totalKg - usedKg) * 100) / 100
+  const kgToNextBag =
+    remainderKg > 0 ? Math.round((bw - remainderKg) * 100) / 100 : 0
+  return {
+    totalKg,
+    bagWeightKg: bw,
+    wholeBags,
+    usedKg,
+    remainderKg,
+    kgToNextBag,
+    nextBagTotal: wholeBags + (kgToNextBag > 0 ? 1 : 0),
+  }
 }
 
 /** Deposit extra KG from a farmer settlement into stock + stock lot */

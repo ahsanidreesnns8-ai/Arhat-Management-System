@@ -188,6 +188,26 @@ export interface StockItem {
   lowStockAlert: boolean
 }
 
+/** One Extra KG batch from a farmer dheri (or top-up) */
+export interface StockLot {
+  id: number
+  productId: number
+  productName?: string
+  productCode?: string
+  farmerId?: number | null
+  farmerName?: string | null
+  farmerCode?: string | null
+  dheriId?: number | null
+  dheriCode?: string | null
+  remainingKg: number
+  originalKg: number
+  ratePer40Kg: number
+  bagWeightKg: number
+  amountValue: number
+  intakeDate: string
+  notes?: string | null
+}
+
 export interface StockTransaction {
   id: number
   productId: number
