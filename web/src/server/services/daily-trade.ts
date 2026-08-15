@@ -92,7 +92,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
       where: { deleted: false, saleDate: day },
       include: {
         buyer: true,
-        items: { include: { product: true, farmer: true, dheri: true } },
+        items: { include: { product: true, farmer: true, dheri: { include: { dayBatch: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     }),
@@ -204,6 +204,8 @@ export async function getDailyBoard(sessionDate?: string | null) {
         farmerName: item.farmer?.name,
         dheriId: item.dheriId == null ? null : Number(item.dheriId),
         dheriCode: item.dheri?.dheriId,
+        dayBatchId: item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId),
+        batchNumber: item.dheri?.dayBatch?.batchNumber ?? null,
       })),
     })),
     batches: batchInfo.batches,

@@ -14,6 +14,14 @@ import { buyerApi, dailyTradeApi, farmerApi, settingsApi, truckApi } from '../se
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Buyer, Farmer, Product, Truck } from '../types'
+import {
+  nextSelectedBatchId,
+  pickSelectedBatch,
+  receivesForBatch,
+  salesForBatch,
+} from './dailyTradeScope'
+
+const SELECTED_BATCH_KEY = 'ams-daily-trade-batch-id'
 
 type BoardReceive = {
   id: number
@@ -45,12 +53,8 @@ type DayBatchRow = {
   unsoldDheris: number
 }
 
-type SaleLine = {
+type SaleItem = {
   id: number
-  saleId: number
-  invoice: string
-  buyerId: number
-  buyerName: string
   productName: string
   bags: number
   weight: number
@@ -60,6 +64,20 @@ type SaleLine = {
   farmerName?: string
   dheriId?: number | null
   dheriCode?: string
+  dayBatchId?: number | null
+  batchNumber?: number | null
+}
+
+type BoardSale = {
+  id: number
+  invoiceNumber: string
+  buyerId: number
+  buyerName: string
+  bags: number
+  weight: number
+  amount: number
+  createdAt?: string
+  items: SaleItem[]
 }
 
 type Board = {
@@ -71,43 +89,40 @@ type Board = {
     stockInKg: number
     stockOutKg: number
   }
-  stockLots: Array<{
-    id: number
-    productName?: string
-    farmerName?: string | null
-    remainingKg: number
-    ratePer40Kg: number
-    intakeDate: string
-  }>
   receives: BoardReceive[]
-  sales: Array<{
-    id: number
-    invoiceNumber: string
-    buyerId: number
-    buyerName: string
-    bags: number
-    weight: number
-    amount: number
-    createdAt?: string
-    items: Array<{
-      id: number
-      productName: string
-      bags: number
-      weight: number
-      rate: number
-      amount: number
-      sourceType: string
-      farmerName?: string
-      dheriId?: number | null
-      dheriCode?: string
-    }>
-  }>
+  sales: BoardSale[]
   batches: DayBatchRow[]
 }
 
 type ReceiveRow = { productId: string; bags: string; bagKg: string; extraKg: string }
 
 const emptyRow = (): ReceiveRow => ({ productId: '', bags: '', bagKg: '40', extraKg: '0' })
+
+function storedBatchId(): number | null {
+  try {
+    const raw = sessionStorage.getItem(SELECTED_BATCH_KEY)
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
+function persistBatchId(id: number | null) {
+  try {
+    if (id == null) sessionStorage.removeItem(SELECTED_BATCH_KEY)
+    else sessionStorage.setItem(SELECTED_BATCH_KEY, String(id))
+  } catch {
+    /* ignore */
+  }
+}
+
+function batchStatusLabel(status: string) {
+  if (status === 'CLOSED') return 'Completed'
+  if (status === 'SELLING') return 'Selling'
+  return 'Receiving'
+}
 
 export default function DailyTradePage() {
   const [board, setBoard] = useState<Board | null>(null)
@@ -117,7 +132,7 @@ export default function DailyTradePage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [loading, setLoading] = useState(true)
   const [openPane, setOpenPane] = useState<'receive' | 'sell' | null>('receive')
-  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null)
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(() => storedBatchId())
   const [openingBatch, setOpeningBatch] = useState(false)
 
   const [farmerId, setFarmerId] = useState('')
@@ -138,6 +153,11 @@ export default function DailyTradePage() {
   const [lastSaleNote, setLastSaleNote] = useState<string | null>(null)
   const [billLang, setBillLang] = useState<'en' | 'ur'>('en')
 
+  const selectBatch = useCallback((id: number | null) => {
+    setSelectedBatchId(id)
+    persistBatchId(id)
+  }, [])
+
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
     try {
@@ -148,11 +168,17 @@ export default function DailyTradePage() {
         farmerApi.getAll(),
         truckApi.getAll(),
       ])
-      setBoard(b.data.data)
+      const data = b.data.data as Board
+      setBoard(data)
       setBuyers(buy.data.data || [])
       setProducts(prod.data.data || [])
       setFarmers(farm.data.data || [])
       setTrucks(truckRes.data.data || [])
+      setSelectedBatchId((prev) => {
+        const next = nextSelectedBatchId(data.batches || [], prev ?? storedBatchId())
+        persistBatchId(next)
+        return next
+      })
     } catch {
       if (!soft) toast.error('Failed to load Daily Trade')
     } finally {
@@ -170,18 +196,15 @@ export default function DailyTradePage() {
   }, [products, rows])
 
   const batches = board?.batches || []
-  const selectedBatch =
-    batches.find((b) => b.id === selectedBatchId) ??
-    batches[batches.length - 1] ??
-    null
-
-  useEffect(() => {
-    if (selectedBatchId == null && selectedBatch) setSelectedBatchId(selectedBatch.id)
-  }, [selectedBatch, selectedBatchId])
+  const selectedBatch = pickSelectedBatch(batches, selectedBatchId)
 
   const batchReceives = useMemo(
-    () => (board?.receives || []).filter((r) => !selectedBatch || r.dayBatchId === selectedBatch.id),
+    () => receivesForBatch(board?.receives || [], selectedBatch?.id ?? null),
     [board, selectedBatch],
+  )
+  const batchSales = useMemo(
+    () => salesForBatch(board?.sales || [], selectedBatch?.id ?? null, batchReceives.map((r) => r.id)),
+    [board, selectedBatch, batchReceives],
   )
   const unsold = batchReceives.filter((r) => r.sellingStatus !== 'SOLD')
 
@@ -199,9 +222,9 @@ export default function DailyTradePage() {
     : 0
   const autoAmount = autoWeight > 0 && rateNum > 0 ? (autoWeight / 40) * rateNum : 0
 
-  const saleLines: SaleLine[] = useMemo(
+  const saleLines = useMemo(
     () =>
-      (board?.sales || []).flatMap((sale) =>
+      batchSales.flatMap((sale) =>
         sale.items.map((item) => ({
           ...item,
           saleId: sale.id,
@@ -210,7 +233,7 @@ export default function DailyTradePage() {
           buyerName: sale.buyerName,
         })),
       ),
-    [board],
+    [batchSales],
   )
 
   const selectedBuyer = buyers.find((b) => String(b.id) === sellBuyerId)
@@ -220,43 +243,56 @@ export default function DailyTradePage() {
     [trucks, farmerId],
   )
 
+  const receivedBags = batchReceives.reduce((s, r) => s + r.bags, 0)
+  const receivedKg = batchReceives.reduce((s, r) => s + r.weight, 0)
+  const extraKg = batchReceives.reduce((s, r) => s + (r.partialBagWeight || 0), 0)
+  const soldBags = batchReceives
+    .filter((r) => r.sellingStatus === 'SOLD')
+    .reduce((s, r) => s + r.bags, 0)
+  const soldKg = batchSales.reduce(
+    (s, sale) => s + sale.items.reduce((n, item) => n + item.weight, 0),
+    0,
+  )
+  const soldAmount = batchSales.reduce(
+    (s, sale) => s + sale.items.reduce((n, item) => n + item.amount, 0),
+    0,
+  )
+
   const historyItems = useMemo(() => {
-    const batchEv = (board?.batches || []).map((b) => ({
-      at: b.createdAt || '',
-      kind: 'BATCH' as const,
-      text: `Batch ${b.batchNumber} created — tap it to receive or sell against that batch`,
-    }))
-    const receives = (board?.receives || []).map((r) => ({
+    if (!selectedBatch) return []
+    const created = selectedBatch.createdAt
+      ? [{
+          at: selectedBatch.createdAt,
+          kind: 'BATCH' as const,
+          text: `Batch ${selectedBatch.batchNumber} created — all work below is only this batch`,
+        }]
+      : []
+    const receives = batchReceives.map((r) => ({
       at: r.createdAt || r.date,
       kind: 'RECEIVE' as const,
-      text: `Batch ${r.batchNumber ?? '—'} · ${r.dheriId} received from ${r.farmerName} · ${r.productName} · ${r.bags} bags (${formatNumber(r.weight)} kg)${r.partialBagWeight ? ` + Extra ${formatNumber(r.partialBagWeight)} kg` : ''}`,
+      text: `${r.dheriId} received from ${r.farmerName} · ${r.productName} · ${r.bags} bags (${formatNumber(r.weight)} kg)${r.partialBagWeight ? ` + Extra ${formatNumber(r.partialBagWeight)} kg` : ''}`,
     }))
-    const sells = (board?.sales || []).flatMap((sale) =>
+    const sells = batchSales.flatMap((sale) =>
       sale.items.map((s) => ({
         at: sale.createdAt || sale.invoiceNumber,
         kind: 'SELL' as const,
         text: `${sale.invoiceNumber} · sold ${s.dheriCode || 'stock'} to ${sale.buyerName} · ${s.bags} bags @ ${formatCurrency(s.rate)}/40kg = ${formatCurrency(s.amount)} — seller balance updated`,
       })),
     )
-    return [...batchEv, ...receives, ...sells].sort((a, b) => a.at.localeCompare(b.at))
-  }, [board])
+    return [...created, ...receives, ...sells].sort((a, b) => a.at.localeCompare(b.at))
+  }, [selectedBatch, batchReceives, batchSales])
 
   const createBatch = async () => {
     setOpeningBatch(true)
     try {
-      if (batches.length === 0) {
-        const res = await dailyTradeApi.ensureReceivingBatch()
-        toast.success('Batch 1 created')
-        await load(true)
-        const id = (res.data.data as { id?: number })?.id
-        if (id) setSelectedBatchId(id)
-      } else {
-        const res = await dailyTradeApi.openNextBatch()
-        toast.success(`Batch ${(res.data.data as { batchNumber?: number })?.batchNumber ?? ''} created`)
-        await load(true)
-        const id = (res.data.data as { id?: number })?.id
-        if (id) setSelectedBatchId(id)
-      }
+      const res = batches.length === 0
+        ? await dailyTradeApi.ensureReceivingBatch()
+        : await dailyTradeApi.openNextBatch()
+      const created = res.data.data as { id?: number; batchNumber?: number }
+      toast.success(`Batch ${created.batchNumber ?? ''} created`)
+      if (created.id) selectBatch(created.id)
+      await load(true)
+      if (created.id) selectBatch(created.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Could not create batch')
@@ -295,10 +331,12 @@ export default function DailyTradePage() {
         notes: receiveNotes.trim() || null,
         lines,
       })
-      toast.success(res.data.data.message || 'Received')
+      toast.success(res.data.data.message || `Received into Batch ${selectedBatch.batchNumber}`)
       setRows([{ ...emptyRow(), productId: products[0] ? String(products[0].id) : '' }])
       setReceiveNotes('')
+      selectBatch(selectedBatch.id)
       await load(true)
+      selectBatch(selectedBatch.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Receive failed')
@@ -367,11 +405,13 @@ export default function DailyTradePage() {
       setLastSaleBuyerId(sale.buyerId ?? Number(sellBuyerId))
       setLastSaleItemIds((sale.items || []).map((i) => i.id).filter(Boolean))
       setLastSaleNote(
-        `${selectedDheri?.dheriId} → ${selectedBuyer?.name || 'seller'} @ ${formatCurrency(rateNum)}/40kg = ${formatCurrency(autoAmount)} (${sale.invoiceNumber || ''})`,
+        `Batch ${selectedBatch.batchNumber} · ${selectedDheri?.dheriId} → ${selectedBuyer?.name || 'seller'} @ ${formatCurrency(rateNum)}/40kg = ${formatCurrency(autoAmount)} (${sale.invoiceNumber || ''})`,
       )
       setSellRate('')
       setSellPaid('0')
+      selectBatch(selectedBatch.id)
       await load(true)
+      selectBatch(selectedBatch.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Sell failed')
@@ -398,14 +438,15 @@ export default function DailyTradePage() {
 
   if (loading && !board) return <TableSkeleton rows={12} />
 
-  const session = board?.session
-  const stockKg = (board?.stockLots || []).reduce((s, l) => s + l.remainingKg, 0)
+  const workingLabel = selectedBatch
+    ? `Batch ${selectedBatch.batchNumber}`
+    : 'no batch selected'
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Daily Trade"
-        description="Create a batch, receive one or more dheris from a farmer, sell a dheri to a seller, print the bill. Same farmer can appear in any batch."
+        description="Tap a batch. Receiving, selling, bills, and history below are only for that batch. Same farmer can appear in Batch 1, 2, 3…"
         action={
           <Button variant="secondary" onClick={() => void load()}>
             <RefreshCw className="h-4 w-4" /> Reload
@@ -413,7 +454,52 @@ export default function DailyTradePage() {
         }
       />
 
-      {/* 1. Two clickable tables */}
+      <div className="card-3d p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" /> Batches — tap one, then work only on that batch
+          </h3>
+          <Button loading={openingBatch} onClick={() => void createBatch()}>
+            <Plus className="h-4 w-4" /> Create new batch
+          </Button>
+        </div>
+        {batches.length === 0 ? (
+          <p className="text-sm text-slate-500">No batch yet. Tap Create new batch to start Batch 1.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {batches.map((b) => {
+              const on = selectedBatch?.id === b.id
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => selectBatch(b.id)}
+                  className={`rounded-xl border px-4 py-3 min-w-[8rem] text-left transition ${
+                    on
+                      ? 'bg-[#002D62] text-white border-[#C5A059]'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10'
+                  }`}
+                >
+                  <p className="font-semibold">Batch {b.batchNumber}</p>
+                  <p className={`text-xs mt-1 ${on ? 'text-white/80' : 'text-slate-500'}`}>
+                    {batchStatusLabel(b.status)} · {b.soldDheris}/{b.totalDheris} sold · {b.unsoldDheris} left
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {selectedBatch ? (
+          <p className="text-sm text-[#002D62] dark:text-[#C5A059] font-medium">
+            Working on Batch {selectedBatch.batchNumber} only
+            {selectedBatch.status === 'CLOSED' ? ' (completed — you can still receive more dheris into it).' : '.'}
+            {' '}Same farmer can be used in any other batch too.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-500">Tap a batch above. Frames below stay empty until you do.</p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <button
           type="button"
@@ -424,15 +510,15 @@ export default function DailyTradePage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Receiving bags</p>
-              <p className="text-3xl font-bold mt-1 tabular-nums">{session?.receivedBags || 0}</p>
-              <p className="text-sm text-slate-500">{formatNumber(session?.receivedWeightKg || 0)} kg</p>
-              <p className="text-xs mt-2">Extra / stock kg: {formatNumber(session?.stockInKg || stockKg)}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Receiving bags · {workingLabel}</p>
+              <p className="text-3xl font-bold mt-1 tabular-nums">{receivedBags}</p>
+              <p className="text-sm text-slate-500">{formatNumber(receivedKg)} kg</p>
+              <p className="text-xs mt-2">Extra KG in this batch: {formatNumber(extraKg)}</p>
             </div>
             <Package className="h-7 w-7 text-emerald-600" />
           </div>
           <p className="text-xs text-primary mt-3 flex items-center gap-1">
-            Tap to {openPane === 'receive' ? 'hide' : 'see'} receive details <ChevronDown className="h-3 w-3" />
+            Tap to {openPane === 'receive' ? 'hide' : 'see'} stock bags in {workingLabel} <ChevronDown className="h-3 w-3" />
           </p>
         </button>
         <button
@@ -444,15 +530,15 @@ export default function DailyTradePage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Selling bags</p>
-              <p className="text-3xl font-bold mt-1 tabular-nums">{session?.soldBags || 0}</p>
-              <p className="text-sm text-slate-500">{formatNumber(session?.soldWeightKg || 0)} kg</p>
-              <p className="text-xs mt-2">Stock out: {formatNumber(session?.stockOutKg || 0)} kg</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Selling bags · {workingLabel}</p>
+              <p className="text-3xl font-bold mt-1 tabular-nums">{soldBags}</p>
+              <p className="text-sm text-slate-500">{formatNumber(soldKg)} kg</p>
+              <p className="text-xs mt-2">Sold amount: {formatCurrency(soldAmount)}</p>
             </div>
             <Scale className="h-7 w-7 text-primary" />
           </div>
           <p className="text-xs text-primary mt-3 flex items-center gap-1">
-            Tap to {openPane === 'sell' ? 'hide' : 'see'} sell details <ChevronDown className="h-3 w-3" />
+            Tap to {openPane === 'sell' ? 'hide' : 'see'} sales in {workingLabel} <ChevronDown className="h-3 w-3" />
           </p>
         </button>
       </div>
@@ -460,7 +546,7 @@ export default function DailyTradePage() {
       {openPane === 'receive' && (
         <div className="card-3d overflow-hidden">
           <div className="px-4 py-3 font-semibold border-b border-slate-100 dark:border-white/10">
-            Receiving details — stock bags & Extra KG
+            Receiving details — {workingLabel} stock bags only
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
@@ -477,7 +563,7 @@ export default function DailyTradePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
-                {(board?.receives || []).map((r) => (
+                {batchReceives.map((r) => (
                   <tr key={r.id}>
                     <td className="px-3 py-2">B{r.batchNumber ?? '—'}</td>
                     <td className="px-3 py-2 font-medium">{r.dheriId}</td>
@@ -491,27 +577,19 @@ export default function DailyTradePage() {
                 ))}
               </tbody>
             </table>
-            {(board?.receives || []).length === 0 && (
-              <p className="p-4 text-sm text-slate-500">No bags received today.</p>
+            {batchReceives.length === 0 && (
+              <p className="p-4 text-sm text-slate-500">
+                {selectedBatch ? `No bags received in Batch ${selectedBatch.batchNumber} yet.` : 'Tap a batch to see its stock bags.'}
+              </p>
             )}
           </div>
-          {(board?.stockLots || []).length > 0 && (
-            <div className="px-4 py-3 border-t border-slate-100 dark:border-white/10 text-sm">
-              <p className="font-semibold mb-2">Extra KG stock lots</p>
-              {(board?.stockLots || []).map((lot) => (
-                <p key={lot.id} className="text-slate-600 dark:text-slate-300">
-                  {lot.intakeDate} · {lot.productName} · {lot.farmerName || '—'} · {formatNumber(lot.remainingKg)} kg @ {formatCurrency(lot.ratePer40Kg)}/40kg
-                </p>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
       {openPane === 'sell' && (
         <div className="card-3d overflow-hidden">
           <div className="px-4 py-3 font-semibold border-b border-slate-100 dark:border-white/10">
-            Selling details — invoices, sellers, stock bags
+            Selling details — {workingLabel} invoices only
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
@@ -535,7 +613,7 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">
                       <Link className="text-primary" to={`/buyers/${s.buyerId}`}>{s.buyerName}</Link>
                     </td>
-                    <td className="px-3 py-2">{s.dheriCode || (s.sourceType === 'BUSINESS_STOCK' ? 'STOCK BAGS' : '—')}</td>
+                    <td className="px-3 py-2">{s.dheriCode || '—'}</td>
                     <td className="px-3 py-2">{s.farmerName || '—'}</td>
                     <td className="px-3 py-2">{s.bags}</td>
                     <td className="px-3 py-2">{formatCurrency(s.rate)}</td>
@@ -544,189 +622,157 @@ export default function DailyTradePage() {
                 ))}
               </tbody>
             </table>
-            {saleLines.length === 0 && <p className="p-4 text-sm text-slate-500">No bags sold today.</p>}
+            {saleLines.length === 0 && (
+              <p className="p-4 text-sm text-slate-500">
+                {selectedBatch ? `No bags sold in Batch ${selectedBatch.batchNumber} yet.` : 'Tap a batch to see its sales.'}
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {/* 2. Batches */}
-      <div className="card-3d p-4 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" /> Batches — tap one to work below
-          </h3>
-          <Button loading={openingBatch} onClick={() => void createBatch()}>
-            <Plus className="h-4 w-4" /> Create new batch
-          </Button>
-        </div>
-        {batches.length === 0 ? (
-          <p className="text-sm text-slate-500">No batch yet. Tap Create new batch to start Batch 1.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {batches.map((b) => {
-              const on = selectedBatch?.id === b.id
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setSelectedBatchId(b.id)}
-                  className={`rounded-xl border px-4 py-3 min-w-[8rem] text-left transition ${
-                    on
-                      ? 'bg-[#002D62] text-white border-[#C5A059]'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10'
-                  }`}
-                >
-                  <p className="font-semibold">Batch {b.batchNumber}</p>
-                  <p className={`text-xs mt-1 ${on ? 'text-white/80' : 'text-slate-500'}`}>
-                    {b.soldDheris}/{b.totalDheris} sold · {b.unsoldDheris} left
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {selectedBatch && (
-          <p className="text-sm text-[#002D62] dark:text-[#C5A059] font-medium">
-            Working on Batch {selectedBatch.batchNumber}. Same farmer can be used in Batch 1, 2, 3…
-          </p>
-        )}
-      </div>
-
-      {/* 3. Add dheri(s) */}
       <div className="rounded-2xl border-2 border-emerald-200/80 dark:border-emerald-800/40 overflow-hidden">
         <div className="px-5 py-3 bg-emerald-700 text-white font-semibold">
-          Add dheri(s) into Batch {selectedBatch?.batchNumber ?? '—'}
-        </div>
-        <div className="p-5 space-y-4 bg-white dark:bg-slate-900">
-          <Select
-            label="Farmer (existing — can be the same farmer in every batch) *"
-            value={farmerId}
-            onChange={(e) => {
-              setFarmerId(e.target.value)
-              setTruckId('')
-            }}
-            options={[
-              { value: '', label: 'Select farmer' },
-              ...farmers.map((f) => ({ value: String(f.id), label: `${f.name} (${f.farmerId})` })),
-            ]}
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Truck (optional)"
-              value={truckId}
-              onChange={(e) => setTruckId(e.target.value)}
-              options={[
-                { value: '', label: farmerId ? 'No truck' : 'Select farmer first' },
-                ...farmerTrucks.map((t) => ({
-                  value: String(t.id),
-                  label: `${t.registrationNumber}${t.driverName ? ` · ${t.driverName}` : ''}`,
-                })),
-              ]}
-            />
-            <Input
-              label="Notes (optional)"
-              value={receiveNotes}
-              onChange={(e) => setReceiveNotes(e.target.value)}
-              placeholder="e.g. morning load, two products"
-            />
-          </div>
-          <p className="text-xs text-slate-500">
-            One farmer can send multiple dheris at once — add a row per dheri below, then save all into this batch.
-          </p>
-          {rows.map((row, i) => {
-            const previewKg =
-              (parseInt(row.bags, 10) || 0) * (parseFloat(row.bagKg) || 40) + (parseFloat(row.extraKg) || 0)
-            return (
-            <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-3 rounded-xl border border-slate-200 dark:border-white/10 p-3">
-              <Select
-                label={`Dheri ${i + 1} product *`}
-                value={row.productId}
-                onChange={(e) =>
-                  setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, productId: e.target.value } : r)))
-                }
-                options={[
-                  { value: '', label: 'Product' },
-                  ...products.map((p) => ({ value: String(p.id), label: p.name })),
-                ]}
-              />
-              <Input
-                label="Bags *"
-                type="number"
-                value={row.bags}
-                onChange={(e) =>
-                  setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, bags: e.target.value } : r)))
-                }
-              />
-              <Input
-                label="Bag weight (kg)"
-                type="number"
-                step="0.01"
-                value={row.bagKg}
-                onChange={(e) =>
-                  setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, bagKg: e.target.value } : r)))
-                }
-              />
-              <Input
-                label="Extra KG"
-                type="number"
-                step="0.01"
-                value={row.extraKg}
-                onChange={(e) =>
-                  setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, extraKg: e.target.value } : r)))
-                }
-              />
-              <div className="flex items-end gap-2">
-                <div className="flex-1 text-xs text-slate-500 pb-2">
-                  Weight {previewKg ? `${formatNumber(previewKg)} kg` : '—'}
-                </div>
-                {rows.length > 1 && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-            )
-          })}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              onClick={() =>
-                setRows((prev) => [
-                  ...prev,
-                  { ...emptyRow(), productId: products[0] ? String(products[0].id) : '' },
-                ])
-              }
-            >
-              <Plus className="h-4 w-4" /> Add another dheri (same farmer)
-            </Button>
-            <Button onClick={() => void handleReceive()} loading={receiving} disabled={!selectedBatch}>
-              <Package className="h-4 w-4" /> Save into Batch {selectedBatch?.batchNumber ?? '—'}
-            </Button>
-            <Link to="/farmers" className="text-sm text-primary underline self-center">Add farmer</Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Sell specific dheri */}
-      <div className="rounded-2xl border-2 border-[#002D62]/25 overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
-          <ShoppingCart className="h-4 w-4 text-[#C5A059]" />
-          Sell a dheri from Batch {selectedBatch?.batchNumber ?? '—'}
+          Add dheri(s) into {workingLabel}
         </div>
         <div className="p-5 space-y-4 bg-white dark:bg-slate-900">
           {!selectedBatch ? (
-            <p className="text-sm text-slate-500">Tap a batch first.</p>
+            <p className="text-sm text-slate-500">Tap a batch first. New receives go only into the tapped batch.</p>
+          ) : (
+            <>
+              <Select
+                label="Farmer (can be the same farmer in Batch 1, 2, 3…) *"
+                value={farmerId}
+                onChange={(e) => {
+                  setFarmerId(e.target.value)
+                  setTruckId('')
+                }}
+                options={[
+                  { value: '', label: 'Select farmer' },
+                  ...farmers.map((f) => ({ value: String(f.id), label: `${f.name} (${f.farmerId})` })),
+                ]}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Select
+                  label="Truck (optional)"
+                  value={truckId}
+                  onChange={(e) => setTruckId(e.target.value)}
+                  options={[
+                    { value: '', label: farmerId ? 'No truck' : 'Select farmer first' },
+                    ...farmerTrucks.map((t) => ({
+                      value: String(t.id),
+                      label: `${t.registrationNumber}${t.driverName ? ` · ${t.driverName}` : ''}`,
+                    })),
+                  ]}
+                />
+                <Input
+                  label="Notes (optional)"
+                  value={receiveNotes}
+                  onChange={(e) => setReceiveNotes(e.target.value)}
+                  placeholder="e.g. morning load, two products"
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                One farmer can send multiple dheris at once — add a row per dheri, then save all into Batch {selectedBatch.batchNumber}.
+                {selectedBatch.status === 'CLOSED' ? ' This batch is completed; receiving still works and reopens it.' : ''}
+              </p>
+              {rows.map((row, i) => {
+                const previewKg =
+                  (parseInt(row.bags, 10) || 0) * (parseFloat(row.bagKg) || 40) + (parseFloat(row.extraKg) || 0)
+                return (
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-5 gap-3 rounded-xl border border-slate-200 dark:border-white/10 p-3">
+                    <Select
+                      label={`Dheri ${i + 1} product *`}
+                      value={row.productId}
+                      onChange={(e) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, productId: e.target.value } : r)))
+                      }
+                      options={[
+                        { value: '', label: 'Product' },
+                        ...products.map((p) => ({ value: String(p.id), label: p.name })),
+                      ]}
+                    />
+                    <Input
+                      label="Bags *"
+                      type="number"
+                      value={row.bags}
+                      onChange={(e) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, bags: e.target.value } : r)))
+                      }
+                    />
+                    <Input
+                      label="Bag weight (kg)"
+                      type="number"
+                      step="0.01"
+                      value={row.bagKg}
+                      onChange={(e) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, bagKg: e.target.value } : r)))
+                      }
+                    />
+                    <Input
+                      label="Extra KG"
+                      type="number"
+                      step="0.01"
+                      value={row.extraKg}
+                      onChange={(e) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, extraKg: e.target.value } : r)))
+                      }
+                    />
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 text-xs text-slate-500 pb-2">
+                        Weight {previewKg ? `${formatNumber(previewKg)} kg` : '—'}
+                      </div>
+                      {rows.length > 1 && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setRows((prev) => [
+                      ...prev,
+                      { ...emptyRow(), productId: products[0] ? String(products[0].id) : '' },
+                    ])
+                  }
+                >
+                  <Plus className="h-4 w-4" /> Add another dheri (same farmer)
+                </Button>
+                <Button onClick={() => void handleReceive()} loading={receiving}>
+                  <Package className="h-4 w-4" /> Save into Batch {selectedBatch.batchNumber}
+                </Button>
+                <Link to="/farmers" className="text-sm text-primary underline self-center">Add farmer</Link>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border-2 border-[#002D62]/25 overflow-hidden">
+        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+          <ShoppingCart className="h-4 w-4 text-[#C5A059]" />
+          Sell a dheri from {workingLabel}
+        </div>
+        <div className="p-5 space-y-4 bg-white dark:bg-slate-900">
+          {!selectedBatch ? (
+            <p className="text-sm text-slate-500">Tap a batch first. Only that batch’s unsold dheris appear here.</p>
           ) : unsold.length === 0 ? (
-            <p className="text-sm text-slate-500">No unsold dheris in this batch. Receive first, or tap another batch.</p>
+            <p className="text-sm text-slate-500">
+              No unsold dheris in Batch {selectedBatch.batchNumber}. Receive into this batch, or tap another batch.
+            </p>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Select
-                  label="Dheri to sell *"
+                  label={`Dheri to sell (Batch ${selectedBatch.batchNumber} only) *`}
                   value={sellDheriId}
                   onChange={(e) => setSellDheriId(e.target.value)}
                   options={unsold.map((r) => ({
@@ -763,7 +809,7 @@ export default function DailyTradePage() {
                 <p className="text-sm">
                   Seller record: <Link className="text-primary font-medium" to={`/buyers/${selectedBuyer.id}`}>{selectedBuyer.name}</Link>
                   {' · '}due {formatCurrency(selectedBuyer.outstandingBalance)}
-                  {' · '}this sale will update Sellers / dashboard pending payments.
+                  {' · '}this sale updates Sellers / dashboard pending payments.
                 </p>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -793,7 +839,6 @@ export default function DailyTradePage() {
         </div>
       </div>
 
-      {/* 5. Bill for the sale above */}
       <div className="rounded-2xl border-2 border-[#C5A059]/60 overflow-hidden">
         <div className="px-5 py-3 bg-gradient-to-r from-[#002D62] to-[#0a3a75] text-white font-semibold flex items-center gap-2">
           <FileText className="h-4 w-4 text-[#C5A059]" />
@@ -832,14 +877,15 @@ export default function DailyTradePage() {
         </div>
       </div>
 
-      {/* 6. History / readme */}
       <div className="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
         <div className="px-5 py-3 bg-slate-100 dark:bg-slate-800 font-semibold flex items-center gap-2">
-          <History className="h-4 w-4" /> History — receive, sell, and batch work today
+          <History className="h-4 w-4" /> History — {workingLabel} only
         </div>
         <div className="p-5 bg-white dark:bg-slate-900">
-          {historyItems.length === 0 ? (
-            <p className="text-sm text-slate-500">No activity yet today.</p>
+          {!selectedBatch ? (
+            <p className="text-sm text-slate-500">Tap a batch to read its receive and sell history.</p>
+          ) : historyItems.length === 0 ? (
+            <p className="text-sm text-slate-500">No activity in Batch {selectedBatch.batchNumber} yet.</p>
           ) : (
             <ol className="space-y-2 text-sm">
               {historyItems.map((h, i) => (

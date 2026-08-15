@@ -8,13 +8,19 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { receiveManyIntoBatch } from '../src/server/services/daily-trade'
+import { getDailyBoard, receiveManyIntoBatch } from '../src/server/services/daily-trade'
 import {
   listDayBatches,
   openNextBatch,
   sellDheriAtAuctionRate,
 } from '../src/server/services/day-batches'
 import { runWithWorkspace } from '../src/server/workspace'
+import {
+  nextSelectedBatchId,
+  pickSelectedBatch,
+  receivesForBatch,
+  salesForBatch,
+} from '../src/client/pages/dailyTradeScope'
 
 const stamp = `SMK${Date.now().toString().slice(-8)}`
 
@@ -143,6 +149,67 @@ async function main() {
       if (!board.batches.some((b: { id: number }) => b.id === b1.id)) {
         throw new Error('board missing created batches')
       }
+
+      const fakeBatches = [
+        { id: 11, batchNumber: 1 },
+        { id: 55, batchNumber: 5 },
+      ]
+      const picked = pickSelectedBatch(fakeBatches, 11)
+      if (picked?.batchNumber !== 1) throw new Error('tap batch 1 must not fall back to batch 5')
+      if (nextSelectedBatchId(fakeBatches, 11) !== 11) {
+        throw new Error('selected batch 1 must stay batch 1 after reload')
+      }
+      if (nextSelectedBatchId(fakeBatches, null) !== 11) {
+        throw new Error('default selection must be first batch, not last')
+      }
+
+      const sellRemaining = await sellDheriAtAuctionRate({
+        dheriId: d2.id,
+        buyerId: Number(buyer.id),
+        dayBatchId: b1.id,
+        ratePer40Kg: 4100,
+        paidAmount: 0,
+      })
+      ids.saleIds.push(BigInt(sellRemaining.sale.id))
+      const afterClose = await listDayBatches()
+      const closed = afterClose.batches.find((b) => b.id === b1.id)
+      if (!closed || closed.status !== 'CLOSED') {
+        throw new Error(`batch 1 should be completed after selling all, got ${closed?.status}`)
+      }
+
+      const intoClosed = await receiveManyIntoBatch({
+        farmerId: Number(farmer.id),
+        dayBatchId: b1.id,
+        notes: 'receive into completed batch',
+        lines: [{ productId: Number(product.id), numberOfBags: 4, weightPerBag: 40 }],
+      })
+      if (intoClosed.created.length !== 1) throw new Error('should receive into completed batch')
+      ids.dheriIds.push(BigInt(intoClosed.created[0].id))
+      const reopened = await listDayBatches()
+      const row1b = reopened.batches.find((b) => b.id === b1.id)
+      if (!row1b || row1b.totalDheris < 3) {
+        throw new Error('completed batch should accept another dheri')
+      }
+      console.log('received into completed batch', row1b.status, intoClosed.created[0].dheriCode)
+
+      const liveBoard = await getDailyBoard()
+      const b1Receives = receivesForBatch(liveBoard.receives, b1.id)
+      const b2Receives = receivesForBatch(liveBoard.receives, b2.id)
+      if (b1Receives.some((r) => r.dayBatchId === b2.id)) {
+        throw new Error('batch 1 receive list leaked batch 2')
+      }
+      if (b2Receives.some((r) => r.dayBatchId === b1.id)) {
+        throw new Error('batch 2 receive list leaked batch 1')
+      }
+      if (b1Receives.length < 3) throw new Error('batch 1 should show only its own dheris (3+)')
+      if (b2Receives.length !== 1) throw new Error('batch 2 should show only its 1 dheri')
+      const b1Sales = salesForBatch(liveBoard.sales, b1.id, b1Receives.map((r) => r.id))
+      const b2Sales = salesForBatch(liveBoard.sales, b2.id, b2Receives.map((r) => r.id))
+      if (b1Sales.some((s) => s.items.some((i) => i.dayBatchId === b2.id))) {
+        throw new Error('batch 1 sales leaked batch 2')
+      }
+      if (b2Sales.length < 1) throw new Error('batch 2 should still show its sale')
+      console.log('scoped board', { b1: b1Receives.length, b2: b2Receives.length })
       console.log('OK daily trade rebuild smoke')
     } finally {
       await cleanup(ids)
