@@ -356,9 +356,9 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const payable = sum(lines.map((x) => x.payable))
   const paid = farmer.payments.reduce((s, item) => s + item.amount.toNumber(), 0)
 
+  // Extra KG stock has no dheri column — batches are tracked by date/product only.
   const stockRows = farmer.stockLots.map((lot) => [
     lot.intakeDate.toISOString().slice(0, 10),
-    lot.dheri?.dheriId ?? '—',
     lot.product.name,
     money(lot.originalKg),
     money(lot.remainingKg),
@@ -370,10 +370,11 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const stockValue = sum(farmer.stockLots.map((x) => x.amountValue.toNumber()))
 
   const note = urdu
-    ? `<div class="note urdu"><strong>نوٹ:</strong> کسان کو مکمل وزن (تھیلیاں + اضافی کلو / اسٹاک) کی قیمت ادا کی جاتی ہے۔ اضافی کلو کسان بل کی مجموعی / قابل ادائیگی رقم میں شامل ہے، اور وہی Extra KG کمپنی اسٹاک میں بھی محفوظ ہے۔ قابل ادائیگی = تھیلیاں + Extra KG − کمیشن۔</div>`
-    : `<div class="note"><strong>Note:</strong> Farmer is paid for the <em>full</em> weight — whole bags <strong>plus Extra KG (stock)</strong>. Extra KG is included in Gross / Payable above, and the same Extra KG is also held in company stock for forming buyer bags later. <strong>Total payable = bags amount + Extra KG amount − commission.</strong></div>`
+    ? `<div class="note urdu"><strong>نوٹ:</strong> کسان کو مکمل وزن (تھیلیاں + اضافی کلو / اسٹاک) کی قیمت ادا کی جاتی ہے۔ اضافی کلو کسان بل کی مجموعی / قابل ادائیگی رقم میں شامل ہے، اور وہی Extra KG کمپنی اسٹاک میں بھی محفوظ ہے۔ قابل ادائیگی = تھیلیاں + Extra KG − کمیشن۔ کل اضافی کلو = ہر قطار کی اضافی کلو کا مجموعہ۔</div>`
+    : `<div class="note"><strong>Note:</strong> Farmer is paid for the <em>full</em> weight — whole bags <strong>plus Extra KG (stock)</strong>. Extra KG is included in Gross / Payable above, and the same Extra KG is also held in company stock for forming buyer bags later. <strong>Total payable = bags amount + Extra KG amount − commission.</strong> <strong>Total Extra KG = sum of Extra KG from every row</strong> (e.g. 45 + 67 = 112).</div>`
 
   const summary = `<div class="summary">
+    <div><div class="label">${urdu ? 'کل اضافی کلو (ہر قطار کا مجموعہ)' : 'Total Extra KG (sum of rows)'}</div><div class="value">${money(extraKg)} kg</div></div>
     <div><div class="label">${urdu ? 'تھیلیوں کی رقم' : 'Bags amount'}</div><div class="value">PKR ${money(bagsGross)}</div></div>
     <div><div class="label">${urdu ? 'اضافی کلو / اسٹاک رقم' : 'Extra KG (stock) amount'}</div><div class="value">PKR ${money(extraGross)}</div></div>
     <div><div class="label">${urdu ? 'کل مجموعی (تھیلیاں + اسٹاک)' : 'Total gross (bags + stock)'}</div><div class="value">PKR ${money(gross)}</div></div>
@@ -385,12 +386,11 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       ? `<h3 class="section-title ${urdu ? 'urdu' : ''}">${urdu ? 'اضافی کلو اسٹاک ریکارڈ (اس کسان سے)' : 'Extra KG stock record (from this farmer)'}</h3>
       ${table(
         urdu
-          ? ['تاریخ', 'ڈھیری', 'پروڈکٹ', 'اصل کلو', 'باقی کلو', 'ریٹ/40کلو', 'رقم']
-          : ['Date', 'Dheri', 'Product', 'Original kg', 'Remaining kg', 'Rate/40kg', 'Amount'],
+          ? ['تاریخ', 'پروڈکٹ', 'اصل کلو', 'باقی کلو', 'ریٹ/40کلو', 'رقم']
+          : ['Date', 'Product', 'Original kg', 'Remaining kg', 'Rate/40kg', 'Amount'],
         stockRows,
         [
           urdu ? 'کل' : 'Totals',
-          String(farmer.stockLots.length),
           '',
           money(stockOriginal),
           money(stockRemaining),
@@ -484,11 +484,11 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       rows,
       [
         urdu ? 'کل' : 'Totals',
-        String(farmer.dheris.length),
+        '',
         '',
         String(bags),
         money(bagsWeight),
-        money(extraKg),
+        money(extraKg), // sum of Extra KG from every row
         money(weight),
         '',
         money(bagsGross),
