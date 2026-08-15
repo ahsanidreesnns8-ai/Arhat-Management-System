@@ -35,6 +35,10 @@ function weatherLabel(code: number, urdu: boolean) {
   return urdu ? 'ہوا' : 'Windy'
 }
 
+function toUrduDigits(value: number) {
+  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
+}
+
 function buildHijri(adjustmentDays: number): WeatherCalendar['hijri'] {
   const base = new Date()
   base.setDate(base.getDate() + (adjustmentDays || 0))
@@ -61,8 +65,15 @@ function buildHijri(adjustmentDays: number): WeatherCalendar['hijri'] {
   }
 }
 
-function toUrduDigits(value: number) {
-  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
+function formatGregorian(raw: string, locale: string) {
+  const d = new Date(`${raw}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return raw
+  return d.toLocaleDateString(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: string, adjustment: number): Promise<WeatherCalendar> {
@@ -109,7 +120,7 @@ export default function WeatherWidget() {
       setFailed(false)
       return
     } catch {
-      // fall through to direct Open-Meteo (works even if backend weather is down)
+      // fall through to direct Open-Meteo
     }
 
     try {
@@ -150,73 +161,61 @@ export default function WeatherWidget() {
   const hijriEn = data.hijri?.formattedEn || '—'
   const hijriUr = data.hijri?.formattedUr || '—'
   const area = data.locationLabel || settings?.weatherLocationLabel || '—'
-
-  const gregorianEn = (() => {
-    const raw = data.gregorianDate || new Date().toISOString().slice(0, 10)
-    const d = new Date(`${raw}T12:00:00`)
-    if (Number.isNaN(d.getTime())) return raw
-    return d.toLocaleDateString('en-PK', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-  })()
-
-  const gregorianUr = (() => {
-    const raw = data.gregorianDate || new Date().toISOString().slice(0, 10)
-    const d = new Date(`${raw}T12:00:00`)
-    if (Number.isNaN(d.getTime())) return raw
-    // Urdu month/day names with Latin digits for readability
-    return d.toLocaleDateString('ur-PK-u-nu-latn', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-  })()
+  const rawDate = data.gregorianDate || new Date().toISOString().slice(0, 10)
+  const gregorianEn = formatGregorian(rawDate, 'en-PK')
+  const gregorianUr = formatGregorian(rawDate, 'ur-PK-u-nu-latn')
 
   return (
     <div
-      className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:gap-x-2 w-full px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10"
-      title={`${condition} · ${area} · ${gregorianEn} · ${hijriEn} · ${hijriUr}`}
+      className="w-full px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10 space-y-1"
+      title={`${condition} · ${area} · ${gregorianEn} · ${gregorianUr} · ${hijriEn} · ${hijriUr}`}
     >
-      {data.weatherAvailable !== false && data.temperatureC != null ? (
-        <>
-          <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-cyan-500 flex-shrink-0" />
-          <span className="text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">
-            {data.temperatureC}°C
-          </span>
-          <span className={`text-slate-500 truncate max-w-[4.5rem] hidden xs:inline sm:inline ${isUrdu ? 'font-urdu' : ''}`}>
-            {condition}
-          </span>
-          <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
-          <span className={`text-slate-600 dark:text-slate-300 truncate max-w-[4.5rem] hidden sm:inline ${isUrdu ? 'font-urdu' : ''}`}>
-            {area}
-          </span>
-        </>
-      ) : (
-        <span className="text-slate-500 truncate">{t('weatherUnavailable')}</span>
-      )}
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        {data.weatherAvailable !== false && data.temperatureC != null ? (
+          <>
+            <Icon className="h-3.5 w-3.5 text-cyan-500 flex-shrink-0" />
+            <span className="text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">
+              {data.temperatureC}°C
+            </span>
+            <span className={`text-slate-500 truncate ${isUrdu ? 'font-urdu' : ''}`}>
+              {condition}
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span className={`text-slate-600 dark:text-slate-300 truncate ${isUrdu ? 'font-urdu' : ''}`}>
+              {area}
+            </span>
+          </>
+        ) : (
+          <span className="text-slate-500 truncate">{t('weatherUnavailable')}</span>
+        )}
+      </div>
 
-      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">|</span>
-      <span className="text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
-        {gregorianEn}
-      </span>
-      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
-      <span className="font-urdu text-slate-700 dark:text-slate-200 whitespace-nowrap" dir="rtl">
-        {gregorianUr}
-      </span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-700 dark:text-slate-200">
+        <span className="whitespace-nowrap tabular-nums">
+          <span className="text-slate-400 mr-1">EN</span>
+          {gregorianEn}
+        </span>
+        <span className="text-slate-300 dark:text-slate-600">·</span>
+        <span className="font-urdu whitespace-nowrap" dir="rtl">
+          <span className="text-slate-400 ml-1 not-italic font-sans" dir="ltr">UR</span>
+          {' '}
+          {gregorianUr}
+        </span>
+      </div>
 
-      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">|</span>
-      <MoonStar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-500 flex-shrink-0" />
-      <span className="text-slate-700 dark:text-slate-200 whitespace-nowrap truncate min-w-0">
-        {hijriEn}
-      </span>
-      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
-      <span className="font-urdu text-slate-700 dark:text-slate-200 whitespace-nowrap truncate min-w-0" dir="rtl">
-        {hijriUr}
-      </span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-700 dark:text-slate-200">
+        <MoonStar className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+        <span className="whitespace-nowrap">
+          <span className="text-slate-400 mr-1">EN</span>
+          {hijriEn}
+        </span>
+        <span className="text-slate-300 dark:text-slate-600">·</span>
+        <span className="font-urdu whitespace-nowrap" dir="rtl">
+          <span className="text-slate-400 ml-1 not-italic font-sans" dir="ltr">UR</span>
+          {' '}
+          {hijriUr}
+        </span>
+      </div>
     </div>
   )
 }
