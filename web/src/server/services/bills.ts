@@ -18,46 +18,267 @@ function sum(nums: number[]) {
   return nums.reduce((a, b) => a + b, 0)
 }
 
-async function page(title: string, party: string, body: string, urdu: boolean) {
-  const settings = await prisma.businessSettings.findFirst()
-  const printed = new Date().toLocaleDateString('en-PK', {
+function dash(value: string | null | undefined) {
+  const v = String(value ?? '').trim()
+  return v ? escape(v) : '—'
+}
+
+function formatBillDates() {
+  const now = new Date()
+  const en = now.toLocaleDateString('en-PK', {
+    weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
+  const ur = now.toLocaleDateString('ur-PK-u-nu-latn', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  // Hijri EN + UR
+  const parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).formatToParts(now)
+  const day = parts.find((p) => p.type === 'day')?.value ?? ''
+  const month = parts.find((p) => p.type === 'month')?.value ?? ''
+  const year = parts.find((p) => p.type === 'year')?.value ?? ''
+  const hijriEn = `${day} ${month} ${year} AH`
+  return { en, ur, hijriEn }
+}
+
+async function page(title: string, partyHtml: string, body: string, urdu: boolean) {
+  const settings = await prisma.businessSettings.findFirst()
+  const dates = formatBillDates()
   return `<!doctype html>
 <html lang="${urdu ? 'ur' : 'en'}" dir="${urdu ? 'rtl' : 'ltr'}">
-<head><meta charset="utf-8"><title>${escape(title)}</title>
+<head>
+<meta charset="utf-8">
+<title>${escape(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 <style>
-body{font-family:Georgia,'Times New Roman',serif;padding:28px;color:#0f172a;background:#fff}
-.sheet{max-width:960px;margin:auto}
-.brand{text-align:center;color:#002d62;border-bottom:2px solid #c5a059;padding-bottom:12px;margin-bottom:16px}
-.brand h1{margin:0;font-size:26px;letter-spacing:.02em}
-.brand h2{margin:6px 0 0;font-size:16px;font-weight:600;color:#334155}
-.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:#475569;margin-bottom:8px}
-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:12.5px}
-th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}
-th{background:#002d62;color:#fff;font-weight:600}
+:root{--navy:#002D62;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:28px;
+  color:var(--ink);
+  background:#fff;
+  font-family:"Source Sans 3",system-ui,sans-serif;
+  font-size:13.5px;
+  line-height:1.45;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+.urdu{font-family:"Noto Nastaliq Urdu","Source Sans 3",serif}
+.sheet{max-width:980px;margin:auto}
+.brand{
+  text-align:center;
+  color:var(--navy);
+  border-bottom:2px solid var(--gold);
+  padding-bottom:14px;
+  margin-bottom:18px;
+}
+.brand h1{
+  margin:0;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:32px;
+  font-weight:700;
+  letter-spacing:.03em;
+}
+.brand h2{
+  margin:8px 0 0;
+  font-family:"Source Sans 3",sans-serif;
+  font-size:15px;
+  font-weight:600;
+  color:#334155;
+  letter-spacing:.02em;
+}
+.dates{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:12px;
+}
+.party-card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px 16px;
+  background:linear-gradient(180deg,#fff 0%,var(--soft) 100%);
+  margin-bottom:14px;
+}
+.party-card h3{
+  margin:0 0 10px;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:22px;
+  color:var(--navy);
+  font-weight:700;
+}
+.party-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:8px 16px;
+}
+.party-grid .label{
+  display:block;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--muted);
+  font-weight:600;
+}
+.party-grid .value{
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--ink);
+  margin-top:2px;
+}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top}
+th{
+  background:var(--navy);
+  color:#fff;
+  font-weight:600;
+  font-size:11.5px;
+  letter-spacing:.02em;
+}
 .totals{font-weight:700;background:#f1f5f9}
-.note{margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;line-height:1.55}
-.note strong{color:#002d62}
-.summary{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
-.summary div{border:1px solid #e2e8f0;border-radius:8px;padding:10px}
-.summary .label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
-.summary .value{font-size:15px;font-weight:700;margin-top:4px;color:#0f172a}
+.note{
+  margin-top:14px;
+  padding:12px 14px;
+  background:var(--soft);
+  border:1px solid var(--line);
+  border-radius:10px;
+  font-size:13px;
+  line-height:1.55;
+}
+.note strong{color:var(--navy)}
+.summary{
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:10px;
+}
+.summary > div{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px;
+  background:#fff;
+}
+.summary .label{
+  font-size:10px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  font-weight:600;
+}
+.summary .value{
+  font-size:16px;
+  font-weight:700;
+  margin-top:6px;
+  color:var(--navy);
+  font-variant-numeric:tabular-nums;
+}
+.section-title{
+  margin:22px 0 0;
+  color:var(--navy);
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:20px;
+  font-weight:700;
+}
+.payment-box{
+  margin-top:18px;
+  border:1.5px solid var(--gold);
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+}
+.payment-box .head{
+  background:linear-gradient(90deg,var(--navy),#0a3a75);
+  color:#fff;
+  padding:10px 14px;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:18px;
+  font-weight:700;
+}
+.payment-box .body{padding:12px 14px}
+.payment-totals{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:12px;
+}
+.payment-totals > div{
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px;
+  background:var(--soft);
+}
+.payment-totals .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.payment-totals .value{font-size:15px;font-weight:700;margin-top:4px;color:var(--navy)}
 .bill-block{page-break-inside:avoid;margin-bottom:48px;padding-bottom:24px;border-bottom:1px dashed #94a3b8}
 .bill-block:last-child{border-bottom:none;margin-bottom:0}
-@media print{body{padding:12px}.bill-block{page-break-after:always;border-bottom:none}}
+@media print{
+  body{padding:12px}
+  .bill-block{page-break-after:always;border-bottom:none}
+  a{color:inherit;text-decoration:none}
+}
 </style>
-</head><body><div class="sheet">
-<div class="brand"><h1>${escape(settings?.companyName ?? 'Rehmani Trading Company')}</h1><h2>${escape(title)}</h2></div>
-<div class="meta"><span>${party}</span><span>Bill date: ${escape(printed)}</span></div>
-${body}
-</div></body></html>`
+</head>
+<body>
+<div class="sheet">
+  <div class="brand">
+    <h1>${escape(settings?.companyName ?? 'Rehmani Trading Company')}</h1>
+    <h2 class="${urdu ? 'urdu' : ''}">${escape(title)}</h2>
+  </div>
+  <div class="dates">
+    <span><strong>EN</strong> ${escape(dates.en)}</span>
+    <span class="urdu" dir="rtl"><strong>UR</strong> ${escape(dates.ur)}</span>
+    <span><strong>Hijri</strong> ${escape(dates.hijriEn)}</span>
+  </div>
+  ${partyHtml}
+  ${body}
+</div>
+</body>
+</html>`
 }
 
 function table(headers: string[], rows: string[][], footer?: string[]) {
   return `<table><thead><tr>${headers.map((item) => `<th>${escape(item)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((item) => `<td>${escape(item)}</td>`).join('')}</tr>`).join('')}</tbody>${footer ? `<tfoot><tr class="totals">${footer.map((item) => `<td>${escape(item)}</td>`).join('')}</tr></tfoot>` : ''}</table>`
+}
+
+function partyDetailsCard(opts: {
+  title: string
+  codeLabel: string
+  code: string
+  name: string
+  phone?: string | null
+  cnic?: string | null
+  city?: string | null
+  address?: string | null
+  notes?: string | null
+  urdu?: boolean
+}) {
+  const u = !!opts.urdu
+  return `<div class="party-card">
+    <h3 class="${u ? 'urdu' : ''}">${escape(opts.name)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${opts.codeLabel}</span><div class="value">${dash(opts.code)}</div></div>
+      <div><span class="label">${u ? 'فون' : 'Phone'}</span><div class="value">${dash(opts.phone)}</div></div>
+      <div><span class="label">${u ? 'شناختی کارڈ' : 'CNIC'}</span><div class="value">${dash(opts.cnic)}</div></div>
+      <div><span class="label">${u ? 'شہر' : 'City'}</span><div class="value">${dash(opts.city)}</div></div>
+      <div style="grid-column:1/-1"><span class="label">${u ? 'پتہ' : 'Address'}</span><div class="value">${dash(opts.address)}</div></div>
+      ${opts.notes ? `<div style="grid-column:1/-1"><span class="label">${u ? 'نوٹس' : 'Notes'}</span><div class="value">${dash(opts.notes)}</div></div>` : ''}
+    </div>
+  </div>`
 }
 
 /**
@@ -73,7 +294,9 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         include: { product: true },
         orderBy: { createdAt: 'desc' },
       },
-      payments: true,
+      payments: {
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      },
       stockLots: {
         include: { product: true, dheri: true },
         orderBy: { intakeDate: 'desc' },
@@ -147,7 +370,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const stockValue = sum(farmer.stockLots.map((x) => x.amountValue.toNumber()))
 
   const note = urdu
-    ? `<div class="note"><strong>نوٹ:</strong> کسان کو مکمل وزن (تھیلیاں + اضافی کلو / اسٹاک) کی قیمت ادا کی جاتی ہے۔ اضافی کلو (Extra KG) کسان بل کی مجموعی / قابل ادائیگی رقم میں شامل ہے، اور وہی Extra KG کمپنی اسٹاک میں بھی محفوظ ہے۔ قابل ادائیگی = تھیلیاں + Extra KG − کمیشن۔</div>`
+    ? `<div class="note urdu"><strong>نوٹ:</strong> کسان کو مکمل وزن (تھیلیاں + اضافی کلو / اسٹاک) کی قیمت ادا کی جاتی ہے۔ اضافی کلو کسان بل کی مجموعی / قابل ادائیگی رقم میں شامل ہے، اور وہی Extra KG کمپنی اسٹاک میں بھی محفوظ ہے۔ قابل ادائیگی = تھیلیاں + Extra KG − کمیشن۔</div>`
     : `<div class="note"><strong>Note:</strong> Farmer is paid for the <em>full</em> weight — whole bags <strong>plus Extra KG (stock)</strong>. Extra KG is included in Gross / Payable above, and the same Extra KG is also held in company stock for forming buyer bags later. <strong>Total payable = bags amount + Extra KG amount − commission.</strong></div>`
 
   const summary = `<div class="summary">
@@ -159,7 +382,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
 
   const stockSection =
     farmer.stockLots.length > 0
-      ? `<h3 style="margin:22px 0 0;color:#002d62;font-size:15px">${urdu ? 'اضافی کلو اسٹاک ریکارڈ (اس کسان سے)' : 'Extra KG stock record (from this farmer)'}</h3>
+      ? `<h3 class="section-title ${urdu ? 'urdu' : ''}">${urdu ? 'اضافی کلو اسٹاک ریکارڈ (اس کسان سے)' : 'Extra KG stock record (from this farmer)'}</h3>
       ${table(
         urdu
           ? ['تاریخ', 'ڈھیری', 'پروڈکٹ', 'اصل کلو', 'باقی کلو', 'ریٹ/40کلو', 'رقم']
@@ -177,11 +400,55 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       )}`
       : ''
 
+  const recentPayments = farmer.payments.slice(0, 12)
+  const paymentRows = recentPayments.map((p) => [
+    p.paymentDate.toISOString().slice(0, 10),
+    money(p.amount),
+    String(p.paymentMethod || 'CASH'),
+    p.referenceNumber || '—',
+    p.notes || '—',
+    String(p.status || 'APPROVED'),
+  ])
+
+  const paymentBox = `<div class="payment-box">
+    <div class="head ${urdu ? 'urdu' : ''}">${urdu ? 'ادائیگیوں کا ریکارڈ (حالیہ)' : 'Payment record (recent)'}</div>
+    <div class="body">
+      ${
+        recentPayments.length === 0
+          ? `<p style="margin:0;color:#64748b">${urdu ? 'ابھی کوئی ادائیگی درج نہیں۔' : 'No payments recorded yet.'}</p>`
+          : table(
+              urdu
+                ? ['تاریخ', 'رقم', 'طریقہ', 'حوالہ', 'نوٹ', 'حالت']
+                : ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Notes', 'Status'],
+              paymentRows,
+            )
+      }
+      <div class="payment-totals">
+        <div><div class="label">${urdu ? 'کل قابل ادائیگی' : 'Total payable'}</div><div class="value">PKR ${money(payable)}</div></div>
+        <div><div class="label">${urdu ? 'ادا شدہ (کل)' : 'Total paid'}</div><div class="value">PKR ${money(paid)}</div></div>
+        <div><div class="label">${urdu ? 'باقی رقم' : 'Remaining balance'}</div><div class="value">PKR ${money(farmer.outstandingBalance)}</div></div>
+      </div>
+    </div>
+  </div>`
+
+  const partyHtml = partyDetailsCard({
+    title: farmer.name,
+    codeLabel: urdu ? 'کسان کوڈ' : 'Farmer ID',
+    code: farmer.farmerId,
+    name: farmer.name,
+    phone: farmer.phone,
+    cnic: farmer.cnic,
+    city: farmer.city,
+    address: farmer.address,
+    notes: farmer.notes,
+    urdu,
+  })
+
   return page(
     urdu
       ? 'کسان بل / ادائیگی رسید (تھیلیاں + اسٹاک)'
       : 'Farmer Bill / Payment Receipt (Bags + Extra KG Stock)',
-    `${escape(farmer.name)} (${escape(farmer.farmerId)})`,
+    partyHtml,
     table(
       urdu
         ? [
@@ -234,7 +501,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       summary +
       note +
       stockSection +
-      `<p style="margin-top:14px"><strong>${urdu ? 'ادا شدہ' : 'Paid'}: PKR ${money(paid)}</strong> · <strong>${urdu ? 'باقی' : 'Remaining'}: PKR ${money(farmer.outstandingBalance)}</strong></p>`,
+      paymentBox,
     urdu,
   )
 }
@@ -248,9 +515,13 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         include: { items: { include: { product: true, dheri: true } } },
         orderBy: { saleDate: 'desc' },
       },
+      payments: {
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      },
     },
   })
   if (!buyer) throw new Error('Buyer not found')
+  const urdu = lang === 'ur'
   const flat = buyer.sales.flatMap((sale) =>
     sale.items.map((item) => ({
       saleDate: sale.saleDate.toISOString().slice(0, 10),
@@ -277,9 +548,49 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
     money(item.rate),
     money(item.amount),
   ])
+  const billed = sum(flat.map((x) => x.amount))
+  const paid = buyer.payments.reduce((s, p) => s + p.amount.toNumber(), 0)
+  const recentPayments = buyer.payments.slice(0, 12)
+  const paymentRows = recentPayments.map((p) => [
+    p.paymentDate.toISOString().slice(0, 10),
+    money(p.amount),
+    String(p.paymentMethod || 'CASH'),
+    p.referenceNumber || '—',
+    p.notes || '—',
+  ])
+  const paymentBox = `<div class="payment-box">
+    <div class="head">${urdu ? 'ادائیگیوں کا ریکارڈ (حالیہ)' : 'Payment record (recent)'}</div>
+    <div class="body">
+      ${
+        recentPayments.length === 0
+          ? `<p style="margin:0;color:#64748b">${urdu ? 'ابھی کوئی ادائیگی درج نہیں۔' : 'No payments recorded yet.'}</p>`
+          : table(
+              ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Notes'],
+              paymentRows,
+            )
+      }
+      <div class="payment-totals">
+        <div><div class="label">${urdu ? 'کل بل' : 'Total billed'}</div><div class="value">PKR ${money(billed)}</div></div>
+        <div><div class="label">${urdu ? 'ادا شدہ' : 'Total paid'}</div><div class="value">PKR ${money(paid)}</div></div>
+        <div><div class="label">${urdu ? 'باقی' : 'Remaining'}</div><div class="value">PKR ${money(buyer.outstandingBalance)}</div></div>
+      </div>
+    </div>
+  </div>`
+
   return page(
-    lang === 'ur' ? 'خریدار بل / ادائیگی رسید' : 'Buyer Bill / Payment Receipt',
-    `${escape(buyer.name)} (${escape(buyer.buyerId)})`,
+    urdu ? 'خریدار بل / ادائیگی رسید' : 'Buyer Bill / Payment Receipt',
+    partyDetailsCard({
+      title: buyer.name,
+      codeLabel: urdu ? 'خریدار کوڈ' : 'Buyer ID',
+      code: buyer.buyerId,
+      name: buyer.name,
+      phone: buyer.phone,
+      cnic: buyer.cnic,
+      city: buyer.city,
+      address: buyer.address,
+      notes: buyer.notes,
+      urdu,
+    }),
     table(
       ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
       rows,
@@ -292,10 +603,10 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         String(sum(flat.map((x) => x.bags))),
         money(sum(flat.map((x) => x.weight))),
         '',
-        money(sum(flat.map((x) => x.amount))),
+        money(billed),
       ],
-    ) + `<p><strong>Remaining: PKR ${money(buyer.outstandingBalance)}</strong></p>`,
-    lang === 'ur',
+    ) + paymentBox,
+    urdu,
   )
 }
 
@@ -311,6 +622,7 @@ export async function buyerBillSelected(
     where: { id: BigInt(buyerId), deleted: false },
   })
   if (!buyer) throw new Error('Buyer not found')
+  const urdu = lang === 'ur'
 
   const items = await prisma.saleItem.findMany({
     where: {
@@ -355,7 +667,7 @@ export async function buyerBillSelected(
         ? `Buyer Bill — Part ${index + 1} of ${chunks.length}`
         : 'Buyer Bill / Selected Lines'
     return `<div class="bill-block">
-      <h3 style="margin:0 0 8px;color:#002d62">${escape(title)}</h3>
+      <h3 class="section-title" style="margin-top:0">${escape(title)}</h3>
       ${table(
         ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
         rows,
@@ -365,10 +677,21 @@ export async function buyerBillSelected(
   })
 
   return page(
-    lang === 'ur' ? 'خریدار بل' : 'Buyer Bill',
-    `${escape(buyer.name)} (${escape(buyer.buyerId)})`,
+    urdu ? 'خریدار بل' : 'Buyer Bill',
+    partyDetailsCard({
+      title: buyer.name,
+      codeLabel: urdu ? 'خریدار کوڈ' : 'Buyer ID',
+      code: buyer.buyerId,
+      name: buyer.name,
+      phone: buyer.phone,
+      cnic: buyer.cnic,
+      city: buyer.city,
+      address: buyer.address,
+      notes: buyer.notes,
+      urdu,
+    }),
     sheets.join('\n'),
-    lang === 'ur',
+    urdu,
   )
 }
 
@@ -385,6 +708,7 @@ export async function saleBill(
     },
   })
   if (!sale) throw new Error('Sale not found')
+  const urdu = lang === 'ur'
   const items =
     party === 'farmer'
       ? sale.items.filter((item) => item.sourceType === 'FARMER')
@@ -392,11 +716,26 @@ export async function saleBill(
   const bags = sum(items.map((x) => x.numberOfBags))
   const weight = sum(items.map((x) => x.totalWeight.toNumber()))
   const amount = sum(items.map((x) => x.amount.toNumber()))
+
+  const partyHtml =
+    party === 'buyer'
+      ? partyDetailsCard({
+          title: sale.buyer.name,
+          codeLabel: urdu ? 'خریدار کوڈ' : 'Buyer ID',
+          code: sale.buyer.buyerId,
+          name: sale.buyer.name,
+          phone: sale.buyer.phone,
+          cnic: sale.buyer.cnic,
+          city: sale.buyer.city,
+          address: sale.buyer.address,
+          notes: sale.buyer.notes,
+          urdu,
+        })
+      : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div></div></div>`
+
   return page(
     party === 'farmer' ? 'Farmer Sale Bill' : 'Buyer Sale Bill',
-    party === 'buyer'
-      ? `${escape(sale.buyer.name)} — ${escape(sale.invoiceNumber)}`
-      : escape(sale.invoiceNumber),
+    partyHtml,
     table(
       ['Date', 'Party', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
       items.map((item) => [
@@ -413,6 +752,6 @@ export async function saleBill(
       ]),
       ['Totals', '', '', '', '', String(bags), money(weight), '', money(amount)],
     ),
-    lang === 'ur',
+    urdu,
   )
 }
