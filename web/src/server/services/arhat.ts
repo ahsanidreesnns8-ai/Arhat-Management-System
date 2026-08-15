@@ -12,12 +12,15 @@ export type ArhatSettlementInput = PriceInput & {
   buyerId?: number | null
   productId?: number | null
   dheriId?: number | null
+  truckId?: number | null
   paymentNow?: number | string | null
   paymentMethod?: string | null
   transactionDate?: string | null
   notes?: string | null
   /** Extra KG deposited into stock lots (defaults to partialBagWeight). */
   stockExtraKg?: number | string | null
+  /** Attach a new dheri to this day batch (Daily Trade selected batch). */
+  dayBatchId?: number | null
 }
 
 export async function settle(
@@ -44,6 +47,7 @@ async function settleFarmer(input: ArhatSettlementInput, userId?: bigint) {
       ...input,
       farmerId: input.farmerId,
       productId: input.productId,
+      dayBatchId: input.dayBatchId ?? undefined,
     })
     dheriId = created.id
     await saveCalculation(dheriId, input)

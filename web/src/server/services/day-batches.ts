@@ -110,7 +110,7 @@ export async function getOrCreateReceivingBatch(batchDate?: string | null) {
   return batchDto(created)
 }
 
-/** Start the next batch for today (Batch 2, 3, …) while prior batches can still sell in order. */
+/** Create the next batch for today. Previous batches stay selectable. */
 export async function openNextBatch(batchDate?: string | null, notes?: string | null) {
   await ensureOpenSession(batchDate)
   const day = dateOnly(batchDate)
@@ -118,24 +118,6 @@ export async function openNextBatch(batchDate?: string | null, notes?: string | 
     where: { batchDate: day },
     orderBy: { batchNumber: 'desc' },
   })
-
-  // Close receiving on previous open receiving batch so new dheris go to the new one
-  if (last?.status === 'RECEIVING') {
-    const hasUnsold = await prisma.dheri.count({
-      where: {
-        dayBatchId: last.id,
-        deleted: false,
-        sellingStatus: { not: 'SOLD' },
-      },
-    })
-    await prisma.dayBatch.update({
-      where: { id: last.id },
-      data: {
-        status: hasUnsold > 0 ? 'SELLING' : 'CLOSED',
-        ...(hasUnsold === 0 ? { closedAt: new Date() } : {}),
-      },
-    })
-  }
 
   const created = await prisma.dayBatch.create({
     data: {

@@ -253,6 +253,11 @@ export const dailyTradeApi = {
     }),
   ensureReceivingBatch: (date?: string) =>
     api.post<ApiResponse<any>>('/daily-trade/batches/ensure', date ? { date } : {}),
+  receiveMany: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{ created: unknown[]; message: string; board: any; dayBatchId: number }>>(
+      '/daily-trade/receive',
+      data,
+    ),
   sellDheri: (data: Record<string, unknown>) =>
     api.post<ApiResponse<{
       sale: Sale

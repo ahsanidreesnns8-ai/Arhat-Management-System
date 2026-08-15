@@ -440,6 +440,13 @@ async function dispatch(
         'Receiving batch ready',
       )
     }
+    if (path[1] === 'receive' && method === 'POST') {
+      const data = await dailyTrade.receiveManyIntoBatch(
+        payload as dailyTrade.ReceiveManyInput,
+        user?.id,
+      )
+      return result(data, data.message)
+    }
     if (path[1] === 'sell-dheri' && method === 'POST') {
       const data = await dayBatches.sellDheriAtAuctionRate(
         payload as dayBatches.SellDheriAuctionInput,

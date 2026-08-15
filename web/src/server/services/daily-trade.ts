@@ -181,6 +181,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
       rate: x.marketRate.toNumber(),
       amount: x.totalPrice.toNumber(),
       date: x.createdAt.toISOString().slice(0, 10),
+      createdAt: x.createdAt.toISOString(),
       sellingStatus: x.sellingStatus,
     })),
     sales: sales.map((x) => ({
@@ -191,6 +192,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
       bags: x.totalBags,
       weight: x.totalWeight.toNumber(),
       amount: x.totalAmount.toNumber(),
+      createdAt: x.createdAt.toISOString(),
       items: x.items.map((item) => ({
         id: Number(item.id),
         productName: item.product.name,
@@ -389,3 +391,80 @@ export async function batchSellToBuyer(input: BatchSellInput, userId?: bigint) {
     message: `Sold ${farmerBags + stockBags} bags to buyer (invoice ${sale.invoiceNumber})`,
   }
 }
+
+export type ReceiveLineInput = {
+  productId: number
+  numberOfBags: number
+  weightPerBag?: number | string
+  extraKg?: number | string
+}
+
+export type ReceiveManyInput = {
+  farmerId: number
+  dayBatchId?: number | null
+  truckId?: number | null
+  notes?: string | null
+  lines: ReceiveLineInput[]
+}
+
+/** Receive one or more dheris from the same farmer into a selected day batch. */
+export async function receiveManyIntoBatch(
+  input: ReceiveManyInput,
+  userId?: bigint,
+) {
+  if (input.farmerId == null) throw new Error('Farmer is required')
+  const lines = (input.lines || []).filter((l) => Number(l.numberOfBags) > 0 && l.productId != null)
+  if (!lines.length) throw new Error('Add at least one dheri with bags and product')
+
+  const { settle } = await import('@/server/services/arhat')
+  const { getOrCreateReceivingBatch } = await import('@/server/services/day-batches')
+
+  let dayBatchId = input.dayBatchId ?? null
+  if (dayBatchId == null) {
+    const batch = await getOrCreateReceivingBatch()
+    dayBatchId = batch.id
+  } else {
+    const exists = await prisma.dayBatch.findFirst({ where: { id: BigInt(dayBatchId) } })
+    if (!exists) throw new Error('Selected batch not found')
+    await prisma.dayBatch.update({
+      where: { id: BigInt(dayBatchId) },
+      data: { status: 'RECEIVING', closedAt: null },
+    })
+  }
+
+  const created: Array<{ id: number; dheriCode: string; productId: number; bags: number }> = []
+  for (const line of lines) {
+    const row = await settle(
+      {
+        settlementType: 'FARMER_PAYABLE',
+        farmerId: input.farmerId,
+        productId: line.productId,
+        numberOfBags: Number(line.numberOfBags),
+        weightPerBag: line.weightPerBag ?? 40,
+        partialBagWeight: line.extraKg ?? 0,
+        marketRate: 0,
+        paymentNow: 0,
+        truckId: input.truckId ?? undefined,
+        notes: input.notes ?? undefined,
+        dayBatchId,
+      },
+      userId,
+    )
+    if (row.dheriId == null) throw new Error('Receive did not create a dheri')
+    created.push({
+      id: Number(row.dheriId),
+      dheriCode: 'dheriCode' in row ? String(row.dheriCode) : String(row.dheriId),
+      productId: Number(line.productId),
+      bags: Number(line.numberOfBags),
+    })
+  }
+
+  const board = await getDailyBoard()
+  return {
+    created,
+    dayBatchId,
+    board,
+    message: `Received ${created.length} dheri${created.length === 1 ? '' : 's'} into this batch`,
+  }
+}
+
