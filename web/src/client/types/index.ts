@@ -79,6 +79,12 @@ export interface SyncPulse {
   updatedAt?: string | null
 }
 
+export interface DashboardWeeklyPoint {
+  name: string
+  sales: number
+  stock: number
+}
+
 export interface DashboardStats {
   todaySales: number
   currentQueue: number
@@ -89,6 +95,7 @@ export interface DashboardStats {
   pendingPayments: number
   revenue: number
   commission: number
+  weeklyTrend?: DashboardWeeklyPoint[]
   recentActivity: RecentActivity[]
 }
 

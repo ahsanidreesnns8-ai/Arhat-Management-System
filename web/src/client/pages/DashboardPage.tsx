@@ -24,14 +24,14 @@ import type { DashboardStats } from '../types'
 import { useBusiness } from '../context/BusinessContext'
 import { fadeUp } from '../utils/motion'
 
-const chartData = [
-  { name: 'Mon', sales: 42000, stock: 1200 },
-  { name: 'Tue', sales: 38000, stock: 1100 },
-  { name: 'Wed', sales: 55000, stock: 980 },
-  { name: 'Thu', sales: 47000, stock: 850 },
-  { name: 'Fri', sales: 62000, stock: 720 },
-  { name: 'Sat', sales: 71000, stock: 600 },
-  { name: 'Sun', sales: 45000, stock: 550 },
+const emptyWeeklyTrend = [
+  { name: 'Mon', sales: 0, stock: 0 },
+  { name: 'Tue', sales: 0, stock: 0 },
+  { name: 'Wed', sales: 0, stock: 0 },
+  { name: 'Thu', sales: 0, stock: 0 },
+  { name: 'Fri', sales: 0, stock: 0 },
+  { name: 'Sat', sales: 0, stock: 0 },
+  { name: 'Sun', sales: 0, stock: 0 },
 ]
 
 const activityLink = (entityType?: string) => {
@@ -143,9 +143,11 @@ export default function DashboardPage() {
     pendingPayments: 0,
     revenue: 0,
     commission: 0,
+    weeklyTrend: emptyWeeklyTrend,
     recentActivity: [],
   }
   const view = stats || emptyStats
+  const chartData = view.weeklyTrend?.length ? view.weeklyTrend : emptyWeeklyTrend
 
   const statCards = [
     { title: "Today's Sales", value: formatCurrency(view.todaySales), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
