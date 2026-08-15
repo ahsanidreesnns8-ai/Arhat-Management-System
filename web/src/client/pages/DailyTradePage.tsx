@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowLeftRight, FileText, History, Layers, Package, RefreshCw, Scale, ShoppingCart, Warehouse,
+  ArrowLeftRight, FileText, History, Layers, Package, Plus, RefreshCw, Scale, ShoppingCart, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -44,6 +44,19 @@ type DayBatchRow = {
   canSell: boolean
 }
 
+type SaleItemRow = {
+  id: number
+  productName: string
+  bags: number
+  weight: number
+  rate: number
+  amount: number
+  sourceType: string
+  farmerName?: string
+  dheriId?: number | null
+  dheriCode?: string
+}
+
 type Board = {
   session: {
     id: number
@@ -79,18 +92,7 @@ type Board = {
     bags: number
     weight: number
     amount: number
-    items: Array<{
-      id: number
-      productName: string
-      bags: number
-      weight: number
-      rate: number
-      amount: number
-      sourceType: string
-      farmerName?: string
-      dheriId?: number | null
-      dheriCode?: string
-    }>
+    items: SaleItemRow[]
   }>
   batches: DayBatchRow[]
   receivingBatch: DayBatchRow | null
@@ -106,7 +108,6 @@ export default function DailyTradePage() {
   const [loading, setLoading] = useState(true)
   const [showHistory, setShowHistory] = useState(false)
 
-  // Receive into current batch
   const [recvFarmerId, setRecvFarmerId] = useState('')
   const [recvProductId, setRecvProductId] = useState('')
   const [recvBags, setRecvBags] = useState('')
@@ -115,15 +116,19 @@ export default function DailyTradePage() {
   const [receiving, setReceiving] = useState(false)
   const [openingBatch, setOpeningBatch] = useState(false)
 
-  // Auction sell one dheri
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null)
   const [sellDheriId, setSellDheriId] = useState('')
   const [sellBuyerId, setSellBuyerId] = useState('')
   const [sellRate, setSellRate] = useState('')
   const [sellPaid, setSellPaid] = useState('0')
   const [selling, setSelling] = useState(false)
+  const [newBuyerName, setNewBuyerName] = useState('')
+  const [addingBuyer, setAddingBuyer] = useState(false)
 
   const [billItemIds, setBillItemIds] = useState<number[]>([])
   const [billBuyerId, setBillBuyerId] = useState<number | null>(null)
+  const [billLang, setBillLang] = useState<'en' | 'ur'>('en')
+  const [lastSaleSummary, setLastSaleSummary] = useState<string | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -154,33 +159,61 @@ export default function DailyTradePage() {
     if (!recvProductId && products[0]) setRecvProductId(String(products[0].id))
   }, [products, recvProductId])
 
-  const activeSell = board?.activeSellBatch ?? null
   const receivingBatch = board?.receivingBatch ?? null
-
-  const sellableDheris = useMemo(() => {
-    if (!board || !activeSell) return []
-    return board.receives.filter(
-      (r) => r.dayBatchId === activeSell.id && r.sellingStatus !== 'SOLD',
-    )
-  }, [board, activeSell])
+  const batches = board?.batches || []
+  const selectedBatch =
+    batches.find((b) => b.id === selectedBatchId) ??
+    board?.activeSellBatch ??
+    batches.find((b) => b.unsoldDheris > 0) ??
+    null
 
   useEffect(() => {
-    if (sellableDheris.length && !sellDheriId) {
+    if (selectedBatchId == null && selectedBatch) setSelectedBatchId(selectedBatch.id)
+  }, [selectedBatch, selectedBatchId])
+
+  const batchDheris = useMemo(() => {
+    if (!board || !selectedBatch) return []
+    return board.receives.filter((r) => r.dayBatchId === selectedBatch.id)
+  }, [board, selectedBatch])
+
+  const sellableDheris = batchDheris.filter((r) => r.sellingStatus !== 'SOLD')
+
+  useEffect(() => {
+    if (sellableDheris.length && !sellableDheris.some((d) => String(d.id) === sellDheriId)) {
       setSellDheriId(String(sellableDheris[0].id))
     }
-    if (sellDheriId && !sellableDheris.some((d) => String(d.id) === sellDheriId)) {
-      setSellDheriId(sellableDheris[0] ? String(sellableDheris[0].id) : '')
-    }
+    if (!sellableDheris.length) setSellDheriId('')
   }, [sellableDheris, sellDheriId])
 
   const selectedSellDheri = sellableDheris.find((d) => String(d.id) === sellDheriId)
+  const rateNum = parseFloat(sellRate) || 0
+  const autoWeight = selectedSellDheri
+    ? selectedSellDheri.bags * selectedSellDheri.weightPerBag + (selectedSellDheri.partialBagWeight || 0)
+    : 0
+  const autoAmount = autoWeight > 0 && rateNum > 0 ? (autoWeight / 40) * rateNum : 0
+
+  const saleLines = useMemo(
+    () =>
+      (board?.sales || []).flatMap((sale) =>
+        sale.items.map((item) => ({
+          ...item,
+          saleId: sale.id,
+          invoice: sale.invoiceNumber,
+          buyerId: sale.buyerId,
+          buyerName: sale.buyerName,
+        })),
+      ),
+    [board],
+  )
 
   const handleOpenNextBatch = async () => {
     setOpeningBatch(true)
     try {
-      await dailyTradeApi.openNextBatch()
+      const res = await dailyTradeApi.openNextBatch()
       toast.success('Next batch opened — receive new farmer dheris here')
       await load(true)
+      const created = res.data.data as { id?: number }
+      if (created?.id) setSelectedBatchId(created.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Could not open next batch')
@@ -216,10 +249,7 @@ export default function DailyTradePage() {
         marketRate: 0,
         paymentNow: 0,
       })
-      toast.success(
-        res.data.message ||
-          `Received into Batch ${receivingBatch?.batchNumber ?? 1}`,
-      )
+      toast.success(res.data.message || `Received into Batch ${receivingBatch?.batchNumber ?? 1}`)
       setRecvBags('')
       setRecvExtraKg('0')
       await load(true)
@@ -231,18 +261,43 @@ export default function DailyTradePage() {
     }
   }
 
+  const handleAddBuyer = async () => {
+    const name = newBuyerName.trim()
+    if (!name) {
+      toast.error('Enter buyer / seller name')
+      return
+    }
+    setAddingBuyer(true)
+    try {
+      const res = await buyerApi.create({ name })
+      const created = res.data.data
+      toast.success(`Buyer ${created.name} added`)
+      setBuyers((prev) => [created, ...prev])
+      setSellBuyerId(String(created.id))
+      setNewBuyerName('')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not add buyer')
+    } finally {
+      setAddingBuyer(false)
+    }
+  }
+
   const handleAuctionSell = async () => {
+    if (!selectedBatch) {
+      toast.error('Click a batch first')
+      return
+    }
     if (!sellDheriId) {
-      toast.error('Select a dheri from the current batch')
+      toast.error('Select a dheri from this batch')
       return
     }
     if (!sellBuyerId) {
-      toast.error('Select the winning buyer')
+      toast.error('Select or add the buyer')
       return
     }
-    const rate = parseFloat(sellRate) || 0
-    if (rate <= 0) {
-      toast.error('Enter highest buyer rate per 40kg')
+    if (rateNum <= 0) {
+      toast.error('Enter rate per 40kg')
       return
     }
     setSelling(true)
@@ -250,24 +305,50 @@ export default function DailyTradePage() {
       const res = await dailyTradeApi.sellDheri({
         dheriId: Number(sellDheriId),
         buyerId: Number(sellBuyerId),
-        ratePer40Kg: rate,
+        dayBatchId: selectedBatch.id,
+        ratePer40Kg: rateNum,
         paidAmount: parseFloat(sellPaid) || 0,
       })
       toast.success(res.data.data.message || 'Sold')
       setBoard(res.data.data.board)
       setSellRate('')
       setSellPaid('0')
-      const sale = res.data.data.sale as { id?: number; buyerId?: number; items?: Array<{ id: number }> }
+      const sale = res.data.data.sale as {
+        id?: number
+        buyerId?: number
+        invoiceNumber?: string
+        items?: Array<{ id: number }>
+      }
       if (sale?.buyerId) setBillBuyerId(sale.buyerId)
       if (sale?.items?.length) {
         setBillItemIds(sale.items.map((i) => i.id).filter(Boolean))
       }
+      const dheriCode = selectedSellDheri?.dheriId || ''
+      setLastSaleSummary(
+        `${dheriCode} · Batch ${selectedBatch.batchNumber} · ${formatCurrency(rateNum)}/40kg · ${formatCurrency(autoAmount)} · ${sale?.invoiceNumber || ''}`,
+      )
       await load(true)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Sell failed')
     } finally {
       setSelling(false)
+    }
+  }
+
+  const openSelectedBill = async (lang: 'en' | 'ur') => {
+    if (!billBuyerId || billItemIds.length === 0) {
+      toast.error('Tick sold lines in the bill table first')
+      return
+    }
+    try {
+      const res = await buyerApi.getSelectedBillHtml(billBuyerId, billItemIds, lang)
+      openHtmlBill(
+        typeof res.data === 'string' ? res.data : String(res.data),
+        lang === 'ur' ? 'Buyer bill (Urdu)' : 'Buyer bill',
+      )
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate bill'))
     }
   }
 
@@ -279,6 +360,7 @@ export default function DailyTradePage() {
       toast.success('Board refreshed — previous day archived')
       const h = await dailyTradeApi.getHistory()
       setHistory(h.data.data || [])
+      setSelectedBatchId(null)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Refresh failed')
@@ -288,13 +370,13 @@ export default function DailyTradePage() {
   if (loading && !board) return <TableSkeleton rows={10} />
 
   const session = board?.session
-  const batches = board?.batches || []
+  const selectedBuyer = buyers.find((b) => String(b.id) === sellBuyerId)
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Daily Trade — Day Batches"
-        description="Receive dheris into Batch 1, 2, 3… · Sell each dheri to the buyer with the highest rate/40kg · Finish one batch before the next"
+        description="Click a batch to sell its dheris · Enter buyer, bags, and rate / 40kg · Weight and amount calculate automatically · Print a professional bill"
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setShowHistory((v) => !v)}>
@@ -325,21 +407,20 @@ export default function DailyTradePage() {
           <p className="text-3xl font-bold mt-1 tabular-nums">{session?.soldBags || 0}</p>
           <p className="text-sm text-slate-500">bags · {formatNumber(session?.soldWeightKg || 0)} kg</p>
           <p className="text-sm mt-2">
-            Must sell now:{' '}
+            Selected batch:{' '}
             <strong>
-              {activeSell
-                ? `Batch ${activeSell.batchNumber} (${activeSell.unsoldDheris} left)`
-                : 'No unsold dheris'}
+              {selectedBatch
+                ? `Batch ${selectedBatch.batchNumber} (${selectedBatch.unsoldDheris} left)`
+                : 'Click a batch below'}
             </strong>
           </p>
         </div>
       </div>
 
-      {/* Batches strip */}
       <div className="card-3d p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" /> Today’s batches
+            <Layers className="h-4 w-4 text-primary" /> Today’s batches — click one to sell
           </h3>
           <Button variant="secondary" loading={openingBatch} onClick={() => void handleOpenNextBatch()}>
             Open next batch
@@ -352,46 +433,46 @@ export default function DailyTradePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {batches.map((b) => {
-              const isActiveSell = activeSell?.id === b.id
+              const isSelected = selectedBatch?.id === b.id
               const isReceiving = receivingBatch?.id === b.id
               return (
-                <div
+                <button
                   key={b.id}
-                  className={`rounded-xl border p-3 ${
-                    isActiveSell
-                      ? 'border-amber-400 bg-amber-50/80 dark:bg-amber-950/20'
+                  type="button"
+                  onClick={() => {
+                    setSelectedBatchId(b.id)
+                    setSellDheriId('')
+                  }}
+                  className={`rounded-xl border p-3 text-left transition shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                    isSelected
+                      ? 'border-[#C5A059] bg-[#002D62] text-white'
                       : isReceiving
                         ? 'border-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/20'
-                        : 'border-slate-200 dark:border-white/10'
+                        : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900'
                   }`}
                 >
                   <p className="font-semibold">Batch {b.batchNumber}</p>
-                  <p className="text-xs text-slate-500 uppercase mt-0.5">{b.status}</p>
+                  <p className={`text-xs uppercase mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
+                    {b.status}
+                  </p>
                   <p className="text-sm mt-2">
                     {b.soldDheris}/{b.totalDheris} sold · {b.unsoldDheris} left
                   </p>
-                  {isActiveSell && (
-                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mt-1">
-                      Sell this batch first
-                    </p>
+                  {isSelected && (
+                    <p className="text-xs font-semibold text-[#C5A059] mt-1">Selected — sell below</p>
                   )}
-                  {isReceiving && (
+                  {!isSelected && isReceiving && (
                     <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-1">
                       Receiving here
                     </p>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
         )}
-        <p className="text-xs text-slate-500">
-          Same farmer can return later — select the existing farmer and enter the new product/bags into the current receiving batch.
-          New day starts new Batch 1.
-        </p>
       </div>
 
-      {/* Receive */}
       <div className="card-3d p-4 space-y-4">
         <h3 className="font-semibold flex items-center gap-2">
           <Package className="h-4 w-4 text-emerald-600" />
@@ -419,30 +500,10 @@ export default function DailyTradePage() {
               ...products.map((p) => ({ value: String(p.id), label: p.name })),
             ]}
           />
-          <Input
-            label="Bags *"
-            type="number"
-            value={recvBags}
-            onChange={(e) => setRecvBags(e.target.value)}
-          />
-          <Input
-            label="Bag weight (kg)"
-            type="number"
-            step="0.01"
-            value={recvBagKg}
-            onChange={(e) => setRecvBagKg(e.target.value)}
-          />
-          <Input
-            label="Extra KG"
-            type="number"
-            step="0.01"
-            value={recvExtraKg}
-            onChange={(e) => setRecvExtraKg(e.target.value)}
-          />
+          <Input label="Bags *" type="number" value={recvBags} onChange={(e) => setRecvBags(e.target.value)} />
+          <Input label="Bag weight (kg)" type="number" step="0.01" value={recvBagKg} onChange={(e) => setRecvBagKg(e.target.value)} />
+          <Input label="Extra KG" type="number" step="0.01" value={recvExtraKg} onChange={(e) => setRecvExtraKg(e.target.value)} />
         </div>
-        <p className="text-xs text-slate-500">
-          Winning rate / 40kg is entered when you sell this dheri to the highest bidder — not at receive time.
-        </p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void handleReceive()} loading={receiving}>
             <Package className="h-4 w-4" /> Add to Batch {receivingBatch?.batchNumber ?? 1}
@@ -453,83 +514,236 @@ export default function DailyTradePage() {
         </div>
       </div>
 
-      {/* Auction sell */}
-      <div className="card-3d p-4 space-y-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <ShoppingCart className="h-4 w-4 text-primary" />
-          Sell dheri — highest buyer rate
-          {activeSell ? ` (Batch ${activeSell.batchNumber})` : ''}
-        </h3>
-        {!activeSell ? (
-          <p className="text-sm text-slate-500">No unsold dheris waiting. Receive into a batch first.</p>
-        ) : (
-          <>
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              Finish Batch {activeSell.batchNumber} before selling later batches.
-              Enter the rate of the buyer who offered the highest price per 40kg.
+      <div className="rounded-2xl border-2 border-[#002D62]/20 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+        <div className="px-5 py-3 bg-[#002D62] text-white flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4 text-[#C5A059]" />
+            Sell dheri from Batch {selectedBatch?.batchNumber ?? '—'}
+          </h3>
+          <span className="text-xs text-white/80">Buyer · bags · rate / 40kg · auto weight</span>
+        </div>
+        <div className="p-5 space-y-4">
+          {!selectedBatch ? (
+            <p className="text-sm text-slate-500">Click a batch card above to sell its dheris.</p>
+          ) : sellableDheris.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Batch {selectedBatch.batchNumber} has no unsold dheris. Click another batch or receive more.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <Select
-                label="Dheri from this batch *"
-                value={sellDheriId}
-                onChange={(e) => setSellDheriId(e.target.value)}
-                options={[
-                  { value: '', label: 'Select dheri' },
-                  ...sellableDheris.map((r) => ({
-                    value: String(r.id),
-                    label: `${r.dheriId} · ${r.farmerName} · ${r.bags} bags · ${r.productName}`,
-                  })),
-                ]}
-              />
-              <Select
-                label="Winning buyer *"
-                value={sellBuyerId}
-                onChange={(e) => setSellBuyerId(e.target.value)}
-                options={[
-                  { value: '', label: 'Select buyer' },
-                  ...buyers.map((b) => ({
-                    value: String(b.id),
-                    label: `${b.name} (${b.buyerId})`,
-                  })),
-                ]}
-              />
-              <Input
-                label="Highest rate / 40kg *"
-                type="number"
-                step="0.01"
-                value={sellRate}
-                onChange={(e) => setSellRate(e.target.value)}
-                placeholder="e.g. 4300"
-              />
-              <Input
-                label="Cash received now"
-                type="number"
-                step="0.01"
-                value={sellPaid}
-                onChange={(e) => setSellPaid(e.target.value)}
-              />
-            </div>
-            {selectedSellDheri && (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Selling <strong>{selectedSellDheri.dheriId}</strong> from{' '}
-                <strong>{selectedSellDheri.farmerName}</strong> —{' '}
-                {selectedSellDheri.bags} bags ({formatNumber(selectedSellDheri.weight)} kg)
-                {selectedSellDheri.partialBagWeight > 0
-                  ? ` · Extra ${formatNumber(selectedSellDheri.partialBagWeight)} kg → stock`
-                  : ''}
-              </p>
-            )}
-            <Button onClick={() => void handleAuctionSell()} loading={selling}>
-              <Scale className="h-4 w-4" /> Sell this dheri at winning rate
-            </Button>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="rounded-xl border border-slate-200 dark:border-white/10 p-4 space-y-3 bg-slate-50/80 dark:bg-slate-800/40">
+                <p className="text-sm font-semibold text-[#002D62] dark:text-[#C5A059]">1. Buyer (seller of cash / buyer of grain)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Select
+                    label="Buyer *"
+                    value={sellBuyerId}
+                    onChange={(e) => setSellBuyerId(e.target.value)}
+                    options={[
+                      { value: '', label: 'Select buyer' },
+                      ...buyers.map((b) => ({
+                        value: String(b.id),
+                        label: `${b.name} (${b.buyerId})`,
+                      })),
+                    ]}
+                  />
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Input
+                        label="Or add new buyer"
+                        value={newBuyerName}
+                        onChange={(e) => setNewBuyerName(e.target.value)}
+                        placeholder="Buyer name"
+                      />
+                    </div>
+                    <Button variant="secondary" loading={addingBuyer} onClick={() => void handleAddBuyer()}>
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 dark:border-white/10 p-4 space-y-3">
+                <p className="text-sm font-semibold text-[#002D62] dark:text-[#C5A059]">
+                  2. Dheri of Batch {selectedBatch.batchNumber}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Select
+                    label="Dheri *"
+                    value={sellDheriId}
+                    onChange={(e) => setSellDheriId(e.target.value)}
+                    options={[
+                      { value: '', label: 'Select dheri' },
+                      ...sellableDheris.map((r) => ({
+                        value: String(r.id),
+                        label: `${r.dheriId} · ${r.farmerName} · ${r.productName}`,
+                      })),
+                    ]}
+                  />
+                  <Input label="Bags" value={selectedSellDheri ? String(selectedSellDheri.bags) : ''} readOnly />
+                  <Input
+                    label="Bag weight (kg)"
+                    value={selectedSellDheri ? String(selectedSellDheri.weightPerBag) : ''}
+                    readOnly
+                  />
+                  <Input
+                    label="Extra KG"
+                    value={selectedSellDheri ? String(selectedSellDheri.partialBagWeight) : '0'}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#C5A059]/40 p-4 space-y-3 bg-[#C5A059]/5">
+                <p className="text-sm font-semibold text-[#002D62] dark:text-[#C5A059]">3. Rate and auto totals</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Input
+                    label="Rate / 40kg *"
+                    type="number"
+                    step="0.01"
+                    value={sellRate}
+                    onChange={(e) => setSellRate(e.target.value)}
+                    placeholder="e.g. 4300"
+                  />
+                  <Input label="Total weight (auto)" value={autoWeight ? formatNumber(autoWeight) : '—'} readOnly />
+                  <Input label="Amount (auto)" value={autoAmount ? formatCurrency(autoAmount) : '—'} readOnly />
+                  <Input
+                    label="Cash received now"
+                    type="number"
+                    step="0.01"
+                    value={sellPaid}
+                    onChange={(e) => setSellPaid(e.target.value)}
+                  />
+                </div>
+                {selectedSellDheri && (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Selling <strong>{selectedSellDheri.dheriId}</strong> from{' '}
+                    <strong>{selectedSellDheri.farmerName}</strong>
+                    {selectedBuyer ? <> to <strong>{selectedBuyer.name}</strong></> : ''}
+                    {' '}— {selectedSellDheri.bags} bags × {formatNumber(selectedSellDheri.weightPerBag)} kg
+                    {selectedSellDheri.partialBagWeight > 0
+                      ? ` + Extra ${formatNumber(selectedSellDheri.partialBagWeight)} kg`
+                      : ''}
+                    {' = '}
+                    <strong>{formatNumber(autoWeight)} kg</strong>
+                    {rateNum > 0 ? <> · {formatCurrency(autoAmount)}</> : ''}
+                  </p>
+                )}
+              </div>
+
+              <Button onClick={() => void handleAuctionSell()} loading={selling}>
+                <Scale className="h-4 w-4" /> Sell this dheri to buyer
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* All dheris table by batch */}
+      <div className="rounded-2xl border-2 border-[#C5A059]/50 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+        <div className="px-5 py-3 bg-gradient-to-r from-[#002D62] to-[#0a3a75] text-white flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4 text-[#C5A059]" />
+            Generate professional bills
+          </h3>
+          <span className="text-xs text-white/80">Tick lines from the sales above, then print EN or UR</span>
+        </div>
+        <div className="p-5 space-y-4">
+          {lastSaleSummary && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/20 px-4 py-3 text-sm">
+              <p className="text-xs uppercase tracking-wide text-emerald-800 dark:text-emerald-200">Last sale</p>
+              <p className="font-semibold mt-1">{lastSaleSummary}</p>
+            </div>
+          )}
+          {saleLines.length === 0 ? (
+            <p className="text-sm text-slate-500">No sales yet today — sell a dheri above, then generate its bill here.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[720px]">
+                  <thead className="bg-[#002D62] text-white text-left">
+                    <tr>
+                      <th className="px-3 py-2">Bill</th>
+                      <th className="px-3 py-2">Invoice</th>
+                      <th className="px-3 py-2">Buyer</th>
+                      <th className="px-3 py-2">Dheri</th>
+                      <th className="px-3 py-2">Farmer</th>
+                      <th className="px-3 py-2">Bags</th>
+                      <th className="px-3 py-2">Rate/40kg</th>
+                      <th className="px-3 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {saleLines.map((item) => (
+                      <tr key={item.id} className={billItemIds.includes(item.id) ? 'bg-[#C5A059]/10' : ''}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={billItemIds.includes(item.id)}
+                            onChange={() => {
+                              setBillBuyerId(item.buyerId)
+                              setBillItemIds((prev) =>
+                                prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id],
+                              )
+                            }}
+                            aria-label={`Bill ${item.dheriCode || item.invoice}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Link className="text-primary" to={`/sales/${item.saleId}`}>{item.invoice}</Link>
+                        </td>
+                        <td className="px-3 py-2">{item.buyerName}</td>
+                        <td className="px-3 py-2 font-medium">{item.dheriCode || '—'}</td>
+                        <td className="px-3 py-2">{item.farmerName || '—'}</td>
+                        <td className="px-3 py-2">{item.bags}</td>
+                        <td className="px-3 py-2">{formatCurrency(item.rate)}</td>
+                        <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm">
+                  {billItemIds.length} line{billItemIds.length === 1 ? '' : 's'} selected
+                </span>
+                <div className="inline-flex rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden">
+                  {(['en', 'ur'] as const).map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setBillLang(code)}
+                      className={`px-3 py-1.5 text-xs font-semibold ${
+                        billLang === code ? 'bg-[#002D62] text-white' : 'bg-transparent'
+                      }`}
+                    >
+                      {code === 'en' ? 'English' : 'اردو'}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => void openSelectedBill(billLang)}
+                  disabled={!billBuyerId || billItemIds.length === 0}
+                >
+                  <FileText className="h-4 w-4" /> Generate bill
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    if (!saleLines.length) return
+                    setBillItemIds(saleLines.map((x) => x.id))
+                    setBillBuyerId(saleLines[0].buyerId)
+                  }}
+                >
+                  Tick all today
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">
-          Today’s dheris by batch
+          Today’s dheris {selectedBatch ? `· Batch ${selectedBatch.batchNumber} highlighted` : ''}
         </div>
         {(board?.receives || []).length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No dheris received today.</p>
@@ -552,16 +766,11 @@ export default function DailyTradePage() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {(board?.receives || []).map((r) => {
                   const sold = r.sellingStatus === 'SOLD'
-                  const locked =
-                    !!activeSell &&
-                    r.dayBatchId !== activeSell.id &&
-                    !sold
+                  const inSelected = selectedBatch?.id === r.dayBatchId
                   return (
                     <tr
                       key={r.id}
-                      className={
-                        locked ? 'opacity-60' : activeSell?.id === r.dayBatchId && !sold ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''
-                      }
+                      className={inSelected && !sold ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}
                     >
                       <td className="px-3 py-2 font-medium">
                         {r.batchNumber != null ? `B${r.batchNumber}` : '—'}
@@ -580,10 +789,10 @@ export default function DailyTradePage() {
                       <td className="px-3 py-2">
                         {sold ? (
                           <span className="text-xs font-semibold text-emerald-700">SOLD</span>
-                        ) : locked ? (
-                          <span className="text-xs text-slate-500">Wait — finish earlier batch</span>
+                        ) : inSelected ? (
+                          <span className="text-xs font-semibold text-amber-700">IN THIS BATCH</span>
                         ) : (
-                          <span className="text-xs font-semibold text-amber-700">READY TO SELL</span>
+                          <span className="text-xs text-slate-500">UNSOLD</span>
                         )}
                       </td>
                     </tr>
@@ -594,61 +803,6 @@ export default function DailyTradePage() {
           </div>
         )}
       </div>
-
-      {(board?.sales || []).length > 0 && (
-        <div className="card-3d overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap justify-between gap-2">
-            <span>Today’s sales</span>
-            <Button
-              variant="secondary"
-              disabled={!billBuyerId || billItemIds.length === 0}
-              onClick={async () => {
-                if (!billBuyerId || !billItemIds.length) return
-                try {
-                  const res = await buyerApi.getSelectedBillHtml(billBuyerId, billItemIds, 'en')
-                  openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Buyer bill')
-                } catch (err) {
-                  toast.error(billErrorMessage(err, 'Could not generate bill'))
-                }
-              }}
-            >
-              <FileText className="h-4 w-4" /> Bill last sale lines
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
-                <tr>
-                  <th className="px-3 py-2">Invoice</th>
-                  <th className="px-3 py-2">Buyer</th>
-                  <th className="px-3 py-2">Dheri</th>
-                  <th className="px-3 py-2">Farmer</th>
-                  <th className="px-3 py-2">Bags</th>
-                  <th className="px-3 py-2">Rate</th>
-                  <th className="px-3 py-2">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {(board?.sales || []).flatMap((sale) =>
-                  sale.items.map((item) => (
-                    <tr key={`${sale.id}-${item.id}`}>
-                      <td className="px-3 py-2">
-                        <Link className="text-primary" to={`/sales/${sale.id}`}>{sale.invoiceNumber}</Link>
-                      </td>
-                      <td className="px-3 py-2">{sale.buyerName}</td>
-                      <td className="px-3 py-2">{item.dheriCode || '—'}</td>
-                      <td className="px-3 py-2">{item.farmerName || '—'}</td>
-                      <td className="px-3 py-2">{item.bags}</td>
-                      <td className="px-3 py-2">{formatCurrency(item.rate)}</td>
-                      <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
-                    </tr>
-                  )),
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex items-center gap-2">

@@ -209,14 +209,17 @@ export type SellDheriAuctionInput = {
   buyerId: number
   /** Winning buyer rate per 40 kg */
   ratePer40Kg: number | string
+  /** When set, sell from this clicked batch instead of only the earliest unfinished one. */
+  dayBatchId?: number | null
   saleDate?: string | null
   paidAmount?: number | string
   notes?: string | null
 }
 
 /**
- * Sell one dheri from the active (earliest unfinished) batch to the buyer
- * who offered the highest rate. Owner enters that winning rate / 40kg here.
+ * Sell one dheri from a day batch to the buyer at the entered rate / 40kg.
+ * If dayBatchId is provided (clicked batch), that batch is used.
+ * Otherwise the earliest unfinished batch is required.
  */
 export async function sellDheriAtAuctionRate(
   input: SellDheriAuctionInput,
@@ -227,24 +230,36 @@ export async function sellDheriAtAuctionRate(
   const rate = round2(input.ratePer40Kg)
   if (rate.lte(0)) throw new Error('Enter the highest buyer rate per 40kg')
 
-  const active = await getActiveSellBatch(input.saleDate)
-  if (!active) throw new Error('No unsold dheris in today’s batches')
-
   const dheri = await prisma.dheri.findFirst({
     where: { id: BigInt(input.dheriId), deleted: false },
     include: { farmer: true, product: true, dayBatch: true },
   })
   if (!dheri) throw new Error('Dheri not found')
+  if (!dheri.dayBatch) throw new Error('This dheri is not in a day batch')
   if (dheri.farmer.deleted || !dheri.farmer.active) {
     throw new Error(
       `Farmer ${dheri.farmer.name} is inactive/deleted — restore the farmer before selling`,
     )
   }
   if (dheri.sellingStatus === 'SOLD') throw new Error('This dheri is already sold')
-  if (dheri.dayBatchId == null || Number(dheri.dayBatchId) !== active.id) {
-    throw new Error(
-      `Sell Batch ${active.batchNumber} first — finish its dheris before later batches`,
-    )
+
+  let targetBatch = batchDto({
+    ...dheri.dayBatch,
+    dheris: [{ sellingStatus: dheri.sellingStatus }],
+  })
+  if (input.dayBatchId != null) {
+    if (Number(dheri.dayBatchId) !== Number(input.dayBatchId)) {
+      throw new Error('Selected dheri does not belong to this batch')
+    }
+  } else {
+    const active = await getActiveSellBatch(input.saleDate)
+    if (!active) throw new Error('No unsold dheris in today’s batches')
+    if (Number(dheri.dayBatchId) !== active.id) {
+      throw new Error(
+        `Sell Batch ${active.batchNumber} first — or click Batch ${dheri.dayBatch.batchNumber} to sell it`,
+      )
+    }
+    targetBatch = active
   }
 
   const oldPayable = dheri.farmerReceivable.toNumber()
@@ -253,11 +268,11 @@ export async function sellDheriAtAuctionRate(
   const sale = await createSale(
     {
       buyerId: input.buyerId,
-      saleDate: input.saleDate || active.batchDate,
+      saleDate: input.saleDate || targetBatch.batchDate,
       paidAmount: input.paidAmount ?? 0,
       notes:
         input.notes ||
-        `Batch ${active.batchNumber} auction: ${dheri.dheriId} @ ${rate.toFixed(2)}/40kg`,
+        `Batch ${targetBatch.batchNumber} auction: ${dheri.dheriId} @ ${rate.toFixed(2)}/40kg`,
       items: [
         {
           productId: Number(dheri.productId),
@@ -330,7 +345,7 @@ export async function sellDheriAtAuctionRate(
   const session = await prisma.dailyTradeSession.findFirst({
     where: {
       status: 'OPEN',
-      sessionDate: dateOnly(input.saleDate || active.batchDate),
+      sessionDate: dateOnly(input.saleDate || targetBatch.batchDate),
       productId: null,
     },
   })
@@ -345,18 +360,18 @@ export async function sellDheriAtAuctionRate(
     })
   }
 
-  const batches = await listDayBatches(input.saleDate || active.batchDate)
+  const batches = await listDayBatches(input.saleDate || targetBatch.batchDate)
   return {
     sale,
     dheriId: Number(dheri.id),
     dheriCode: dheri.dheriId,
-    batchNumber: active.batchNumber,
+    batchNumber: targetBatch.batchNumber,
     ratePer40Kg: rate.toNumber(),
     farmerPayable: newPayable,
     batchClosed,
     batches,
     message: batchClosed
-      ? `Sold ${dheri.dheriId} at PKR ${rate.toFixed(2)}/40kg — Batch ${active.batchNumber} complete`
+      ? `Sold ${dheri.dheriId} at PKR ${rate.toFixed(2)}/40kg — Batch ${targetBatch.batchNumber} complete`
       : `Sold ${dheri.dheriId} at PKR ${rate.toFixed(2)}/40kg to winning buyer`,
   }
 }
