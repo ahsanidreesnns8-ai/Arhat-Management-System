@@ -10,6 +10,8 @@ const products = [
   ['BAR-001', 'Barley'],
 ] as const
 
+const ALLOWED_USERNAMES = ['owner', 'staff'] as const
+
 async function ensureSettings(workspace: 'live' | 'demo', companyName: string) {
   const existing = await prisma.businessSettings.findFirst({ where: { workspace } })
   if (existing) return existing
@@ -95,32 +97,21 @@ async function upsertLoginUser(input: {
   })
 }
 
-async function main() {
-  // Migrate legacy owner → rehmani (keep same row / id)
-  const legacyOwner = await prisma.user.findUnique({ where: { username: 'owner' } })
-  const rehmaniExists = await prisma.user.findUnique({ where: { username: 'rehmani' } })
-  if (legacyOwner && !rehmaniExists) {
-    await prisma.user.update({
-      where: { id: legacyOwner.id },
-      data: {
-        username: 'rehmani',
-        email: 'rehmani@rehmanitrading.com',
-        fullName: 'Rehmani Owner',
-        role: 'OWNER',
-        workspace: 'live',
-        password: await hash('rehmani123', 12),
-        active: true,
-        deleted: false,
-      },
-    })
-  } else if (legacyOwner && rehmaniExists) {
-    // Prefer rehmani; disable legacy owner login
-    await prisma.user.update({
-      where: { id: legacyOwner.id },
-      data: { active: false, deleted: true },
-    })
-  }
+async function disableOtherLogins() {
+  await prisma.user.updateMany({
+    where: {
+      username: { notIn: [...ALLOWED_USERNAMES] },
+    },
+    data: {
+      active: false,
+      deleted: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  })
+}
 
+async function main() {
   await ensureSettings('live', 'Rehmani Trading Company')
   await ensureSettings('demo', 'Rehmani Trading Company')
   await ensureProducts('live')
@@ -128,44 +119,26 @@ async function main() {
   await ensureSync(1, 'live')
   await ensureSync(2, 'demo')
 
-  await upsertLoginUser({
-    username: 'rehmani',
-    email: 'rehmani@rehmanitrading.com',
-    password: 'rehmani123',
-    fullName: 'Rehmani Owner',
-    role: 'OWNER',
-    workspace: 'live',
-  })
-
-  // Shared owner login — intended for 2–3 owner persons
+  // Only two logins are permitted on this system.
   await upsertLoginUser({
     username: 'owner',
     email: 'owner@rehmanitrading.com',
     password: 'owner123',
-    fullName: 'Shared Owner',
+    fullName: 'Owner',
     role: 'OWNER',
     workspace: 'live',
   })
 
-  // Staff / operator login — usage time tracked for owners
   await upsertLoginUser({
     username: 'staff',
     email: 'staff@rehmanitrading.com',
     password: 'staff123',
-    fullName: 'Staff Operator',
+    fullName: 'Staff',
     role: 'OPERATOR',
     workspace: 'live',
   })
 
-  // Shared guest login — isolated demo sandbox
-  await upsertLoginUser({
-    username: 'demo',
-    email: 'demo@rehmanitrading.com',
-    password: 'demo123',
-    fullName: 'Demo Guest',
-    role: 'OPERATOR',
-    workspace: 'demo',
-  })
+  await disableOtherLogins()
 }
 
 main()

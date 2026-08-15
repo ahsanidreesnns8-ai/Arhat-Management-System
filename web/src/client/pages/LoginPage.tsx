@@ -34,7 +34,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('rehmani_remember_user')
-    if (saved) setUsername(saved)
+    if (!saved) return
+    const normalized = saved.trim().toLowerCase()
+    if (normalized === 'owner' || normalized === 'staff') setUsername(saved)
+    else localStorage.removeItem('rehmani_remember_user')
   }, [])
 
   const onMouseMove = (e: MouseEvent) => {

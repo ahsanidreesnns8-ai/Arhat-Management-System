@@ -75,21 +75,32 @@ async function main() {
   results.push(await check('settings/public', 'settings/public'))
 
   let liveToken = ''
-  let demoToken = ''
   try {
-    liveToken = await login('rehmani', 'rehmani123')
-    results.push({ name: 'login rehmani', ok: true, status: 200, detail: 'ok' })
+    liveToken = await login('owner', 'owner123')
+    results.push({ name: 'login owner', ok: true, status: 200, detail: 'ok' })
   } catch (e) {
-    results.push({ name: 'login rehmani', ok: false, status: 0, detail: String(e) })
+    results.push({ name: 'login owner', ok: false, status: 0, detail: String(e) })
   }
   try {
-    demoToken = await login('demo', 'demo123')
-    results.push({ name: 'login demo', ok: true, status: 200, detail: 'ok' })
+    await login('staff', 'staff123')
+    results.push({ name: 'login staff', ok: true, status: 200, detail: 'ok' })
   } catch (e) {
-    results.push({ name: 'login demo', ok: false, status: 0, detail: String(e) })
+    results.push({ name: 'login staff', ok: false, status: 0, detail: String(e) })
+  }
+  for (const [u, p] of [
+    ['rehmani', 'rehmani123'],
+    ['demo', 'demo123'],
+    ['admin', 'admin'],
+  ] as const) {
+    try {
+      await login(u, p)
+      results.push({ name: `login blocked ${u}`, ok: false, status: 200, detail: 'should have been rejected' })
+    } catch {
+      results.push({ name: `login blocked ${u}`, ok: true, status: 401, detail: 'rejected' })
+    }
   }
 
-  const token = liveToken || demoToken
+  const token = liveToken
   if (!token) {
     console.log(JSON.stringify(results, null, 2))
     process.exit(1)
@@ -123,31 +134,24 @@ async function main() {
     results.push(await check(name, path, { token }))
   }
 
-  // demo workspace reads
-  if (demoToken) {
-    for (const path of ['sync/pulse', 'farmers', 'dashboard/stats', 'weather']) {
-      results.push(await check(`demo:${path}`, path, { token: demoToken }))
-    }
-  }
-
-  // mutation smoke on demo only
-  if (demoToken) {
+  // mutation smoke (owner live workspace)
+  {
     const create = await req('farmers', {
       method: 'POST',
-      token: demoToken,
+      token,
       body: { name: 'Smoke Test Farmer', phone: '03001110000', city: 'Lahore' },
     })
     results.push({
-      name: 'demo create farmer',
+      name: 'create farmer',
       ok: create.status >= 200 && create.status < 300 && create.json?.success === true,
       status: create.status,
       detail: create.json?.message || create.json?.data?.farmerId || create.text,
     })
     const id = create.json?.data?.id
     if (id) {
-      const del = await req(`farmers/${id}`, { method: 'DELETE', token: demoToken })
+      const del = await req(`farmers/${id}`, { method: 'DELETE', token })
       results.push({
-        name: 'demo delete farmer',
+        name: 'delete farmer',
         ok: del.status >= 200 && del.status < 300,
         status: del.status,
         detail: del.json?.message || del.text,

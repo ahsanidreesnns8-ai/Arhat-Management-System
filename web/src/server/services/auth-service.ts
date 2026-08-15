@@ -6,6 +6,10 @@ import {
   verifyPassword,
   verifyToken,
 } from '@/server/auth'
+import {
+  isAllowedLoginUsername,
+  normalizeLoginUsername,
+} from '@/server/allowed-logins'
 import { WORKSPACE_DEMO, runWithWorkspace } from '@/server/workspace'
 import {
   endLoginSession,
@@ -21,9 +25,14 @@ export async function login(
   password: string,
   meta?: { ipAddress?: string | null; userAgent?: string | null },
 ) {
-  const normalized = username.trim()
+  const normalized = normalizeLoginUsername(username)
   if (!normalized || !password) {
     throw new Error('Username and password are required')
+  }
+
+  // Hard allowlist: only owner / staff may authenticate.
+  if (!isAllowedLoginUsername(normalized)) {
+    throw new Error('Invalid username or password')
   }
 
   const user = await prisma.user.findFirst({

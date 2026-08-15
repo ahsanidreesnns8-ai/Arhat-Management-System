@@ -1,6 +1,10 @@
 import type { User, UserRole } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { hashPassword } from '@/server/auth'
+import {
+  isAllowedLoginUsername,
+  normalizeLoginUsername,
+} from '@/server/allowed-logins'
 
 export type UserInput = {
   username?: string
@@ -59,22 +63,26 @@ export async function getUser(id: number | bigint) {
 
 export async function createUser(input: UserInput) {
   const role = validate(input)
+  const username = normalizeLoginUsername(input.username!)
+  if (!isAllowedLoginUsername(username)) {
+    throw new Error('Only owner and staff logins are allowed on this system')
+  }
   if (!input.password?.trim()) throw new Error('Password is required')
   const duplicate = await prisma.user.findFirst({
     where: {
       OR: [
-        { username: input.username!.trim() },
+        { username },
         { email: input.email!.trim() },
       ],
     },
   })
-  if (duplicate?.username === input.username!.trim()) {
+  if (duplicate?.username === username) {
     throw new Error('Username already exists')
   }
   if (duplicate) throw new Error('Email already exists')
   const row = await prisma.user.create({
     data: {
-      username: input.username!.trim(),
+      username,
       email: input.email!.trim(),
       password: await hashPassword(input.password),
       fullName: input.fullName!.trim(),
@@ -88,6 +96,10 @@ export async function createUser(input: UserInput) {
 
 export async function updateUser(id: number | bigint, input: UserInput) {
   const role = validate(input)
+  const username = normalizeLoginUsername(input.username!)
+  if (!isAllowedLoginUsername(username)) {
+    throw new Error('Only owner and staff logins are allowed on this system')
+  }
   const existing = await prisma.user.findFirst({
     where: { id: BigInt(id), deleted: false },
   })
@@ -96,19 +108,19 @@ export async function updateUser(id: number | bigint, input: UserInput) {
     where: {
       id: { not: existing.id },
       OR: [
-        { username: input.username!.trim() },
+        { username },
         { email: input.email!.trim() },
       ],
     },
   })
-  if (duplicate?.username === input.username!.trim()) {
+  if (duplicate?.username === username) {
     throw new Error('Username already exists')
   }
   if (duplicate) throw new Error('Email already exists')
   const row = await prisma.user.update({
     where: { id: existing.id },
     data: {
-      username: input.username!.trim(),
+      username,
       email: input.email!.trim(),
       fullName: input.fullName!.trim(),
       role,
@@ -128,7 +140,7 @@ export async function setUserActive(id: number | bigint, active: boolean) {
 
 export async function deleteUser(id: number | bigint) {
   const existing = await getUser(id)
-  if (existing.username === 'rehmani' || existing.username === 'demo' || existing.username === 'owner' || existing.username === 'staff') {
+  if (isAllowedLoginUsername(existing.username)) {
     throw new Error('System accounts cannot be deleted')
   }
   await prisma.user.update({
