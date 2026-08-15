@@ -241,8 +241,13 @@ export const stockApi = {
 }
 
 export const dailyTradeApi = {
-  getBoard: (date?: string) =>
-    api.get<ApiResponse<any>>('/daily-trade/board', { params: date ? { date } : undefined }),
+  getBoard: (date?: string, batchId?: number | null) =>
+    api.get<ApiResponse<any>>('/daily-trade/board', {
+      params: {
+        ...(date ? { date } : {}),
+        ...(batchId != null && Number(batchId) > 0 ? { batchId } : {}),
+      },
+    }),
   getHistory: () => api.get<ApiResponse<any[]>>('/daily-trade/history'),
   getBatches: (date?: string) =>
     api.get<ApiResponse<any>>('/daily-trade/batches', { params: date ? { date } : undefined }),

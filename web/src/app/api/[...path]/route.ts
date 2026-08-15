@@ -412,7 +412,10 @@ async function dispatch(
   if (path[0] === 'daily-trade') {
     if ((path.length === 1 || path[1] === 'board') && method === 'GET') {
       return result(
-        await dailyTrade.getDailyBoard(url.searchParams.get('date')),
+        await dailyTrade.getDailyBoard(
+          url.searchParams.get('date'),
+          url.searchParams.get('batchId'),
+        ),
       )
     }
     if (path[1] === 'history' && method === 'GET') {
@@ -455,6 +458,7 @@ async function dispatch(
       return result(
         { ...data, board: await dailyTrade.getDailyBoard(
           (payload.saleDate as string | undefined) ?? null,
+          (payload.dayBatchId as number | string | undefined) ?? null,
         ) },
         data.message,
       )

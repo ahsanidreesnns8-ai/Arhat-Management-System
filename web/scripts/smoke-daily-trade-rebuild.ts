@@ -162,6 +162,9 @@ async function main() {
       if (nextSelectedBatchId(fakeBatches, null) !== 11) {
         throw new Error('default selection must be first batch, not last')
       }
+      if (nextSelectedBatchId([{ id: 55, batchNumber: 5 }], 11) !== 11) {
+        throw new Error('tapped batch 1 must not jump to batch 5 when the list is stale')
+      }
 
       const sellRemaining = await sellDheriAtAuctionRate({
         dheriId: d2.id,
@@ -192,7 +195,27 @@ async function main() {
       }
       console.log('received into completed batch', row1b.status, intoClosed.created[0].dheriCode)
 
+      let missingBatchThrew = false
+      try {
+        await receiveManyIntoBatch({
+          farmerId: Number(farmer.id),
+          lines: [{ productId: Number(product.id), numberOfBags: 1, weightPerBag: 40 }],
+        })
+      } catch {
+        missingBatchThrew = true
+      }
+      if (!missingBatchThrew) throw new Error('receive without a tapped batch must fail')
+
       const liveBoard = await getDailyBoard()
+      const scopedB1 = await getDailyBoard(null, b1.id)
+      const scopedB2 = await getDailyBoard(null, b2.id)
+      if (scopedB1.receives.some((r) => r.dayBatchId !== b1.id)) {
+        throw new Error('scoped board for batch 1 leaked another batch')
+      }
+      if (scopedB2.receives.some((r) => r.dayBatchId !== b2.id)) {
+        throw new Error('scoped board for batch 2 leaked another batch')
+      }
+      if (scopedB1.scopedBatchId !== b1.id) throw new Error('scopedBatchId should be batch 1')
       const b1Receives = receivesForBatch(liveBoard.receives, b1.id)
       const b2Receives = receivesForBatch(liveBoard.receives, b2.id)
       if (b1Receives.some((r) => r.dayBatchId === b2.id)) {

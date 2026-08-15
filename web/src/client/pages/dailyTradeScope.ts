@@ -44,11 +44,25 @@ export function salesForBatch<
     .filter((sale) => sale.items.length > 0)
 }
 
-export function nextSelectedBatchId(
-  batches: Array<{ id: number }>,
+export function nextSelectedBatchId<T extends { id: number }>(
+  batches: T[],
   preferredId: number | string | null | undefined,
 ): number | null {
   const kept = pickSelectedBatch(batches, preferredId)
   if (kept) return Number(kept.id)
+  // Never jump to another batch (e.g. Batch 5) while the owner tapped Batch 1
+  if (preferredId != null && preferredId !== '') {
+    const n = Number(preferredId)
+    if (Number.isFinite(n) && n > 0) return n
+  }
   return batches[0]?.id ?? null
+}
+
+export function boardMatchesSelectedBatch(
+  scopedBatchId: number | string | null | undefined,
+  selectedBatchId: number | string | null | undefined,
+) {
+  if (selectedBatchId == null || selectedBatchId === '') return true
+  if (scopedBatchId == null || scopedBatchId === '') return false
+  return sameId(scopedBatchId, selectedBatchId)
 }

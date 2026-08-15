@@ -76,28 +76,67 @@ function sessionDto(row: {
   }
 }
 
-export async function getDailyBoard(sessionDate?: string | null) {
+function parseBatchId(batchId?: number | string | null) {
+  if (batchId == null || batchId === '') return null
+  const n = Number(batchId)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/**
+ * Daily board. When `batchId` is set, receives/sales are only that tapped batch
+ * so the UI cannot leak Batch 5 while Batch 1 is selected.
+ */
+export async function getDailyBoard(
+  sessionDate?: string | null,
+  batchId?: number | string | null,
+) {
   const session = await getOrCreateOpenSession(sessionDate)
   const day = dateOnly(sessionDate)
-  const start = day
-  const end = new Date(day.getTime() + 86_400_000)
+  const scopedId = parseBatchId(batchId)
 
-  const [dheris, sales, lots, batchInfo] = await Promise.all([
+  const [lots, batchInfo] = await Promise.all([
+    listStockLots(),
+    import('@/server/services/day-batches').then((m) => m.listDayBatches(sessionDate)),
+  ])
+  const dayBatchIds = batchInfo.batches.map((b) => BigInt(b.id))
+
+  const dheriWhere =
+    scopedId != null
+      ? { deleted: false, dayBatchId: BigInt(scopedId) }
+      : dayBatchIds.length
+        ? { deleted: false, dayBatchId: { in: dayBatchIds } }
+        : { deleted: false, id: { in: [] as bigint[] } }
+
+  const saleWhere =
+    scopedId != null
+      ? {
+          deleted: false,
+          items: { some: { dheri: { dayBatchId: BigInt(scopedId) } } },
+        }
+      : {
+          deleted: false,
+          OR: [
+            { saleDate: day },
+            ...(dayBatchIds.length
+              ? [{ items: { some: { dheri: { dayBatchId: { in: dayBatchIds } } } } }]
+              : []),
+          ],
+        }
+
+  const [dheris, sales] = await Promise.all([
     prisma.dheri.findMany({
-      where: { deleted: false, createdAt: { gte: start, lt: end } },
+      where: dheriWhere,
       include: { farmer: true, product: true, dayBatch: true },
       orderBy: [{ dayBatchId: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.sale.findMany({
-      where: { deleted: false, saleDate: day },
+      where: saleWhere,
       include: {
         buyer: true,
         items: { include: { product: true, farmer: true, dheri: { include: { dayBatch: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     }),
-    listStockLots(),
-    import('@/server/services/day-batches').then((m) => m.listDayBatches(sessionDate)),
   ])
 
   const farmerBags = dheris.reduce((s, x) => s + x.numberOfBags, 0)
@@ -120,47 +159,50 @@ export async function getDailyBoard(sessionDate?: string | null) {
   )
   const stockKg = lots.reduce((s, x) => s + x.remainingKg, 0)
 
-  // Keep session counters in sync with live day data
-  await prisma.dailyTradeSession.update({
-    where: { id: BigInt(session.id) },
-    data: {
-      receivedBags,
-      receivedWeightKg: receivedWeight.toFixed(2),
-      soldBags,
-      soldWeightKg: soldWeight.toFixed(2),
-      highestRate: highestRate.toFixed(2),
-      detailsJson: {
-        receives: dheris.map((x) => ({
-          id: Number(x.id),
-          dheriId: x.dheriId,
-          farmer: x.farmer.name,
-          product: x.product.name,
-          bags: x.numberOfBags,
-          weight: x.totalWeight.toNumber(),
-          rate: x.marketRate.toNumber(),
-          amount: x.totalPrice.toNumber(),
-          date: x.createdAt.toISOString().slice(0, 10),
-        })),
-        sales: sales.map((x) => ({
-          id: Number(x.id),
-          invoice: x.invoiceNumber,
-          buyer: x.buyer.name,
-          bags: x.totalBags,
-          weight: x.totalWeight.toNumber(),
-          amount: x.totalAmount.toNumber(),
-        })),
-        stockLots: lots,
-      },
-    },
-  })
-
-  const refreshed = await prisma.dailyTradeSession.findUnique({
+  // Never overwrite day-level session counters from a single-batch query
+  let sessionRow = await prisma.dailyTradeSession.findUnique({
     where: { id: BigInt(session.id) },
     include: { product: true },
   })
+  if (scopedId == null) {
+    sessionRow = await prisma.dailyTradeSession.update({
+      where: { id: BigInt(session.id) },
+      data: {
+        receivedBags,
+        receivedWeightKg: receivedWeight.toFixed(2),
+        soldBags,
+        soldWeightKg: soldWeight.toFixed(2),
+        highestRate: highestRate.toFixed(2),
+        detailsJson: {
+          receives: dheris.map((x) => ({
+            id: Number(x.id),
+            dheriId: x.dheriId,
+            farmer: x.farmer.name,
+            product: x.product.name,
+            bags: x.numberOfBags,
+            weight: x.totalWeight.toNumber(),
+            rate: x.marketRate.toNumber(),
+            amount: x.totalPrice.toNumber(),
+            date: x.createdAt.toISOString().slice(0, 10),
+          })),
+          sales: sales.map((x) => ({
+            id: Number(x.id),
+            invoice: x.invoiceNumber,
+            buyer: x.buyer.name,
+            bags: x.totalBags,
+            weight: x.totalWeight.toNumber(),
+            amount: x.totalAmount.toNumber(),
+          })),
+          stockLots: lots,
+        },
+      },
+      include: { product: true },
+    })
+  }
 
   return {
-    session: sessionDto(refreshed!),
+    scopedBatchId: scopedId,
+    session: sessionDto(sessionRow!),
     stockLots: lots,
     stockKgAvailable: stockKg,
     farmerBags,
@@ -193,7 +235,14 @@ export async function getDailyBoard(sessionDate?: string | null) {
       weight: x.totalWeight.toNumber(),
       amount: x.totalAmount.toNumber(),
       createdAt: x.createdAt.toISOString(),
-      items: x.items.map((item) => ({
+      items: x.items
+        .filter((item) => {
+          if (scopedId == null) return true
+          const itemBatch =
+            item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId)
+          return itemBatch === scopedId
+        })
+        .map((item) => ({
         id: Number(item.id),
         productName: item.product.name,
         bags: item.numberOfBags,
@@ -207,7 +256,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
         dayBatchId: item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId),
         batchNumber: item.dheri?.dayBatch?.batchNumber ?? null,
       })),
-    })),
+    })).filter((sale) => scopedId == null || sale.items.length > 0),
     batches: batchInfo.batches,
     receivingBatch: batchInfo.receivingBatch,
     activeSellBatch: batchInfo.activeSellBatch,
@@ -419,20 +468,18 @@ export async function receiveManyIntoBatch(
   if (!lines.length) throw new Error('Add at least one dheri with bags and product')
 
   const { settle } = await import('@/server/services/arhat')
-  const { getOrCreateReceivingBatch } = await import('@/server/services/day-batches')
 
-  let dayBatchId = input.dayBatchId ?? null
+  const dayBatchId = parseBatchId(input.dayBatchId)
   if (dayBatchId == null) {
-    const batch = await getOrCreateReceivingBatch()
-    dayBatchId = batch.id
-  } else {
-    const exists = await prisma.dayBatch.findFirst({ where: { id: BigInt(dayBatchId) } })
-    if (!exists) throw new Error('Selected batch not found')
-    await prisma.dayBatch.update({
-      where: { id: BigInt(dayBatchId) },
-      data: { status: 'RECEIVING', closedAt: null },
-    })
+    throw new Error('Tap a batch first — dheris are received only into the selected batch')
   }
+  const exists = await prisma.dayBatch.findFirst({ where: { id: BigInt(dayBatchId) } })
+  if (!exists) throw new Error('Selected batch not found')
+  // Completed (all sold) batches can still receive more dheris
+  await prisma.dayBatch.update({
+    where: { id: BigInt(dayBatchId) },
+    data: { status: 'RECEIVING', closedAt: null },
+  })
 
   const created: Array<{ id: number; dheriCode: string; productId: number; bags: number }> = []
   for (const line of lines) {
@@ -461,7 +508,7 @@ export async function receiveManyIntoBatch(
     })
   }
 
-  const board = await getDailyBoard()
+  const board = await getDailyBoard(null, dayBatchId)
   return {
     created,
     dayBatchId,
