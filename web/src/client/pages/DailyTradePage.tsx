@@ -138,19 +138,21 @@ export default function DailyTradePage() {
       setBoard(b.data.data)
       setHistory(h.data.data || [])
       setBuyers(buy.data.data || [])
-      const productsList = prod.data.data || []
-      setProducts(productsList)
+      setProducts(prod.data.data || [])
       setFarmers(farm.data.data || [])
-      if (!recvProductId && productsList[0]) setRecvProductId(String(productsList[0].id))
     } catch {
       if (!soft) toast.error('Failed to load daily trade board')
     } finally {
       if (!soft) setLoading(false)
     }
-  }, [recvProductId])
+  }, [])
 
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
+
+  useEffect(() => {
+    if (!recvProductId && products[0]) setRecvProductId(String(products[0].id))
+  }, [products, recvProductId])
 
   const activeSell = board?.activeSellBatch ?? null
   const receivingBatch = board?.receivingBatch ?? null

@@ -235,6 +235,11 @@ export async function sellDheriAtAuctionRate(
     include: { farmer: true, product: true, dayBatch: true },
   })
   if (!dheri) throw new Error('Dheri not found')
+  if (dheri.farmer.deleted || !dheri.farmer.active) {
+    throw new Error(
+      `Farmer ${dheri.farmer.name} is inactive/deleted — restore the farmer before selling`,
+    )
+  }
   if (dheri.sellingStatus === 'SOLD') throw new Error('This dheri is already sold')
   if (dheri.dayBatchId == null || Number(dheri.dayBatchId) !== active.id) {
     throw new Error(
@@ -244,65 +249,7 @@ export async function sellDheriAtAuctionRate(
 
   const oldPayable = dheri.farmerReceivable.toNumber()
 
-  // Apply winning auction rate and recalculate farmer amounts
-  await saveCalculation(dheri.id, {
-    numberOfBags: dheri.numberOfBags,
-    weightPerBag: dheri.weightPerBag.toNumber(),
-    partialBagWeight: dheri.partialBagWeight.toNumber(),
-    marketRate: rate.toNumber(),
-    commissionPercentage: dheri.commissionPercentage.toNumber(),
-  })
-
-  const updated = await prisma.dheri.findFirst({
-    where: { id: dheri.id },
-  })
-  if (!updated) throw new Error('Dheri not found after rate update')
-
-  const newPayable = updated.farmerReceivable.toNumber()
-  await prisma.$transaction(async (tx) => {
-    if (updated.payablePosted) {
-      const delta = round2(d(newPayable).sub(oldPayable))
-      if (!delta.eq(0)) {
-        await tx.farmer.update({
-          where: { id: updated.farmerId },
-          data: { outstandingBalance: { increment: delta.toFixed(2) } },
-        })
-      }
-    } else if (newPayable > 0) {
-      await tx.farmer.update({
-        where: { id: updated.farmerId },
-        data: { outstandingBalance: { increment: newPayable.toFixed(2) } },
-      })
-      await tx.dheri.update({
-        where: { id: updated.id },
-        data: { payablePosted: true },
-      })
-    }
-
-    // Keep Extra KG stock lot priced at the winning rate
-    await tx.stockLot.updateMany({
-      where: { dheriId: updated.id },
-      data: {
-        ratePer40Kg: rate.toFixed(2),
-      },
-    })
-  })
-
-  // Refresh stock lot amountValue after rate change
-  const lots = await prisma.stockLot.findMany({ where: { dheriId: updated.id } })
-  for (const lot of lots) {
-    const amount = round2(
-      d(lot.remainingKg).div(40).mul(rate),
-    )
-    // also recompute from original for amountValue display of remaining
-    const value = round2(d(lot.remainingKg).div(40).mul(rate))
-    await prisma.stockLot.update({
-      where: { id: lot.id },
-      data: { amountValue: value.toFixed(2) },
-    })
-    void amount
-  }
-
+  // Create the buyer sale first so a failure does not leave half-updated rates.
   const sale = await createSale(
     {
       buyerId: input.buyerId,
@@ -327,14 +274,59 @@ export async function sellDheriAtAuctionRate(
     userId,
   )
 
-  await prisma.dheri.update({
-    where: { id: dheri.id },
-    data: { sellingStatus: 'SOLD' },
+  // Apply winning auction rate and recalculate farmer payable
+  await saveCalculation(dheri.id, {
+    numberOfBags: dheri.numberOfBags,
+    weightPerBag: dheri.weightPerBag.toNumber(),
+    partialBagWeight: dheri.partialBagWeight.toNumber(),
+    marketRate: rate.toNumber(),
+    commissionPercentage: dheri.commissionPercentage.toNumber(),
+  })
+
+  const updated = await prisma.dheri.findFirst({ where: { id: dheri.id } })
+  if (!updated) throw new Error('Dheri not found after rate update')
+  const newPayable = updated.farmerReceivable.toNumber()
+
+  await prisma.$transaction(async (tx) => {
+    if (updated.payablePosted) {
+      const delta = round2(d(newPayable).sub(oldPayable))
+      if (!delta.eq(0)) {
+        await tx.farmer.update({
+          where: { id: updated.farmerId },
+          data: { outstandingBalance: { increment: delta.toFixed(2) } },
+        })
+      }
+    } else if (newPayable > 0) {
+      await tx.farmer.update({
+        where: { id: updated.farmerId },
+        data: { outstandingBalance: { increment: newPayable.toFixed(2) } },
+      })
+      await tx.dheri.update({
+        where: { id: updated.id },
+        data: { payablePosted: true },
+      })
+    }
+
+    const lots = await tx.stockLot.findMany({ where: { dheriId: updated.id } })
+    for (const lot of lots) {
+      const value = round2(d(lot.remainingKg).div(40).mul(rate))
+      await tx.stockLot.update({
+        where: { id: lot.id },
+        data: {
+          ratePer40Kg: rate.toFixed(2),
+          amountValue: value.toFixed(2),
+        },
+      })
+    }
+
+    await tx.dheri.update({
+      where: { id: dheri.id },
+      data: { sellingStatus: 'SOLD' },
+    })
   })
 
   const batchClosed = await maybeCloseBatch(dheri.dayBatchId!)
 
-  // Bump session highest rate
   const session = await prisma.dailyTradeSession.findFirst({
     where: {
       status: 'OPEN',
