@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowLeftRight, History, Package, RefreshCw, Scale, ShoppingCart, Warehouse,
+  ArrowLeftRight, FileText, History, Package, RefreshCw, Scale, ShoppingCart, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -11,6 +11,7 @@ import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dailyTradeApi, settingsApi, stockApi } from '../services/api'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Buyer, Product } from '../types'
 
@@ -64,10 +65,23 @@ type Board = {
   sales: Array<{
     id: number
     invoiceNumber: string
+    buyerId: number
     buyerName: string
     bags: number
     weight: number
     amount: number
+    items: Array<{
+      id: number
+      productName: string
+      bags: number
+      weight: number
+      rate: number
+      amount: number
+      sourceType: string
+      farmerName?: string
+      dheriId?: number | null
+      dheriCode?: string
+    }>
   }>
 }
 
@@ -100,6 +114,10 @@ export default function DailyTradePage() {
   const [historyDetail, setHistoryDetail] = useState<HistoryRow | null>(null)
   const [topUpKg, setTopUpKg] = useState('')
   const [toppingUp, setToppingUp] = useState(false)
+  const [billItemIds, setBillItemIds] = useState<number[]>([])
+  const [billBuyerId, setBillBuyerId] = useState<number | null>(null)
+  const [billGroupSize, setBillGroupSize] = useState('')
+  const [lastSaleId, setLastSaleId] = useState<number | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -255,6 +273,12 @@ export default function DailyTradePage() {
       setBoard(res.data.data.board)
       setSelectedDheris([])
       setPaidAmount('0')
+      const sale = res.data.data.sale as { id?: number; buyerId?: number; items?: Array<{ id: number }> }
+      if (sale?.id) setLastSaleId(sale.id)
+      if (sale?.buyerId) setBillBuyerId(sale.buyerId)
+      if (sale?.items?.length) {
+        setBillItemIds(sale.items.map((i) => i.id).filter(Boolean))
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Batch sell failed')
@@ -491,24 +515,47 @@ export default function DailyTradePage() {
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex justify-between">
-          <span>Today’s receives (tick to sell selected)</span>
-          <button
-            type="button"
-            className="text-sm text-primary"
-            onClick={() => setSelectedDheris(unsold.map((x) => x.id))}
-          >
-            Select all unsold
-          </button>
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap justify-between gap-2">
+          <span>Today’s dheris — tick Sell (before) / Bill (after sold)</span>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <button
+              type="button"
+              className="text-primary"
+              onClick={() => setSelectedDheris(unsold.map((x) => x.id))}
+            >
+              Tick all unsold
+            </button>
+            <button
+              type="button"
+              className="text-primary"
+              onClick={() => {
+                const soldLines = (board?.sales || []).flatMap((s) =>
+                  s.items.filter((i) => i.sourceType === 'FARMER' && i.id).map((i) => ({
+                    itemId: i.id,
+                    buyerId: s.buyerId,
+                  })),
+                )
+                if (!soldLines.length) {
+                  toast.error('No sold dheri lines yet')
+                  return
+                }
+                setBillItemIds(soldLines.map((x) => x.itemId))
+                setBillBuyerId(soldLines[0].buyerId)
+              }}
+            >
+              Tick all sold for bill
+            </button>
+          </div>
         </div>
         {receivesForProduct.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No farmer receives today — use Arhat Sale / Farmer Product.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
                 <tr>
                   <th className="px-3 py-2">Sell</th>
+                  <th className="px-3 py-2">Bill</th>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Dheri</th>
                   <th className="px-3 py-2">Farmer</th>
@@ -522,24 +569,56 @@ export default function DailyTradePage() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {receivesForProduct.map((r) => {
                   const sold = r.sellingStatus === 'SOLD'
+                  const saleLine = (board?.sales || [])
+                    .flatMap((s) => s.items.map((item) => ({ ...item, buyerId: s.buyerId, invoice: s.invoiceNumber })))
+                    .find((item) => item.dheriId === r.id)
+                  const billChecked = saleLine?.id != null && billItemIds.includes(saleLine.id)
                   return (
-                    <tr key={r.id} className={sold ? 'opacity-60' : ''}>
+                    <tr key={r.id} className={sold ? '' : ''}>
                       <td className="px-3 py-2">
                         <input
                           type="checkbox"
                           disabled={sold}
-                          checked={selectedDheris.includes(r.id)}
+                          checked={!sold && selectedDheris.includes(r.id)}
                           onChange={() => toggleDheri(r.id)}
+                          title={sold ? 'Already sold' : 'Include in next batch sell'}
+                          aria-label={`Sell ${r.dheriId}`}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          disabled={!sold || !saleLine?.id}
+                          checked={!!billChecked}
+                          onChange={() => {
+                            if (!saleLine?.id) return
+                            setBillBuyerId(saleLine.buyerId)
+                            setBillItemIds((prev) =>
+                              prev.includes(saleLine.id)
+                                ? prev.filter((x) => x !== saleLine.id)
+                                : [...prev, saleLine.id],
+                            )
+                          }}
+                          title={sold ? 'Include this dheri on buyer bill' : 'Sell first, then tick for bill'}
+                          aria-label={`Bill ${r.dheriId}`}
                         />
                       </td>
                       <td className="px-3 py-2">{r.date}</td>
-                      <td className="px-3 py-2">{r.dheriId}</td>
+                      <td className="px-3 py-2 font-medium">{r.dheriId}</td>
                       <td className="px-3 py-2">{r.farmerName}</td>
                       <td className="px-3 py-2">{r.bags}</td>
                       <td className="px-3 py-2">{formatNumber(r.partialBagWeight)}</td>
                       <td className="px-3 py-2">{formatCurrency(r.rate)}</td>
                       <td className="px-3 py-2">{formatCurrency(r.amount)}</td>
-                      <td className="px-3 py-2">{r.sellingStatus}</td>
+                      <td className="px-3 py-2">
+                        {sold ? (
+                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                            SOLD{saleLine?.invoice ? ` · ${saleLine.invoice}` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-amber-700 dark:text-amber-300">UNSOLD</span>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -547,7 +626,99 @@ export default function DailyTradePage() {
             </table>
           </div>
         )}
+
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2 bg-slate-50/80 dark:bg-slate-900/40">
+          <span className="text-sm font-medium">
+            Buyer bill: {billItemIds.length} dheri line{billItemIds.length === 1 ? '' : 's'} selected
+          </span>
+          <input
+            type="number"
+            min={1}
+            placeholder="Split (e.g. 3)"
+            value={billGroupSize}
+            onChange={(e) => setBillGroupSize(e.target.value)}
+            className="w-28 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
+            title="Optional: split into separate bill sheets of this many dheris"
+          />
+          <Button
+            variant="secondary"
+            disabled={!billBuyerId || billItemIds.length === 0}
+            onClick={async () => {
+              if (!billBuyerId || !billItemIds.length) {
+                toast.error('Tick sold dheris in the Bill column first')
+                return
+              }
+              try {
+                const gs = billGroupSize ? Number(billGroupSize) : undefined
+                const res = await buyerApi.getSelectedBillHtml(billBuyerId, billItemIds, 'en', gs)
+                openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Buyer bill (selected dheris)')
+              } catch (err) {
+                toast.error(billErrorMessage(err, 'Could not generate bill'))
+              }
+            }}
+          >
+            <FileText className="h-4 w-4" /> Generate bill (selected)
+          </Button>
+          {lastSaleId && (
+            <Link to={`/sales/${lastSaleId}`} className="text-sm text-primary underline">
+              Open last sale
+            </Link>
+          )}
+        </div>
       </div>
+
+      {(board?.sales || []).length > 0 && (
+        <div className="card-3d overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">
+            Today’s sales — tick dheri lines for bill
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
+                <tr>
+                  <th className="px-3 py-2">Bill</th>
+                  <th className="px-3 py-2">Invoice</th>
+                  <th className="px-3 py-2">Buyer</th>
+                  <th className="px-3 py-2">Dheri</th>
+                  <th className="px-3 py-2">Farmer</th>
+                  <th className="px-3 py-2">Bags</th>
+                  <th className="px-3 py-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {(board?.sales || []).flatMap((sale) =>
+                  sale.items.map((item) => (
+                    <tr key={`${sale.id}-${item.id}`}>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={billItemIds.includes(item.id)}
+                          onChange={() => {
+                            setBillBuyerId(sale.buyerId)
+                            setBillItemIds((prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter((x) => x !== item.id)
+                                : [...prev, item.id],
+                            )
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link className="text-primary" to={`/sales/${sale.id}`}>{sale.invoiceNumber}</Link>
+                      </td>
+                      <td className="px-3 py-2">{sale.buyerName}</td>
+                      <td className="px-3 py-2 font-medium">{item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—')}</td>
+                      <td className="px-3 py-2">{item.farmerName || '—'}</td>
+                      <td className="px-3 py-2">{item.bags}</td>
+                      <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex items-center gap-2">

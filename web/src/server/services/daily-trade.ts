@@ -183,11 +183,13 @@ export async function getDailyBoard(sessionDate?: string | null) {
     sales: sales.map((x) => ({
       id: Number(x.id),
       invoiceNumber: x.invoiceNumber,
+      buyerId: Number(x.buyerId),
       buyerName: x.buyer.name,
       bags: x.totalBags,
       weight: x.totalWeight.toNumber(),
       amount: x.totalAmount.toNumber(),
       items: x.items.map((item) => ({
+        id: Number(item.id),
         productName: item.product.name,
         bags: item.numberOfBags,
         weight: item.totalWeight.toNumber(),
@@ -195,6 +197,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
         amount: item.amount.toNumber(),
         sourceType: item.sourceType,
         farmerName: item.farmer?.name,
+        dheriId: item.dheriId == null ? null : Number(item.dheriId),
         dheriCode: item.dheri?.dheriId,
       })),
     })),

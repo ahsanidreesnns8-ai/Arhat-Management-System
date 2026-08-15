@@ -97,6 +97,8 @@ export default function BuyerDetailPage() {
       saleId: sale.id,
       saleDate: sale.saleDate,
       product: item.productName || `Product #${item.productId}`,
+      dheri: item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—'),
+      farmer: item.farmerName || '—',
       bags: item.numberOfBags,
       weight: item.totalWeight ?? (item.numberOfBags * item.weightPerBag + (item.partialBagWeight || 0)),
       rate: item.rate,
@@ -205,7 +207,9 @@ export default function BuyerDetailPage() {
 
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap items-center justify-between gap-2">
-          <span>Product history (tick lines → Generate bill)</span>
+          <span>
+            Dheri purchase lines — tick which bills to print ({selectedItems.length} selected)
+          </span>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="number"
@@ -214,10 +218,13 @@ export default function BuyerDetailPage() {
               value={groupSize}
               onChange={(e) => setGroupSize(e.target.value)}
               className="w-36 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
-              title="Optional: split selected lines into separate bill sheets of this size"
+              title="Optional: e.g. 3 = bill of 3 dheris, then another bill for the rest"
             />
             <Button variant="secondary" onClick={() => void openSelectedBill('en')}>
-              <FileText className="h-4 w-4" /> Bill selected
+              <FileText className="h-4 w-4" /> Bill selected ({selectedItems.length})
+            </Button>
+            <Button variant="secondary" onClick={() => void openSelectedBill('ur')}>
+              <FileText className="h-4 w-4" /> بل منتخب
             </Button>
             <button
               type="button"
@@ -230,18 +237,27 @@ export default function BuyerDetailPage() {
             >
               Tick all
             </button>
+            <button
+              type="button"
+              className="text-sm text-slate-500"
+              onClick={() => setSelectedItems([])}
+            >
+              Clear
+            </button>
           </div>
         </div>
         {productRows.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No products purchased yet</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
                 <tr>
                   <th className="px-4 py-2">Bill</th>
                   <th className="px-4 py-2">Invoice</th>
                   <th className="px-4 py-2">Date</th>
+                  <th className="px-4 py-2">Dheri</th>
+                  <th className="px-4 py-2">Farmer</th>
                   <th className="px-4 py-2">Product</th>
                   <th className="px-4 py-2">Bags</th>
                   <th className="px-4 py-2">Weight</th>
@@ -252,17 +268,21 @@ export default function BuyerDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {productRows.map((row) => (
-                  <tr key={row.key}>
+                  <tr key={row.key} className={row.itemId != null && selectedItems.includes(row.itemId) ? 'bg-primary/5' : ''}>
                     <td className="px-4 py-2">
                       <input
                         type="checkbox"
+                        className="h-4 w-4"
                         disabled={row.itemId == null}
                         checked={row.itemId != null && selectedItems.includes(row.itemId)}
                         onChange={() => row.itemId != null && toggleItem(row.itemId)}
+                        aria-label={`Bill dheri ${row.dheri}`}
                       />
                     </td>
                     <td className="px-4 py-2"><Link className="text-primary" to={`/sales/${row.saleId}`}>{row.invoice}</Link></td>
                     <td className="px-4 py-2">{row.saleDate}</td>
+                    <td className="px-4 py-2 font-semibold">{row.dheri}</td>
+                    <td className="px-4 py-2">{row.farmer}</td>
                     <td className="px-4 py-2 font-medium">{row.product}</td>
                     <td className="px-4 py-2">{row.bags}</td>
                     <td className="px-4 py-2">{row.weight}</td>
