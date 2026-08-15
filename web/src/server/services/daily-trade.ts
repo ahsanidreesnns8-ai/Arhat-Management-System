@@ -162,6 +162,8 @@ export async function getDailyBoard(sessionDate?: string | null) {
     session: sessionDto(refreshed!),
     stockLots: lots,
     stockKgAvailable: stockKg,
+    farmerBags,
+    stockBagsSold,
     receives: dheris.map((x) => ({
       id: Number(x.id),
       dheriId: x.dheriId,
