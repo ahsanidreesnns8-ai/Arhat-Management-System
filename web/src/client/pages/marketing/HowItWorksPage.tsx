@@ -35,8 +35,8 @@ const steps = [
   {
     enTitle: 'Bills, reports & AI',
     urTitle: 'بل، رپورٹس اور اے آئی',
-    en: 'Download bilingual bills, export reports, and ask the AI munshi about balances or world questions.',
-    ur: 'دو زبانی بل ڈاؤن لوڈ کریں، رپورٹس نکالیں، اے آئی منشی سے بیلنس یا دنیا کے سوال پوچھیں۔',
+    en: 'Download bilingual bills, export reports, and ask the AI Assistant about balances or world questions.',
+    ur: 'دو زبانی بل ڈاؤن لوڈ کریں، رپورٹس نکالیں، اے آئی اسسٹنٹ سے بیلنس یا دنیا کے سوال پوچھیں۔',
   },
 ]
 

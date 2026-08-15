@@ -53,8 +53,8 @@ export default function FeaturesPage() {
           </h1>
           <p className={`mt-3 text-slate-600 ${isUrdu ? 'font-urdu' : ''}`}>
             {isUrdu
-              ? 'پکا کھاتہ طرز کی ساخت — آڑھت، پارٹیز، اسٹاک، ادائیگی، رپورٹس اور اے آئی منشی۔'
-              : 'Pakka Khata–style structure — arhat, parties, stock, payments, reports and AI munshi.'}
+              ? 'پکا کھاتہ طرز کی ساخت — آڑھت، پارٹیز، اسٹاک، ادائیگی، رپورٹس اور اے آئی اسسٹنٹ۔'
+              : 'Pakka Khata–style structure — arhat, parties, stock, payments, reports and AI Assistant.'}
           </p>
         </div>
       </section>

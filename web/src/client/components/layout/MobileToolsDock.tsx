@@ -127,7 +127,7 @@ export default function MobileToolsDock() {
             <div className="flex items-center gap-2 min-w-[42%] justify-end">
               <div className={`min-w-0 ${isUrdu ? 'font-urdu' : 'text-right'}`}>
                 <p className="text-[11px] font-semibold text-white/90 leading-tight">
-                  {isUrdu ? 'اے آئی منشی' : 'AI Munshi'}
+                  {t('aiTitle')}
                 </p>
                 <p className="text-[10px] text-slate-400 truncate">
                   {isUrdu ? 'مدد پوچھیں' : 'Ask for help'}
