@@ -40,14 +40,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth()
   const { t, isUrdu } = useLanguage()
   const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN'
-  const fromEdge = isUrdu ? '100%' : '-100%'
+  // Always slide in from the left (menu button sits top-left)
+  const fromEdge = '-100%'
 
   return (
     <AnimatePresence>
       {open && (
         <motion.aside
-          className="sidebar-3d fixed top-0 h-full z-50 w-[min(86vw,300px)] overflow-hidden"
-          style={{ [isUrdu ? 'right' : 'left']: 0 }}
+          className="sidebar-3d fixed top-0 left-0 h-full z-50 w-[min(86vw,300px)] overflow-hidden"
           initial={{ x: fromEdge }}
           animate={{ x: 0 }}
           exit={{ x: fromEdge }}

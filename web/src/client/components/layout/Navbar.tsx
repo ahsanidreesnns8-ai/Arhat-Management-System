@@ -49,6 +49,17 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <motion.button
             type="button"
+            onClick={onToggleMenu}
+            className="nav-icon-btn flex-shrink-0 text-[#002D62] dark:text-[#E8C87A] border border-[#002D62]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
+            whileTap={{ scale: 0.94 }}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </motion.button>
+
+          <motion.button
+            type="button"
             onClick={goBack}
             disabled={isHome}
             className={`nav-icon-btn flex-shrink-0 ${
@@ -107,17 +118,6 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
               <LogOut className="h-4 w-4" />
             </motion.button>
           </div>
-
-          <motion.button
-            type="button"
-            onClick={onToggleMenu}
-            className="nav-icon-btn ml-0.5 text-[#002D62] dark:text-[#E8C87A] border border-[#002D62]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
-            whileTap={{ scale: 0.94 }}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </motion.button>
         </div>
       </div>
 
