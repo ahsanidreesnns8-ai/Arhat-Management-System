@@ -56,9 +56,13 @@ function buildHijri(adjustmentDays: number): WeatherCalendar['hijri'] {
     monthNameUr: monthUr,
     adjustmentDays: adjustmentDays || 0,
     formattedEn: `${day} ${monthEn} ${year} AH`,
-    formattedUr: `${day} ${monthUr} ${year} ھ`,
+    formattedUr: `${toUrduDigits(day)} ${monthUr} ${toUrduDigits(year)} ھ`,
     autoDaily: !adjustmentDays,
   }
+}
+
+function toUrduDigits(value: number) {
+  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
 }
 
 async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: string, adjustment: number): Promise<WeatherCalendar> {
@@ -143,15 +147,39 @@ export default function WeatherWidget() {
 
   const Icon = weatherIcon(data.weatherCode || 0)
   const condition = isUrdu ? data.conditionUr : data.conditionEn
-  const hijri = isUrdu
-    ? (data.hijri?.formattedUr || '—')
-    : (data.hijri?.formattedEn || '—')
+  const hijriEn = data.hijri?.formattedEn || '—'
+  const hijriUr = data.hijri?.formattedUr || '—'
   const area = data.locationLabel || settings?.weatherLocationLabel || '—'
+
+  const gregorianEn = (() => {
+    const raw = data.gregorianDate || new Date().toISOString().slice(0, 10)
+    const d = new Date(`${raw}T12:00:00`)
+    if (Number.isNaN(d.getTime())) return raw
+    return d.toLocaleDateString('en-PK', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  })()
+
+  const gregorianUr = (() => {
+    const raw = data.gregorianDate || new Date().toISOString().slice(0, 10)
+    const d = new Date(`${raw}T12:00:00`)
+    if (Number.isNaN(d.getTime())) return raw
+    // Urdu month/day names with Latin digits for readability
+    return d.toLocaleDateString('ur-PK-u-nu-latn', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  })()
 
   return (
     <div
-      className="flex items-center gap-1.5 sm:gap-2 w-full px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10"
-      title={`${condition} · ${area} · ${hijri}`}
+      className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:gap-x-2 w-full px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border border-cyan-400/20 bg-gradient-to-br from-sky-500/10 to-amber-500/10"
+      title={`${condition} · ${area} · ${gregorianEn} · ${hijriEn} · ${hijriUr}`}
     >
       {data.weatherAvailable !== false && data.temperatureC != null ? (
         <>
@@ -170,10 +198,24 @@ export default function WeatherWidget() {
       ) : (
         <span className="text-slate-500 truncate">{t('weatherUnavailable')}</span>
       )}
+
+      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">|</span>
+      <span className="text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+        {gregorianEn}
+      </span>
+      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
+      <span className="font-urdu text-slate-700 dark:text-slate-200 whitespace-nowrap" dir="rtl">
+        {gregorianUr}
+      </span>
+
       <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">|</span>
       <MoonStar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-500 flex-shrink-0" />
-      <span className={`text-slate-700 dark:text-slate-200 truncate min-w-0 ${isUrdu ? 'font-urdu' : ''}`} dir={isUrdu ? 'rtl' : 'ltr'}>
-        {hijri}
+      <span className="text-slate-700 dark:text-slate-200 whitespace-nowrap truncate min-w-0">
+        {hijriEn}
+      </span>
+      <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
+      <span className="font-urdu text-slate-700 dark:text-slate-200 whitespace-nowrap truncate min-w-0" dir="rtl">
+        {hijriUr}
       </span>
     </div>
   )
