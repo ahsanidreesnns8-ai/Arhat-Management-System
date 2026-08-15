@@ -82,11 +82,11 @@ export async function getDailyBoard(sessionDate?: string | null) {
   const start = day
   const end = new Date(day.getTime() + 86_400_000)
 
-  const [dheris, sales, lots] = await Promise.all([
+  const [dheris, sales, lots, batchInfo] = await Promise.all([
     prisma.dheri.findMany({
       where: { deleted: false, createdAt: { gte: start, lt: end } },
-      include: { farmer: true, product: true },
-      orderBy: { createdAt: 'asc' },
+      include: { farmer: true, product: true, dayBatch: true },
+      orderBy: [{ dayBatchId: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.sale.findMany({
       where: { deleted: false, saleDate: day },
@@ -97,6 +97,7 @@ export async function getDailyBoard(sessionDate?: string | null) {
       orderBy: { createdAt: 'asc' },
     }),
     listStockLots(),
+    import('@/server/services/day-batches').then((m) => m.listDayBatches(sessionDate)),
   ])
 
   const farmerBags = dheris.reduce((s, x) => s + x.numberOfBags, 0)
@@ -171,6 +172,8 @@ export async function getDailyBoard(sessionDate?: string | null) {
       farmerName: x.farmer.name,
       productId: Number(x.productId),
       productName: x.product.name,
+      dayBatchId: x.dayBatchId == null ? null : Number(x.dayBatchId),
+      batchNumber: x.dayBatch?.batchNumber ?? null,
       bags: x.numberOfBags,
       weightPerBag: x.weightPerBag.toNumber(),
       partialBagWeight: x.partialBagWeight.toNumber(),
@@ -201,6 +204,9 @@ export async function getDailyBoard(sessionDate?: string | null) {
         dheriCode: item.dheri?.dheriId,
       })),
     })),
+    batches: batchInfo.batches,
+    receivingBatch: batchInfo.receivingBatch,
+    activeSellBatch: batchInfo.activeSellBatch,
   }
 }
 
@@ -256,13 +262,22 @@ export async function batchSellToBuyer(input: BatchSellInput, userId?: bigint) {
   if (input.productId == null) throw new Error('Product is required')
 
   const board = await getDailyBoard(input.saleDate)
+  const { getActiveSellBatch } = await import('@/server/services/day-batches')
+  const active = await getActiveSellBatch(input.saleDate)
+  if (!active) throw new Error('No unsold dheris in today’s batches')
+
   const bagWeight = round2(input.bagWeightKg ?? 40)
   const selected = board.receives.filter((r) => {
     if (r.productId !== input.productId) return false
+    if (r.dayBatchId !== active.id) return false
     if (input.dheriIds?.length) return input.dheriIds.includes(r.id)
     return r.sellingStatus !== 'SOLD'
   })
-  if (!selected.length) throw new Error('No dheris available to sell for this product')
+  if (!selected.length) {
+    throw new Error(
+      `No unsold dheris in Batch ${active.batchNumber} for this product — finish this batch first`,
+    )
+  }
 
   const farmerBags = selected.reduce((s, x) => s + x.bags, 0)
   const farmerWeight = selected.reduce((s, x) => s + x.weight, 0)

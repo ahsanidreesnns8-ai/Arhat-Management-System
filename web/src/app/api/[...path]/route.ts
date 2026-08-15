@@ -28,6 +28,7 @@ import * as backup from '@/server/services/backup'
 import * as arhat from '@/server/services/arhat'
 import * as stockLots from '@/server/services/stock-lots'
 import * as dailyTrade from '@/server/services/daily-trade'
+import * as dayBatches from '@/server/services/day-batches'
 
 type RouteContext = {
   params: Promise<{ path: string[] }>
@@ -416,6 +417,40 @@ async function dispatch(
     }
     if (path[1] === 'history' && method === 'GET') {
       return result(await dailyTrade.listDailyHistory())
+    }
+    if (path[1] === 'batches' && method === 'GET') {
+      return result(
+        await dayBatches.listDayBatches(url.searchParams.get('date')),
+      )
+    }
+    if (path[1] === 'batches' && path[2] === 'open-next' && method === 'POST') {
+      return result(
+        await dayBatches.openNextBatch(
+          (payload.date as string | undefined) ?? null,
+          (payload.notes as string | undefined) ?? null,
+        ),
+        'Next batch opened',
+      )
+    }
+    if (path[1] === 'batches' && path[2] === 'ensure' && method === 'POST') {
+      return result(
+        await dayBatches.getOrCreateReceivingBatch(
+          (payload.date as string | undefined) ?? null,
+        ),
+        'Receiving batch ready',
+      )
+    }
+    if (path[1] === 'sell-dheri' && method === 'POST') {
+      const data = await dayBatches.sellDheriAtAuctionRate(
+        payload as dayBatches.SellDheriAuctionInput,
+        user?.id,
+      )
+      return result(
+        { ...data, board: await dailyTrade.getDailyBoard(
+          (payload.saleDate as string | undefined) ?? null,
+        ) },
+        data.message,
+      )
     }
     if (path[1] === 'refresh' && method === 'POST') {
       return result(

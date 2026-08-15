@@ -262,6 +262,7 @@ model Dheri {
   arhatShare           Decimal       @default(0.00) @map("arhat_share") @db.Decimal(15, 2)
   sellingStatus        SellingStatus @default(PENDING) @map("selling_status")
   payablePosted        Boolean       @default(false) @map("payable_posted")
+  dayBatchId           BigInt?       @map("day_batch_id")
   notes                String?
   deleted              Boolean       @default(false)
   createdAt            DateTime      @default(now()) @map("created_at")
@@ -269,6 +270,7 @@ model Dheri {
   farmer               Farmer        @relation(fields: [farmerId], references: [id])
   truck                Truck?        @relation(fields: [truckId], references: [id])
   product              Product       @relation(fields: [productId], references: [id])
+  dayBatch             DayBatch?     @relation(fields: [dayBatchId], references: [id])
   queueEntry           QueueEntry?
   saleItems            SaleItem[]
   payments             Payment[]
@@ -276,6 +278,7 @@ model Dheri {
 
   @@unique([workspace, dheriId])
   @@index([workspace])
+  @@index([workspace, dayBatchId])
   @@map("dheris")
 }
 
@@ -441,6 +444,12 @@ enum DailyTradeStatus {
   ARCHIVED
 }
 
+enum DayBatchStatus {
+  RECEIVING
+  SELLING
+  CLOSED
+}
+
 /// Extra KG held as stock with farmer/rate provenance for batch selling
 model StockLot {
   id            BigInt   @id @default(autoincrement())
@@ -464,6 +473,24 @@ model StockLot {
   @@index([workspace, productId])
   @@index([workspace, intakeDate])
   @@map("stock_lots")
+}
+
+/// One receiving/selling group within a calendar day (Batch 1, Batch 2, …)
+model DayBatch {
+  id          BigInt         @id @default(autoincrement())
+  workspace   String         @default("live") @db.VarChar(20)
+  batchDate   DateTime       @map("batch_date") @db.Date
+  batchNumber Int            @map("batch_number")
+  status      DayBatchStatus @default(RECEIVING)
+  notes       String?
+  closedAt    DateTime?      @map("closed_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  dheris      Dheri[]
+
+  @@unique([workspace, batchDate, batchNumber])
+  @@index([workspace, batchDate, status])
+  @@map("day_batches")
 }
 
 /// Open daily receiving/selling board; archived on Refresh into history snapshot

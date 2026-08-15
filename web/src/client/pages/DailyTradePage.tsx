@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowLeftRight, FileText, History, Package, RefreshCw, Scale, ShoppingCart, Warehouse,
+  ArrowLeftRight, FileText, History, Layers, Package, RefreshCw, Scale, ShoppingCart, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -10,10 +10,10 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
-import { buyerApi, dailyTradeApi, settingsApi, stockApi } from '../services/api'
+import { arhatApi, buyerApi, dailyTradeApi, farmerApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
-import type { Buyer, Product } from '../types'
+import type { Buyer, Farmer, Product } from '../types'
 
 type BoardReceive = {
   id: number
@@ -22,6 +22,8 @@ type BoardReceive = {
   farmerName: string
   productId: number
   productName: string
+  dayBatchId: number | null
+  batchNumber: number | null
   bags: number
   weightPerBag: number
   partialBagWeight: number
@@ -32,17 +34,14 @@ type BoardReceive = {
   sellingStatus: string
 }
 
-type StockLotRow = {
+type DayBatchRow = {
   id: number
-  productId: number
-  productName?: string
-  farmerName?: string | null
-  dheriCode?: string | null
-  remainingKg: number
-  originalKg: number
-  ratePer40Kg: number
-  amountValue: number
-  intakeDate: string
+  batchNumber: number
+  status: string
+  totalDheris: number
+  soldDheris: number
+  unsoldDheris: number
+  canSell: boolean
 }
 
 type Board = {
@@ -59,7 +58,17 @@ type Board = {
     balanced: boolean
     remainingBags: number
   }
-  stockLots: StockLotRow[]
+  stockLots: Array<{
+    id: number
+    productId: number
+    productName?: string
+    farmerName?: string | null
+    dheriCode?: string | null
+    remainingKg: number
+    ratePer40Kg: number
+    amountValue: number
+    intakeDate: string
+  }>
   stockKgAvailable: number
   receives: BoardReceive[]
   sales: Array<{
@@ -83,152 +92,181 @@ type Board = {
       dheriCode?: string
     }>
   }>
-}
-
-type HistoryRow = {
-  id: number
-  sessionDate: string
-  receivedBags: number
-  soldBags: number
-  stockInKg: number
-  stockOutKg: number
-  highestRate: number
-  closedAt: string | null
-  details?: unknown
+  batches: DayBatchRow[]
+  receivingBatch: DayBatchRow | null
+  activeSellBatch: DayBatchRow | null
 }
 
 export default function DailyTradePage() {
   const [board, setBoard] = useState<Board | null>(null)
-  const [history, setHistory] = useState<HistoryRow[]>([])
+  const [history, setHistory] = useState<Array<Record<string, unknown>>>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
+  const [farmers, setFarmers] = useState<Farmer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [buyerId, setBuyerId] = useState('')
-  const [productId, setProductId] = useState('')
-  const [bagWeight, setBagWeight] = useState('65')
-  const [paidAmount, setPaidAmount] = useState('0')
-  const [selectedDheris, setSelectedDheris] = useState<number[]>([])
-  const [includeStockBags, setIncludeStockBags] = useState(true)
-  const [selling, setSelling] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [historyDetail, setHistoryDetail] = useState<HistoryRow | null>(null)
-  const [topUpKg, setTopUpKg] = useState('')
-  const [toppingUp, setToppingUp] = useState(false)
+
+  // Receive into current batch
+  const [recvFarmerId, setRecvFarmerId] = useState('')
+  const [recvProductId, setRecvProductId] = useState('')
+  const [recvBags, setRecvBags] = useState('')
+  const [recvBagKg, setRecvBagKg] = useState('40')
+  const [recvExtraKg, setRecvExtraKg] = useState('0')
+  const [receiving, setReceiving] = useState(false)
+  const [openingBatch, setOpeningBatch] = useState(false)
+
+  // Auction sell one dheri
+  const [sellDheriId, setSellDheriId] = useState('')
+  const [sellBuyerId, setSellBuyerId] = useState('')
+  const [sellRate, setSellRate] = useState('')
+  const [sellPaid, setSellPaid] = useState('0')
+  const [selling, setSelling] = useState(false)
+
   const [billItemIds, setBillItemIds] = useState<number[]>([])
   const [billBuyerId, setBillBuyerId] = useState<number | null>(null)
-  const [billGroupSize, setBillGroupSize] = useState('')
-  const [lastSaleId, setLastSaleId] = useState<number | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
     try {
-      const [b, h, buy, prod] = await Promise.all([
+      const [b, h, buy, prod, farm] = await Promise.all([
         dailyTradeApi.getBoard(),
         dailyTradeApi.getHistory(),
         buyerApi.getAll(),
         settingsApi.getProducts(),
+        farmerApi.getAll(),
       ])
       setBoard(b.data.data)
       setHistory(h.data.data || [])
       setBuyers(buy.data.data || [])
       const productsList = prod.data.data || []
       setProducts(productsList)
-      if (!productId && productsList[0]) setProductId(String(productsList[0].id))
+      setFarmers(farm.data.data || [])
+      if (!recvProductId && productsList[0]) setRecvProductId(String(productsList[0].id))
     } catch {
       if (!soft) toast.error('Failed to load daily trade board')
     } finally {
       if (!soft) setLoading(false)
     }
-  }, [productId])
+  }, [recvProductId])
 
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
 
-  const receivesForProduct = useMemo(() => {
-    if (!board) return []
-    const pid = Number(productId)
-    return board.receives.filter((r) => !pid || r.productId === pid)
-  }, [board, productId])
+  const activeSell = board?.activeSellBatch ?? null
+  const receivingBatch = board?.receivingBatch ?? null
 
-  const unsold = useMemo(
-    () => receivesForProduct.filter((r) => r.sellingStatus !== 'SOLD'),
-    [receivesForProduct],
-  )
-
-  const preview = useMemo(() => {
-    const chosen = selectedDheris.length
-      ? unsold.filter((r) => selectedDheris.includes(r.id))
-      : unsold
-    const farmerBags = chosen.reduce((s, x) => s + x.bags, 0)
-    const farmerAmount = chosen.reduce((s, x) => s + x.amount, 0)
-    const farmerExtraKg = chosen.reduce((s, x) => s + (x.partialBagWeight || 0), 0)
-    const bw = parseFloat(bagWeight) || 65
-    const pid = Number(productId)
-    const productLots = (board?.stockLots || []).filter((l) => !pid || l.productId === pid)
-    const stockKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
-    const stockBags = includeStockBags ? Math.floor(stockKg / bw) : 0
-    const highest = Math.max(
-      board?.session.highestRate || 0,
-      ...chosen.map((x) => x.rate),
-      ...productLots.map((l) => l.ratePer40Kg),
-      0,
+  const sellableDheris = useMemo(() => {
+    if (!board || !activeSell) return []
+    return board.receives.filter(
+      (r) => r.dayBatchId === activeSell.id && r.sellingStatus !== 'SOLD',
     )
-    const stockKgUsed = stockBags * bw
-    const leftoverKg = Math.round((stockKg - stockKgUsed) * 100) / 100
-    const kgToNextBag = leftoverKg > 0 ? Math.round((bw - leftoverKg) * 100) / 100 : (stockKg === 0 ? bw : 0)
-    const stockAmount = stockKgUsed > 0 ? (stockKgUsed / 40) * highest : 0
-    return {
-      farmerBags,
-      farmerExtraKg,
-      stockBags,
-      totalBags: farmerBags + stockBags,
-      farmerAmount,
-      stockAmount,
-      totalAmount: farmerAmount + stockAmount,
-      stockKg,
-      stockKgUsed,
-      leftoverKg,
-      kgToNextBag,
-      highest,
-      productLots,
-      batchCount: productLots.length,
-    }
-  }, [unsold, selectedDheris, bagWeight, includeStockBags, board, productId])
+  }, [board, activeSell])
 
-  const handleTopUp = async () => {
-    const kg = parseFloat(topUpKg) || 0
-    if (!productId) {
-      toast.error('Select a product first')
-      return
+  useEffect(() => {
+    if (sellableDheris.length && !sellDheriId) {
+      setSellDheriId(String(sellableDheris[0].id))
     }
-    if (kg <= 0) {
-      toast.error('Enter kg to add')
-      return
+    if (sellDheriId && !sellableDheris.some((d) => String(d.id) === sellDheriId)) {
+      setSellDheriId(sellableDheris[0] ? String(sellableDheris[0].id) : '')
     }
-    setToppingUp(true)
+  }, [sellableDheris, sellDheriId])
+
+  const selectedSellDheri = sellableDheris.find((d) => String(d.id) === sellDheriId)
+
+  const handleOpenNextBatch = async () => {
+    setOpeningBatch(true)
     try {
-      await stockApi.topUpLot({
-        productId: Number(productId),
-        extraKg: kg,
-        bagWeightKg: parseFloat(bagWeight) || 65,
-        ratePer40Kg: preview.highest || undefined,
-        notes: `Top-up to complete bag (${kg} kg)`,
-      })
-      toast.success(`Added ${kg} kg to Extra KG stock`)
-      setTopUpKg('')
+      await dailyTradeApi.openNextBatch()
+      toast.success('Next batch opened — receive new farmer dheris here')
       await load(true)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Top-up failed')
+      toast.error(msg || 'Could not open next batch')
     } finally {
-      setToppingUp(false)
+      setOpeningBatch(false)
     }
   }
 
-  const toggleDheri = (id: number) => {
-    setSelectedDheris((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    )
+  const handleReceive = async () => {
+    if (!recvFarmerId) {
+      toast.error('Select farmer (already registered)')
+      return
+    }
+    if (!recvProductId) {
+      toast.error('Select product')
+      return
+    }
+    const bags = parseInt(recvBags, 10) || 0
+    if (bags <= 0) {
+      toast.error('Enter number of bags')
+      return
+    }
+    setReceiving(true)
+    try {
+      await dailyTradeApi.ensureReceivingBatch()
+      const res = await arhatApi.settle({
+        settlementType: 'FARMER_PAYABLE',
+        farmerId: Number(recvFarmerId),
+        productId: Number(recvProductId),
+        numberOfBags: bags,
+        weightPerBag: parseFloat(recvBagKg) || 40,
+        partialBagWeight: parseFloat(recvExtraKg) || 0,
+        marketRate: 0,
+        paymentNow: 0,
+      })
+      toast.success(
+        res.data.message ||
+          `Received into Batch ${receivingBatch?.batchNumber ?? 1}`,
+      )
+      setRecvBags('')
+      setRecvExtraKg('0')
+      await load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Receive failed')
+    } finally {
+      setReceiving(false)
+    }
+  }
+
+  const handleAuctionSell = async () => {
+    if (!sellDheriId) {
+      toast.error('Select a dheri from the current batch')
+      return
+    }
+    if (!sellBuyerId) {
+      toast.error('Select the winning buyer')
+      return
+    }
+    const rate = parseFloat(sellRate) || 0
+    if (rate <= 0) {
+      toast.error('Enter highest buyer rate per 40kg')
+      return
+    }
+    setSelling(true)
+    try {
+      const res = await dailyTradeApi.sellDheri({
+        dheriId: Number(sellDheriId),
+        buyerId: Number(sellBuyerId),
+        ratePer40Kg: rate,
+        paidAmount: parseFloat(sellPaid) || 0,
+      })
+      toast.success(res.data.data.message || 'Sold')
+      setBoard(res.data.data.board)
+      setSellRate('')
+      setSellPaid('0')
+      const sale = res.data.data.sale as { id?: number; buyerId?: number; items?: Array<{ id: number }> }
+      if (sale?.buyerId) setBillBuyerId(sale.buyerId)
+      if (sale?.items?.length) {
+        setBillItemIds(sale.items.map((i) => i.id).filter(Boolean))
+      }
+      await load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Sell failed')
+    } finally {
+      setSelling(false)
+    }
   }
 
   const handleRefresh = async () => {
@@ -239,64 +277,22 @@ export default function DailyTradePage() {
       toast.success('Board refreshed — previous day archived')
       const h = await dailyTradeApi.getHistory()
       setHistory(h.data.data || [])
-      setSelectedDheris([])
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Refresh failed')
     }
   }
 
-  const handleSell = async () => {
-    if (!buyerId) {
-      toast.error('Select a buyer')
-      return
-    }
-    if (!productId) {
-      toast.error('Select a product')
-      return
-    }
-    if (preview.totalBags <= 0) {
-      toast.error('Nothing to sell')
-      return
-    }
-    setSelling(true)
-    try {
-      const res = await dailyTradeApi.batchSell({
-        buyerId: Number(buyerId),
-        productId: Number(productId),
-        dheriIds: selectedDheris.length ? selectedDheris : undefined,
-        bagWeightKg: parseFloat(bagWeight) || 65,
-        paidAmount: parseFloat(paidAmount) || 0,
-        includeStockBags,
-      })
-      toast.success(res.data.data.message || 'Sold')
-      setBoard(res.data.data.board)
-      setSelectedDheris([])
-      setPaidAmount('0')
-      const sale = res.data.data.sale as { id?: number; buyerId?: number; items?: Array<{ id: number }> }
-      if (sale?.id) setLastSaleId(sale.id)
-      if (sale?.buyerId) setBillBuyerId(sale.buyerId)
-      if (sale?.items?.length) {
-        setBillItemIds(sale.items.map((i) => i.id).filter(Boolean))
-      }
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Batch sell failed')
-    } finally {
-      setSelling(false)
-    }
-  }
-
   if (loading && !board) return <TableSkeleton rows={10} />
 
   const session = board?.session
-  const balanced = (session?.receivedBags || 0) === (session?.soldBags || 0)
+  const batches = board?.batches || []
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daily Trade & Stock"
-        description="Receive from farmers → Extra KG to stock → Sell equal bags to one buyer"
+        title="Daily Trade — Day Batches"
+        description="Receive dheris into Batch 1, 2, 3… · Sell each dheri to the buyer with the highest rate/40kg · Finish one batch before the next"
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setShowHistory((v) => !v)}>
@@ -306,317 +302,286 @@ export default function DailyTradePage() {
               <RefreshCw className="h-4 w-4" /> Reload
             </Button>
             <Button variant="secondary" onClick={() => void handleRefresh()}>
-              <ArrowLeftRight className="h-4 w-4" /> Refresh board
+              <ArrowLeftRight className="h-4 w-4" /> End day / archive
             </Button>
           </div>
         }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DiagramCard
-          title="Receiving today"
-          tone="receive"
-          bags={session?.receivedBags || 0}
-          weight={session?.receivedWeightKg || 0}
-          stockKg={session?.stockInKg || board?.stockKgAvailable || 0}
-          extra={
-            <Link to="/arhat-sale" className="text-sm text-primary underline">
-              Add farmer / Extra KG
-            </Link>
-          }
-          onRefresh={() => void handleRefresh()}
-        />
-        <DiagramCard
-          title="Selling today"
-          tone="sell"
-          bags={session?.soldBags || 0}
-          weight={session?.soldWeightKg || 0}
-          stockKg={session?.stockOutKg || 0}
-          balanced={balanced}
-          remaining={session?.remainingBags || 0}
-          extra={
-            <span className="text-sm text-slate-500">
-              Highest rate: {formatCurrency(session?.highestRate || 0)} / 40kg
-            </span>
-          }
-          onRefresh={() => void handleRefresh()}
-        />
+        <div className="card-3d p-5 border border-emerald-200/60 dark:border-emerald-800/40">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving today</p>
+          <p className="text-3xl font-bold mt-1 tabular-nums">{session?.receivedBags || 0}</p>
+          <p className="text-sm text-slate-500">bags · {formatNumber(session?.receivedWeightKg || 0)} kg</p>
+          <p className="text-sm mt-2">
+            Current receive batch:{' '}
+            <strong>Batch {receivingBatch?.batchNumber ?? '—'}</strong>
+          </p>
+        </div>
+        <div className="card-3d p-5 border border-primary/30">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Selling today</p>
+          <p className="text-3xl font-bold mt-1 tabular-nums">{session?.soldBags || 0}</p>
+          <p className="text-sm text-slate-500">bags · {formatNumber(session?.soldWeightKg || 0)} kg</p>
+          <p className="text-sm mt-2">
+            Must sell now:{' '}
+            <strong>
+              {activeSell
+                ? `Batch ${activeSell.batchNumber} (${activeSell.unsoldDheris} left)`
+                : 'No unsold dheris'}
+            </strong>
+          </p>
+        </div>
       </div>
 
-      {!balanced && (
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          Bags not equal yet — receive {(session?.receivedBags || 0)} vs sold {(session?.soldBags || 0)}.
-          Leftover Extra KG stays in stock until it forms whole bags.
+      {/* Batches strip */}
+      <div className="card-3d p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" /> Today’s batches
+          </h3>
+          <Button variant="secondary" loading={openingBatch} onClick={() => void handleOpenNextBatch()}>
+            Open next batch
+          </Button>
+        </div>
+        {batches.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No batches yet — receive the first farmer dheri below to start Batch 1.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {batches.map((b) => {
+              const isActiveSell = activeSell?.id === b.id
+              const isReceiving = receivingBatch?.id === b.id
+              return (
+                <div
+                  key={b.id}
+                  className={`rounded-xl border p-3 ${
+                    isActiveSell
+                      ? 'border-amber-400 bg-amber-50/80 dark:bg-amber-950/20'
+                      : isReceiving
+                        ? 'border-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-white/10'
+                  }`}
+                >
+                  <p className="font-semibold">Batch {b.batchNumber}</p>
+                  <p className="text-xs text-slate-500 uppercase mt-0.5">{b.status}</p>
+                  <p className="text-sm mt-2">
+                    {b.soldDheris}/{b.totalDheris} sold · {b.unsoldDheris} left
+                  </p>
+                  {isActiveSell && (
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mt-1">
+                      Sell this batch first
+                    </p>
+                  )}
+                  {isReceiving && (
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-1">
+                      Receiving here
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-xs text-slate-500">
+          Same farmer can return later — select the existing farmer and enter the new product/bags into the current receiving batch.
+          New day starts new Batch 1.
         </p>
-      )}
+      </div>
 
+      {/* Receive */}
       <div className="card-3d p-4 space-y-4">
         <h3 className="font-semibold flex items-center gap-2">
-          <ShoppingCart className="h-4 w-4 text-primary" /> Batch sell to one buyer
+          <Package className="h-4 w-4 text-emerald-600" />
+          Receive dheri into Batch {receivingBatch?.batchNumber ?? 1}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Select
-            label="Buyer *"
-            value={buyerId}
-            onChange={(e) => setBuyerId(e.target.value)}
+            label="Farmer (existing) *"
+            value={recvFarmerId}
+            onChange={(e) => setRecvFarmerId(e.target.value)}
             options={[
-              { value: '', label: 'Select buyer' },
-              ...buyers.map((b) => ({ value: String(b.id), label: `${b.name} (${b.buyerId})` })),
+              { value: '', label: 'Select farmer' },
+              ...farmers.map((f) => ({
+                value: String(f.id),
+                label: `${f.name} (${f.farmerId})`,
+              })),
             ]}
           />
           <Select
             label="Product *"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+            value={recvProductId}
+            onChange={(e) => setRecvProductId(e.target.value)}
             options={[
               { value: '', label: 'Select product' },
               ...products.map((p) => ({ value: String(p.id), label: p.name })),
             ]}
           />
           <Input
+            label="Bags *"
+            type="number"
+            value={recvBags}
+            onChange={(e) => setRecvBags(e.target.value)}
+          />
+          <Input
             label="Bag weight (kg)"
             type="number"
             step="0.01"
-            value={bagWeight}
-            onChange={(e) => setBagWeight(e.target.value)}
+            value={recvBagKg}
+            onChange={(e) => setRecvBagKg(e.target.value)}
           />
           <Input
-            label="Cash received now"
+            label="Extra KG"
             type="number"
             step="0.01"
-            value={paidAmount}
-            onChange={(e) => setPaidAmount(e.target.value)}
+            value={recvExtraKg}
+            onChange={(e) => setRecvExtraKg(e.target.value)}
           />
         </div>
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={includeStockBags}
-            onChange={(e) => setIncludeStockBags(e.target.checked)}
-          />
-          Include Extra KG stock bags in this sale (priced at highest rate / 40kg)
-        </label>
-
-        <div className="rounded-xl border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-950/20 p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-amber-600 text-white text-xs font-semibold px-2.5 py-1">
-              Extra KG from farmers
-            </span>
-            <span className="text-sm font-bold tabular-nums">
-              {formatNumber(preview.stockKg)} kg
-            </span>
-            <span className="text-xs text-slate-500">
-              · {preview.batchCount} separate batch{preview.batchCount === 1 ? '' : 'es'}
-            </span>
-            <Link to="/stock" className="text-xs text-primary underline ml-auto">
-              View batches in Stock
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
-              <p className="text-xs text-slate-500">Bags you can make now</p>
-              <p className="text-xl font-bold mt-0.5">{preview.stockBags}</p>
-              <p className="text-xs text-slate-500">@ {formatNumber(parseFloat(bagWeight) || 65)} kg / bag</p>
-            </div>
-            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
-              <p className="text-xs text-slate-500">Leftover after whole bags</p>
-              <p className="text-xl font-bold mt-0.5">{formatNumber(preview.leftoverKg)} kg</p>
-            </div>
-            <div className="rounded-lg bg-white/70 dark:bg-black/20 border border-amber-100 dark:border-amber-900/40 p-3">
-              <p className="text-xs text-slate-500">Add more kg for +1 bag</p>
-              <p className="text-xl font-bold mt-0.5 text-amber-800 dark:text-amber-200">
-                {preview.kgToNextBag > 0 ? `+${formatNumber(preview.kgToNextBag)} kg` : '—'}
-              </p>
-            </div>
-          </div>
-
-          {preview.kgToNextBag > 0 && (
-            <p className="text-xs text-amber-900 dark:text-amber-100">
-              You have {formatNumber(preview.stockKg)} kg from farmer Extra KG.
-              That makes <strong>{preview.stockBags}</strong> full bag{preview.stockBags === 1 ? '' : 's'}.
-              Add <strong>{formatNumber(preview.kgToNextBag)} kg</strong> more to complete one more bag
-              (total {preview.stockBags + 1}).
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[10rem] flex-1">
-              <Input
-                label="Add further kg (to complete bag)"
-                type="number"
-                step="0.01"
-                min="0"
-                value={topUpKg}
-                onChange={(e) => setTopUpKg(e.target.value)}
-                placeholder={preview.kgToNextBag > 0 ? String(preview.kgToNextBag) : '0'}
-              />
-            </div>
-            <Button
-              variant="secondary"
-              loading={toppingUp}
-              onClick={() => void handleTopUp()}
-            >
-              Add to Extra KG stock
-            </Button>
-            {preview.kgToNextBag > 0 && (
-              <Button
-                variant="secondary"
-                onClick={() => setTopUpKg(String(preview.kgToNextBag))}
-              >
-                Fill {formatNumber(preview.kgToNextBag)} kg
-              </Button>
-            )}
-          </div>
-
-          {preview.productLots.length > 0 && (
-            <div className="overflow-x-auto">
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Batches in this Extra KG</p>
-              <table className="w-full text-xs min-w-[520px]">
-                <thead>
-                  <tr className="text-left text-slate-500">
-                    <th className="py-1 pr-2">Date</th>
-                    <th className="py-1 pr-2">Farmer</th>
-                    <th className="py-1 pr-2">Dheri</th>
-                    <th className="py-1 pr-2">Remaining</th>
-                    <th className="py-1">Rate/40kg</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.productLots.map((lot) => (
-                    <tr key={lot.id} className="border-t border-amber-100/80 dark:border-amber-900/30">
-                      <td className="py-1.5 pr-2">{lot.intakeDate}</td>
-                      <td className="py-1.5 pr-2">{lot.farmerName || 'Top-up'}</td>
-                      <td className="py-1.5 pr-2">{lot.dheriCode || '—'}</td>
-                      <td className="py-1.5 pr-2 font-semibold">{formatNumber(lot.remainingKg)} kg</td>
-                      <td className="py-1.5">{formatCurrency(lot.ratePer40Kg)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <p className="text-xs text-slate-500">
+          Winning rate / 40kg is entered when you sell this dheri to the highest bidder — not at receive time.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void handleReceive()} loading={receiving}>
+            <Package className="h-4 w-4" /> Add to Batch {receivingBatch?.batchNumber ?? 1}
+          </Button>
+          <Link to="/farmers" className="text-sm text-primary underline self-center">
+            Add new farmer first
+          </Link>
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <Stat label="Farmer bags" value={String(preview.farmerBags)} />
-          <Stat label="Stock bags" value={String(preview.stockBags)} />
-          <Stat label="Total bags" value={String(preview.totalBags)} />
-          <Stat label="Stock leftover" value={`${formatNumber(preview.leftoverKg)} kg`} />
-          <Stat label="Farmer amount" value={formatCurrency(preview.farmerAmount)} />
-          <Stat label="Stock bags amount" value={formatCurrency(preview.stockAmount)} />
-          <Stat label="Total amount" value={formatCurrency(preview.totalAmount)} />
-          <Stat label="Bill rate (stock)" value={formatCurrency(preview.highest)} />
-        </div>
-
-        <Button onClick={() => void handleSell()} loading={selling}>
-          <ShoppingCart className="h-4 w-4" /> Sell {preview.totalBags} bags to buyer
-        </Button>
       </div>
 
-      <div className="card-3d overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap justify-between gap-2">
-          <span>Today’s dheris — tick Sell (before) / Bill (after sold)</span>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <button
-              type="button"
-              className="text-primary"
-              onClick={() => setSelectedDheris(unsold.map((x) => x.id))}
-            >
-              Tick all unsold
-            </button>
-            <button
-              type="button"
-              className="text-primary"
-              onClick={() => {
-                const soldLines = (board?.sales || []).flatMap((s) =>
-                  s.items.filter((i) => i.sourceType === 'FARMER' && i.id).map((i) => ({
-                    itemId: i.id,
-                    buyerId: s.buyerId,
+      {/* Auction sell */}
+      <div className="card-3d p-4 space-y-4">
+        <h3 className="font-semibold flex items-center gap-2">
+          <ShoppingCart className="h-4 w-4 text-primary" />
+          Sell dheri — highest buyer rate
+          {activeSell ? ` (Batch ${activeSell.batchNumber})` : ''}
+        </h3>
+        {!activeSell ? (
+          <p className="text-sm text-slate-500">No unsold dheris waiting. Receive into a batch first.</p>
+        ) : (
+          <>
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Finish Batch {activeSell.batchNumber} before selling later batches.
+              Enter the rate of the buyer who offered the highest price per 40kg.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Select
+                label="Dheri from this batch *"
+                value={sellDheriId}
+                onChange={(e) => setSellDheriId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select dheri' },
+                  ...sellableDheris.map((r) => ({
+                    value: String(r.id),
+                    label: `${r.dheriId} · ${r.farmerName} · ${r.bags} bags · ${r.productName}`,
                   })),
-                )
-                if (!soldLines.length) {
-                  toast.error('No sold dheri lines yet')
-                  return
-                }
-                setBillItemIds(soldLines.map((x) => x.itemId))
-                setBillBuyerId(soldLines[0].buyerId)
-              }}
-            >
-              Tick all sold for bill
-            </button>
-          </div>
+                ]}
+              />
+              <Select
+                label="Winning buyer *"
+                value={sellBuyerId}
+                onChange={(e) => setSellBuyerId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select buyer' },
+                  ...buyers.map((b) => ({
+                    value: String(b.id),
+                    label: `${b.name} (${b.buyerId})`,
+                  })),
+                ]}
+              />
+              <Input
+                label="Highest rate / 40kg *"
+                type="number"
+                step="0.01"
+                value={sellRate}
+                onChange={(e) => setSellRate(e.target.value)}
+                placeholder="e.g. 4300"
+              />
+              <Input
+                label="Cash received now"
+                type="number"
+                step="0.01"
+                value={sellPaid}
+                onChange={(e) => setSellPaid(e.target.value)}
+              />
+            </div>
+            {selectedSellDheri && (
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Selling <strong>{selectedSellDheri.dheriId}</strong> from{' '}
+                <strong>{selectedSellDheri.farmerName}</strong> —{' '}
+                {selectedSellDheri.bags} bags ({formatNumber(selectedSellDheri.weight)} kg)
+                {selectedSellDheri.partialBagWeight > 0
+                  ? ` · Extra ${formatNumber(selectedSellDheri.partialBagWeight)} kg → stock`
+                  : ''}
+              </p>
+            )}
+            <Button onClick={() => void handleAuctionSell()} loading={selling}>
+              <Scale className="h-4 w-4" /> Sell this dheri at winning rate
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* All dheris table by batch */}
+      <div className="card-3d overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">
+          Today’s dheris by batch
         </div>
-        {receivesForProduct.length === 0 ? (
-          <p className="p-6 text-sm text-gray-500">No farmer receives today — use Arhat Sale / Farmer Product.</p>
+        {(board?.receives || []).length === 0 ? (
+          <p className="p-6 text-sm text-gray-500">No dheris received today.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[800px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
                 <tr>
-                  <th className="px-3 py-2">Sell</th>
-                  <th className="px-3 py-2">Bill</th>
-                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Batch</th>
                   <th className="px-3 py-2">Dheri</th>
                   <th className="px-3 py-2">Farmer</th>
+                  <th className="px-3 py-2">Product</th>
                   <th className="px-3 py-2">Bags</th>
                   <th className="px-3 py-2">Extra kg</th>
-                  <th className="px-3 py-2">Rate</th>
+                  <th className="px-3 py-2">Rate/40kg</th>
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {receivesForProduct.map((r) => {
+                {(board?.receives || []).map((r) => {
                   const sold = r.sellingStatus === 'SOLD'
-                  const saleLine = (board?.sales || [])
-                    .flatMap((s) => s.items.map((item) => ({ ...item, buyerId: s.buyerId, invoice: s.invoiceNumber })))
-                    .find((item) => item.dheriId === r.id)
-                  const billChecked = saleLine?.id != null && billItemIds.includes(saleLine.id)
+                  const locked =
+                    !!activeSell &&
+                    r.dayBatchId !== activeSell.id &&
+                    !sold
                   return (
-                    <tr key={r.id} className={sold ? '' : ''}>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          disabled={sold}
-                          checked={!sold && selectedDheris.includes(r.id)}
-                          onChange={() => toggleDheri(r.id)}
-                          title={sold ? 'Already sold' : 'Include in next batch sell'}
-                          aria-label={`Sell ${r.dheriId}`}
-                        />
+                    <tr
+                      key={r.id}
+                      className={
+                        locked ? 'opacity-60' : activeSell?.id === r.dayBatchId && !sold ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''
+                      }
+                    >
+                      <td className="px-3 py-2 font-medium">
+                        {r.batchNumber != null ? `B${r.batchNumber}` : '—'}
                       </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          disabled={!sold || !saleLine?.id}
-                          checked={!!billChecked}
-                          onChange={() => {
-                            if (!saleLine?.id) return
-                            setBillBuyerId(saleLine.buyerId)
-                            setBillItemIds((prev) =>
-                              prev.includes(saleLine.id)
-                                ? prev.filter((x) => x !== saleLine.id)
-                                : [...prev, saleLine.id],
-                            )
-                          }}
-                          title={sold ? 'Include this dheri on buyer bill' : 'Sell first, then tick for bill'}
-                          aria-label={`Bill ${r.dheriId}`}
-                        />
-                      </td>
-                      <td className="px-3 py-2">{r.date}</td>
-                      <td className="px-3 py-2 font-medium">{r.dheriId}</td>
+                      <td className="px-3 py-2">{r.dheriId}</td>
                       <td className="px-3 py-2">{r.farmerName}</td>
+                      <td className="px-3 py-2">{r.productName}</td>
                       <td className="px-3 py-2">{r.bags}</td>
                       <td className="px-3 py-2">{formatNumber(r.partialBagWeight)}</td>
-                      <td className="px-3 py-2">{formatCurrency(r.rate)}</td>
-                      <td className="px-3 py-2">{formatCurrency(r.amount)}</td>
+                      <td className="px-3 py-2">
+                        {r.rate > 0 ? formatCurrency(r.rate) : <span className="text-slate-400">at sell</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        {r.amount > 0 ? formatCurrency(r.amount) : '—'}
+                      </td>
                       <td className="px-3 py-2">
                         {sold ? (
-                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                            SOLD{saleLine?.invoice ? ` · ${saleLine.invoice}` : ''}
-                          </span>
+                          <span className="text-xs font-semibold text-emerald-700">SOLD</span>
+                        ) : locked ? (
+                          <span className="text-xs text-slate-500">Wait — finish earlier batch</span>
                         ) : (
-                          <span className="text-xs text-amber-700 dark:text-amber-300">UNSOLD</span>
+                          <span className="text-xs font-semibold text-amber-700">READY TO SELL</span>
                         )}
                       </td>
                     </tr>
@@ -626,62 +591,38 @@ export default function DailyTradePage() {
             </table>
           </div>
         )}
-
-        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2 bg-slate-50/80 dark:bg-slate-900/40">
-          <span className="text-sm font-medium">
-            Buyer bill: {billItemIds.length} dheri line{billItemIds.length === 1 ? '' : 's'} selected
-          </span>
-          <input
-            type="number"
-            min={1}
-            placeholder="Split (e.g. 3)"
-            value={billGroupSize}
-            onChange={(e) => setBillGroupSize(e.target.value)}
-            className="w-28 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
-            title="Optional: split into separate bill sheets of this many dheris"
-          />
-          <Button
-            variant="secondary"
-            disabled={!billBuyerId || billItemIds.length === 0}
-            onClick={async () => {
-              if (!billBuyerId || !billItemIds.length) {
-                toast.error('Tick sold dheris in the Bill column first')
-                return
-              }
-              try {
-                const gs = billGroupSize ? Number(billGroupSize) : undefined
-                const res = await buyerApi.getSelectedBillHtml(billBuyerId, billItemIds, 'en', gs)
-                openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Buyer bill (selected dheris)')
-              } catch (err) {
-                toast.error(billErrorMessage(err, 'Could not generate bill'))
-              }
-            }}
-          >
-            <FileText className="h-4 w-4" /> Generate bill (selected)
-          </Button>
-          {lastSaleId && (
-            <Link to={`/sales/${lastSaleId}`} className="text-sm text-primary underline">
-              Open last sale
-            </Link>
-          )}
-        </div>
       </div>
 
       {(board?.sales || []).length > 0 && (
         <div className="card-3d overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold">
-            Today’s sales — tick dheri lines for bill
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 font-semibold flex flex-wrap justify-between gap-2">
+            <span>Today’s sales</span>
+            <Button
+              variant="secondary"
+              disabled={!billBuyerId || billItemIds.length === 0}
+              onClick={async () => {
+                if (!billBuyerId || !billItemIds.length) return
+                try {
+                  const res = await buyerApi.getSelectedBillHtml(billBuyerId, billItemIds, 'en')
+                  openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Buyer bill')
+                } catch (err) {
+                  toast.error(billErrorMessage(err, 'Could not generate bill'))
+                }
+              }}
+            >
+              <FileText className="h-4 w-4" /> Bill last sale lines
+            </Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
                 <tr>
-                  <th className="px-3 py-2">Bill</th>
                   <th className="px-3 py-2">Invoice</th>
                   <th className="px-3 py-2">Buyer</th>
                   <th className="px-3 py-2">Dheri</th>
                   <th className="px-3 py-2">Farmer</th>
                   <th className="px-3 py-2">Bags</th>
+                  <th className="px-3 py-2">Rate</th>
                   <th className="px-3 py-2">Amount</th>
                 </tr>
               </thead>
@@ -690,26 +631,13 @@ export default function DailyTradePage() {
                   sale.items.map((item) => (
                     <tr key={`${sale.id}-${item.id}`}>
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={billItemIds.includes(item.id)}
-                          onChange={() => {
-                            setBillBuyerId(sale.buyerId)
-                            setBillItemIds((prev) =>
-                              prev.includes(item.id)
-                                ? prev.filter((x) => x !== item.id)
-                                : [...prev, item.id],
-                            )
-                          }}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
                         <Link className="text-primary" to={`/sales/${sale.id}`}>{sale.invoiceNumber}</Link>
                       </td>
                       <td className="px-3 py-2">{sale.buyerName}</td>
-                      <td className="px-3 py-2 font-medium">{item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—')}</td>
+                      <td className="px-3 py-2">{item.dheriCode || '—'}</td>
                       <td className="px-3 py-2">{item.farmerName || '—'}</td>
                       <td className="px-3 py-2">{item.bags}</td>
+                      <td className="px-3 py-2">{formatCurrency(item.rate)}</td>
                       <td className="px-3 py-2">{formatCurrency(item.amount)}</td>
                     </tr>
                   )),
@@ -728,16 +656,14 @@ export default function DailyTradePage() {
           <p className="p-6 text-sm text-gray-500">No Extra KG in stock yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm min-w-[560px]">
               <thead className="bg-gray-50 dark:bg-gray-800/50 text-left">
                 <tr>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Product</th>
                   <th className="px-3 py-2">Farmer</th>
-                  <th className="px-3 py-2">Dheri</th>
-                  <th className="px-3 py-2">Remaining kg</th>
+                  <th className="px-3 py-2">Remaining</th>
                   <th className="px-3 py-2">Rate/40kg</th>
-                  <th className="px-3 py-2">Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -746,10 +672,8 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">{lot.intakeDate}</td>
                     <td className="px-3 py-2">{lot.productName}</td>
                     <td className="px-3 py-2">{lot.farmerName || '—'}</td>
-                    <td className="px-3 py-2">{lot.dheriCode || '—'}</td>
-                    <td className="px-3 py-2">{formatNumber(lot.remainingKg)}</td>
+                    <td className="px-3 py-2">{formatNumber(lot.remainingKg)} kg</td>
                     <td className="px-3 py-2">{formatCurrency(lot.ratePer40Kg)}</td>
-                    <td className="px-3 py-2">{formatCurrency(lot.amountValue)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -764,109 +688,19 @@ export default function DailyTradePage() {
             Archived daily boards
           </div>
           {history.length === 0 ? (
-            <p className="p-6 text-sm text-gray-500">No archived days yet. Use Refresh board to archive.</p>
+            <p className="p-6 text-sm text-gray-500">No archived days yet.</p>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {history.map((h) => (
-                <li key={h.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{h.sessionDate}</p>
-                    <p className="text-xs text-slate-500">
-                      Received {h.receivedBags} · Sold {h.soldBags} · Stock in {formatNumber(h.stockInKg)} kg
-                    </p>
-                  </div>
-                  <Button variant="secondary" onClick={() => setHistoryDetail(h)}>
-                    Details
-                  </Button>
+                <li key={String(h.id)} className="px-4 py-3 text-sm">
+                  <strong>{String(h.sessionDate)}</strong>
+                  {' · '}received {String(h.receivedBags)} · sold {String(h.soldBags)}
                 </li>
               ))}
             </ul>
           )}
         </div>
       )}
-
-      {historyDetail && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-3" onClick={() => setHistoryDetail(null)}>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[80vh] overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-lg mb-2">History — {historyDetail.sessionDate}</h3>
-            <pre className="text-xs whitespace-pre-wrap break-words bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">
-              {JSON.stringify(historyDetail.details ?? historyDetail, null, 2)}
-            </pre>
-            <Button className="mt-3" variant="secondary" onClick={() => setHistoryDetail(null)}>Close</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200/70 dark:border-white/10 p-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="font-semibold mt-0.5">{value}</p>
-    </div>
-  )
-}
-
-function DiagramCard({
-  title,
-  tone,
-  bags,
-  weight,
-  stockKg,
-  balanced,
-  remaining,
-  extra,
-  onRefresh,
-}: {
-  title: string
-  tone: 'receive' | 'sell'
-  bags: number
-  weight: number
-  stockKg: number
-  balanced?: boolean
-  remaining?: number
-  extra?: React.ReactNode
-  onRefresh: () => void
-}) {
-  return (
-    <div
-      className={`card-3d p-5 border ${
-        tone === 'receive'
-          ? 'border-emerald-200/60 dark:border-emerald-800/40'
-          : balanced
-            ? 'border-emerald-200/60 dark:border-emerald-800/40'
-            : 'border-amber-200/60 dark:border-amber-800/40'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">{title}</p>
-          <p className="text-3xl font-bold mt-1 tabular-nums">{bags}</p>
-          <p className="text-sm text-slate-500">bags · {formatNumber(weight)} kg</p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          {tone === 'receive' ? (
-            <Package className="h-8 w-8 text-emerald-600" />
-          ) : (
-            <Scale className="h-8 w-8 text-primary" />
-          )}
-          <button type="button" onClick={onRefresh} className="text-xs text-primary underline">
-            Refresh
-          </button>
-        </div>
-      </div>
-      <p className="text-sm">
-        Extra / stock kg: <strong>{formatNumber(stockKg)}</strong>
-      </p>
-      {remaining != null && remaining !== 0 && (
-        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-          Remaining to sell: {remaining} bags
-        </p>
-      )}
-      {balanced && <p className="text-sm text-emerald-600 mt-1">Balanced with receiving</p>}
-      <div className="mt-3">{extra}</div>
     </div>
   )
 }

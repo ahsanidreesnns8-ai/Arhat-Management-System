@@ -68,6 +68,7 @@ async function main() {
     stockLots: (await prisma.stockLot.deleteMany({})).count,
     stockTransactions: (await prisma.stockTransaction.deleteMany({})).count,
     dailyTradeSessions: (await prisma.dailyTradeSession.deleteMany({})).count,
+    dayBatches: (await prisma.dayBatch.deleteMany({})).count,
     sales: (await prisma.sale.deleteMany({})).count,
     dheris: (await prisma.dheri.deleteMany({})).count,
     trucks: (await prisma.truck.deleteMany({})).count,

@@ -7,6 +7,7 @@ const dheriInclude = {
   farmer: true,
   truck: true,
   product: true,
+  dayBatch: true,
 } as const
 
 type DheriRow = Prisma.DheriGetPayload<{ include: typeof dheriInclude }>
@@ -15,6 +16,7 @@ export type DheriInput = PriceInput & {
   farmerId?: number | null
   truckId?: number | null
   productId?: number | null
+  dayBatchId?: number | null
   notes?: string | null
 }
 
@@ -29,6 +31,8 @@ export function dheriDto(row: DheriRow) {
     truckCode: row.truck?.truckId ?? null,
     productId: Number(row.productId),
     productName: row.product.name,
+    dayBatchId: row.dayBatchId == null ? null : Number(row.dayBatchId),
+    batchNumber: row.dayBatch?.batchNumber ?? null,
     queueNumber: row.queueNumber,
     numberOfBags: row.numberOfBags,
     weightPerBag: row.weightPerBag.toNumber(),
@@ -105,12 +109,22 @@ async function validateRelations(input: DheriInput, partial = false) {
 export async function createDheri(input: DheriInput) {
   await validateRelations(input)
   const result = await calculatePrice(input)
+  let dayBatchId =
+    input.dayBatchId != null ? BigInt(input.dayBatchId) : null
+  if (dayBatchId == null) {
+    const { getOrCreateReceivingBatch } = await import(
+      '@/server/services/day-batches'
+    )
+    const batch = await getOrCreateReceivingBatch()
+    dayBatchId = BigInt(batch.id)
+  }
   const row = await prisma.dheri.create({
     data: {
       dheriId: await nextDheriCode(),
       farmerId: BigInt(input.farmerId!),
       truckId: input.truckId == null ? null : BigInt(input.truckId),
       productId: BigInt(input.productId!),
+      dayBatchId,
       numberOfBags: input.numberOfBags ?? 0,
       weightPerBag: String(input.weightPerBag ?? 40),
       partialBagWeight: String(input.partialBagWeight ?? 0),

@@ -107,8 +107,8 @@ export default function FarmerProductPage() {
       toast.error('Number of bags must be greater than zero')
       return
     }
-    if ((parseFloat(marketRate) || 0) <= 0) {
-      toast.error('Enter market rate')
+    if ((parseFloat(marketRate) || 0) < 0) {
+      toast.error('Market rate cannot be negative')
       return
     }
 
@@ -242,7 +242,7 @@ export default function FarmerProductPage() {
             <p className="-mt-2 text-xs text-slate-500">
               0 if none. Priced at today’s rate and saved to stock with farmer details.
             </p>
-            <Input label="Market Rate / 40kg *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
+            <Input label="Market Rate / 40kg (optional — set at auction sell)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />
             <Select

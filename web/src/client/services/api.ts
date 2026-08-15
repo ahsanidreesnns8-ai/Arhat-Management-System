@@ -244,6 +244,24 @@ export const dailyTradeApi = {
   getBoard: (date?: string) =>
     api.get<ApiResponse<any>>('/daily-trade/board', { params: date ? { date } : undefined }),
   getHistory: () => api.get<ApiResponse<any[]>>('/daily-trade/history'),
+  getBatches: (date?: string) =>
+    api.get<ApiResponse<any>>('/daily-trade/batches', { params: date ? { date } : undefined }),
+  openNextBatch: (date?: string, notes?: string) =>
+    api.post<ApiResponse<any>>('/daily-trade/batches/open-next', {
+      ...(date ? { date } : {}),
+      ...(notes ? { notes } : {}),
+    }),
+  ensureReceivingBatch: (date?: string) =>
+    api.post<ApiResponse<any>>('/daily-trade/batches/ensure', date ? { date } : {}),
+  sellDheri: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      sale: Sale
+      message: string
+      board: any
+      batchNumber: number
+      ratePer40Kg: number
+      batchClosed: boolean
+    }>>('/daily-trade/sell-dheri', data),
   refresh: (date?: string) =>
     api.post<ApiResponse<any>>('/daily-trade/refresh', date ? { date } : {}),
   batchSell: (data: Record<string, unknown>) =>

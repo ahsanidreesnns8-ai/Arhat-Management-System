@@ -133,8 +133,8 @@ export default function ArhatSalePage() {
       toast.error('Number of bags must be greater than zero')
       return
     }
-    if ((parseFloat(marketRate) || 0) <= 0) {
-      toast.error('Enter market rate')
+    if ((parseFloat(marketRate) || 0) < 0) {
+      toast.error('Market rate cannot be negative')
       return
     }
 
@@ -268,7 +268,7 @@ export default function ArhatSalePage() {
             <p className="-mt-2 text-xs text-slate-500">
               Enter 0 if none. Extra KG is priced at market rate, paid to farmer, and deposited into stock for forming bags.
             </p>
-            <Input label="Market Rate / 40kg *" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
+            <Input label="Market Rate / 40kg (optional — winning buyer rate set when selling)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input
               label={mode === 'BUYER_SALE' ? 'Cash received now' : 'Cash paid now'}
