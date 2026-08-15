@@ -5,6 +5,7 @@ import { clientIp, rateLimit } from '@/server/rate-limit'
 import { bumpRevision, getPulse } from '@/server/sync'
 import { runWithWorkspace } from '@/server/workspace'
 import * as authService from '@/server/services/auth-service'
+import * as loginSessions from '@/server/services/login-sessions'
 import * as farmers from '@/server/services/farmers'
 import * as buyers from '@/server/services/buyers'
 import * as trucks from '@/server/services/trucks'
@@ -59,6 +60,7 @@ async function body(request: NextRequest) {
 function isPublic(method: string, path: string[]) {
   return (
     (method === 'POST' && path.join('/') === 'auth/login') ||
+    (method === 'POST' && path.join('/') === 'auth/logout') ||
     (method === 'GET' && path.join('/') === 'health') ||
     (method === 'GET' && path.join('/') === 'settings/public')
   )
@@ -82,6 +84,7 @@ async function authenticate(
   if (path[0] === 'users' || path[0] === 'audit' || path[0] === 'backup') {
     return requireRoles(request, 'OWNER', 'ADMIN')
   }
+  // Heartbeat/logout still require a bearer token but are handled after auth
   return requireAuth(request)
 }
 
@@ -112,11 +115,25 @@ async function dispatch(
       )
     }
     return result(
-      await authService.login(
-        String(payload.username ?? ''),
-        String(payload.password ?? ''),
-      ),
+      await authService.login(String(payload.username ?? ''), String(payload.password ?? ''), {
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent'),
+      }),
     )
+  }
+  if (path[0] === 'auth' && path[1] === 'logout' && method === 'POST') {
+    const authorization = request.headers.get('authorization')
+    const token = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : null
+    return result(await authService.logout(token), 'Logged out')
+  }
+  if (path[0] === 'auth' && path[1] === 'heartbeat' && method === 'POST') {
+    const authorization = request.headers.get('authorization')
+    const token = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : null
+    return result(await authService.heartbeat(token))
   }
   if (path[0] === 'auth' && path[1] === 'theme' && method === 'PUT') {
     await authService.updateTheme(
@@ -457,6 +474,9 @@ async function dispatch(
   if (path[0] === 'users') {
     if (path.length === 1 && method === 'GET') {
       return result(await users.listUsers())
+    }
+    if (path[1] === 'staff-usage' && method === 'GET') {
+      return result(await loginSessions.getStaffUsageSummary())
     }
     if (path.length === 1 && method === 'POST') {
       return result(

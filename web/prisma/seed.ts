@@ -137,6 +137,26 @@ async function main() {
     workspace: 'live',
   })
 
+  // Shared owner login — intended for 2–3 owner persons
+  await upsertLoginUser({
+    username: 'owner',
+    email: 'owner@rehmanitrading.com',
+    password: 'owner123',
+    fullName: 'Shared Owner',
+    role: 'OWNER',
+    workspace: 'live',
+  })
+
+  // Staff / operator login — usage time tracked for owners
+  await upsertLoginUser({
+    username: 'staff',
+    email: 'staff@rehmanitrading.com',
+    password: 'staff123',
+    fullName: 'Staff Operator',
+    role: 'OPERATOR',
+    workspace: 'live',
+  })
+
   // Shared guest login — isolated demo sandbox
   await upsertLoginUser({
     username: 'demo',

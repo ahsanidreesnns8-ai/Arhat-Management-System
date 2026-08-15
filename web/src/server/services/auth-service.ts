@@ -4,13 +4,23 @@ import {
   signToken,
   updateTheme as persistTheme,
   verifyPassword,
+  verifyToken,
 } from '@/server/auth'
 import { WORKSPACE_DEMO, runWithWorkspace } from '@/server/workspace'
+import {
+  endLoginSession,
+  startLoginSession,
+  touchLoginSession,
+} from '@/server/services/login-sessions'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
 
-export async function login(username: string, password: string) {
+export async function login(
+  username: string,
+  password: string,
+  meta?: { ipAddress?: string | null; userAgent?: string | null },
+) {
   const normalized = username.trim()
   if (!normalized || !password) {
     throw new Error('Username and password are required')
@@ -84,10 +94,16 @@ export async function login(username: string, password: string) {
   })
 
   const workspace = authenticated.workspace === WORKSPACE_DEMO ? WORKSPACE_DEMO : 'live'
+  const session = await startLoginSession({
+    userId: authenticated.id,
+    workspace,
+    ipAddress: meta?.ipAddress,
+    userAgent: meta?.userAgent,
+  })
+
   const settings = await runWithWorkspace(workspace, async () =>
     prisma.businessSettings.findFirst({ select: { companyName: true } }),
   )
-  // Live branding fallback if demo settings missing
   const liveFallback =
     !settings?.companyName && workspace === WORKSPACE_DEMO
       ? await getLiveSettingsCompanyName()
@@ -97,15 +113,41 @@ export async function login(username: string, password: string) {
     ...authenticated,
     workspace,
     isDemo: workspace === WORKSPACE_DEMO,
+    sessionId: Number(session.id),
     companyName:
       settings?.companyName ??
       liveFallback?.companyName ??
       'Rehmani Trading Company',
-    token: await signToken({
-      ...authenticated,
-      workspace,
-    }),
+    token: await signToken(
+      {
+        ...authenticated,
+        workspace,
+      },
+      session.id,
+    ),
   }
+}
+
+export async function logout(token: string | null | undefined) {
+  if (!token) return { closed: false }
+  try {
+    const payload = await verifyToken(token)
+    const sid = payload.sid
+    if (sid == null) return { closed: false }
+    await endLoginSession(String(sid))
+    return { closed: true }
+  } catch {
+    return { closed: false }
+  }
+}
+
+export async function heartbeat(token: string | null | undefined) {
+  if (!token) throw new Error('Authentication required')
+  const payload = await verifyToken(token)
+  const sid = payload.sid
+  if (sid == null) return { ok: false }
+  const row = await touchLoginSession(String(sid))
+  return { ok: !!row, lastSeenAt: row?.lastSeenAt?.toISOString() ?? null }
 }
 
 export async function updateTheme(username: string, theme: string) {

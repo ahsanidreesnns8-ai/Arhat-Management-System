@@ -72,6 +72,7 @@ async function main() {
     dheris: (await prisma.dheri.deleteMany({})).count,
     trucks: (await prisma.truck.deleteMany({})).count,
     auditLogs: (await prisma.auditLog.deleteMany({})).count,
+    loginSessions: (await prisma.loginSession.deleteMany({})).count,
     farmers: (await prisma.farmer.deleteMany({})).count,
     buyers: (await prisma.buyer.deleteMany({})).count,
   }

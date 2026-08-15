@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   ApiResponse, AiChatResponse, BusinessSettings, Buyer, DashboardStats,
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
-  ReportSummary, Sale, SearchResult, StockItem, StockLot, StockTransaction,
+  ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar,
 } from '../types'
 
@@ -141,7 +141,9 @@ const billRequest = (
 
 export const authApi = {
   login: (username: string, password: string) =>
-    api.post<ApiResponse<User & { token: string }>>('/auth/login', { username, password }),
+    api.post<ApiResponse<User & { token: string; sessionId?: number }>>('/auth/login', { username, password }),
+  logout: () => api.post<ApiResponse<{ closed: boolean }>>('/auth/logout'),
+  heartbeat: () => api.post<ApiResponse<{ ok: boolean; lastSeenAt: string | null }>>('/auth/heartbeat'),
   updateTheme: (theme: string) =>
     api.put('/auth/theme', null, { params: { theme } }),
 }
@@ -335,6 +337,7 @@ export const reportApi = {
 
 export const userApi = {
   getAll: () => api.get<ApiResponse<SystemUser[]>>('/users'),
+  staffUsage: () => api.get<ApiResponse<StaffUsageSummary>>('/users/staff-usage'),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<SystemUser>>('/users', data),
   update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<SystemUser>>(`/users/${id}`, data),
   suspend: (id: number) => api.patch<ApiResponse<void>>(`/users/${id}/suspend`),

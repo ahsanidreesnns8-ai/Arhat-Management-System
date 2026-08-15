@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Shield, Users, Database, Activity, Plus } from 'lucide-react'
+import { Shield, Users, Database, Activity, Plus, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -8,13 +8,15 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { useAuth } from '../context/AuthContext'
 import { auditApi, backupApi, userApi } from '../services/api'
-import type { SystemUser } from '../types'
+import type { StaffUsageSummary, SystemUser } from '../types'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import { formatDateTime } from '../utils/format'
 
 export default function OwnerPage() {
   const { user } = useAuth()
   const [users, setUsers] = useState<SystemUser[]>([])
   const [logs, setLogs] = useState<Array<{ action: string; entityType: string; createdAt: string }>>([])
+  const [staffUsage, setStaffUsage] = useState<StaffUsageSummary | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ username: '', email: '', fullName: '', password: '', role: 'OPERATOR' })
   const [saving, setSaving] = useState(false)
@@ -22,6 +24,7 @@ export default function OwnerPage() {
   const load = () => {
     userApi.getAll().then((res) => setUsers(res.data.data || [])).catch(() => toast.error('Failed to load users'))
     auditApi.getRecent().then((res) => setLogs(res.data.data || [])).catch(() => {})
+    userApi.staffUsage().then((res) => setStaffUsage(res.data.data || null)).catch(() => {})
   }
 
   useEffect(() => { load() }, [])
@@ -127,7 +130,7 @@ export default function OwnerPage() {
     <div className="space-y-4">
       <PageHeader
         title="Owner Panel"
-        description="Users, backups, audit"
+        description="Users, staff access time, backups, audit"
         action={
           <Button size="sm" onClick={() => setModalOpen(true)}>
             <Plus className="h-3.5 w-3.5" /> Add
@@ -148,6 +151,60 @@ export default function OwnerPage() {
             <p className="text-sm font-semibold text-slate-900 dark:text-white">{item.value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 text-sm font-semibold flex items-center gap-1.5">
+          <Clock className="h-4 w-4 text-primary" />
+          Staff access time
+        </div>
+        <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-800">
+          How many times and how long staff accounts used this website. Shared owner logins are not listed here.
+        </div>
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {(staffUsage?.staff || []).map((row) => (
+            <div key={row.userId} className="px-3 py-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{row.fullName}</p>
+                  <p className="text-[11px] text-gray-500 truncate">
+                    {row.username} · {row.role} · {row.active ? 'Active' : 'Suspended'}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-semibold text-primary">{row.totalDurationLabel}</p>
+                  <p className="text-[10px] text-gray-500">{row.loginCount} login{row.loginCount === 1 ? '' : 's'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2 py-1.5">
+                  <div className="text-gray-500">Active now</div>
+                  <div className="font-medium">{row.activeSessions}</div>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2 py-1.5">
+                  <div className="text-gray-500">Last login</div>
+                  <div className="font-medium">{row.lastLoginAt ? formatDateTime(row.lastLoginAt) : '—'}</div>
+                </div>
+              </div>
+              {row.recentSessions.length > 0 && (
+                <ul className="space-y-1 max-h-36 overflow-y-auto">
+                  {row.recentSessions.map((s) => (
+                    <li key={s.id} className="text-[11px] flex justify-between gap-2 text-gray-600 dark:text-gray-300">
+                      <span className="truncate">
+                        {formatDateTime(s.loginAt)}
+                        {s.active ? ' · online' : ''}
+                      </span>
+                      <span className="font-medium shrink-0">{s.durationLabel}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          {!staffUsage?.staff?.length && (
+            <p className="p-3 text-sm text-gray-500">No staff usage yet — staff logins will appear here.</p>
+          )}
+        </div>
       </div>
 
       <div className="card overflow-hidden">

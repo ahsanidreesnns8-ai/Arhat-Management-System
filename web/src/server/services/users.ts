@@ -128,7 +128,7 @@ export async function setUserActive(id: number | bigint, active: boolean) {
 
 export async function deleteUser(id: number | bigint) {
   const existing = await getUser(id)
-  if (existing.username === 'rehmani' || existing.username === 'demo') {
+  if (existing.username === 'rehmani' || existing.username === 'demo' || existing.username === 'owner' || existing.username === 'staff') {
     throw new Error('System accounts cannot be deleted')
   }
   await prisma.user.update({

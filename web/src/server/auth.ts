@@ -20,11 +20,15 @@ export type AuthUser = Pick<
   'id' | 'username' | 'email' | 'fullName' | 'role' | 'themePreference' | 'workspace'
 >
 
-export async function signToken(user: AuthUser): Promise<string> {
+export async function signToken(
+  user: AuthUser,
+  sessionId?: bigint | number | null,
+): Promise<string> {
   return new SignJWT({
     username: user.username,
     role: user.role,
     workspace: user.workspace || 'live',
+    ...(sessionId != null ? { sid: sessionId.toString() } : {}),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id.toString())

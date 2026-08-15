@@ -9,6 +9,37 @@ export interface User {
   themePreference: 'LIGHT' | 'DARK' | 'SYSTEM'
   companyName: string
   token: string
+  sessionId?: number
+}
+
+export interface StaffUsageSession {
+  id: number
+  loginAt: string
+  logoutAt: string | null
+  lastSeenAt: string
+  active: boolean
+  durationSec: number
+  durationLabel: string
+  ipAddress?: string | null
+}
+
+export interface StaffUsageRow {
+  userId: number
+  username: string
+  fullName: string
+  role: string
+  active: boolean
+  loginCount: number
+  activeSessions: number
+  totalDurationSec: number
+  totalDurationLabel: string
+  lastLoginAt: string | null
+  recentSessions: StaffUsageSession[]
+}
+
+export interface StaffUsageSummary {
+  generatedAt: string
+  staff: StaffUsageRow[]
 }
 
 export interface ApiResponse<T> {
