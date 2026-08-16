@@ -1,3 +1,4 @@
+import { isOwnerFinanceRole } from '@/lib/roles'
 import { prisma } from '@/server/db'
 
 function utcDayRange(offsetDays = 0) {
@@ -11,7 +12,7 @@ function utcDayRange(offsetDays = 0) {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
-export async function getDashboardStats() {
+export async function getDashboardStats(role?: string | null) {
   const { start, end } = utcDayRange(0)
   const weekStart = utcDayRange(-6).start
 
@@ -79,6 +80,7 @@ export async function getDashboardStats() {
   })
 
   const todaySales = sales._sum.totalAmount?.toNumber() ?? 0
+  const showFinance = role == null || isOwnerFinanceRole(role)
   const stockAsOf = start.toISOString().slice(0, 10)
   const lotRows = await prisma.stockLot.findMany({
     where: { remainingKg: { gt: 0 } },
@@ -101,9 +103,11 @@ export async function getDashboardStats() {
       amountValue: lot.amountValue.toNumber(),
       intakeDate: lot.intakeDate.toISOString().slice(0, 10),
     })),
-    pendingPayments: outstanding._sum.outstandingBalance?.toNumber() ?? 0,
-    revenue: todaySales,
-    commission: commission._sum.arhatShare?.toNumber() ?? 0,
+    pendingPayments: showFinance
+      ? outstanding._sum.outstandingBalance?.toNumber() ?? 0
+      : 0,
+    revenue: showFinance ? todaySales : 0,
+    commission: showFinance ? commission._sum.arhatShare?.toNumber() ?? 0 : 0,
     weeklyTrend,
     recentActivity: activity.map((item) => ({
       action: item.action,

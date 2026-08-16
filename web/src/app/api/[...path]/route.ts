@@ -29,6 +29,7 @@ import * as arhat from '@/server/services/arhat'
 import * as stockLots from '@/server/services/stock-lots'
 import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
+import { isOwnerFinanceRole } from '@/lib/roles'
 
 type RouteContext = {
   params: Promise<{ path: string[] }>
@@ -109,7 +110,7 @@ async function dispatch(
   }
   if (path[0] === 'auth' && path[1] === 'login' && method === 'POST') {
     const ip = clientIp(request)
-    const limited = rateLimit(`login:${ip}`, 20, 15 * 60_000)
+    const limited = rateLimit(`login:${ip}`, 200, 15 * 60_000)
     if (!limited.ok) {
       throw new Error(
         `Too many login attempts. Try again in ${limited.retryAfterSec}s.`,
@@ -575,7 +576,7 @@ async function dispatch(
   }
 
   if (path[0] === 'dashboard' && path[1] === 'stats' && method === 'GET') {
-    return result(await dashboard.getDashboardStats())
+    return result(await dashboard.getDashboardStats(user?.role))
   }
   if (path[0] === 'search' && method === 'GET') {
     return result(await searchService.search(url.searchParams.get('q') ?? ''))
@@ -600,12 +601,14 @@ async function dispatch(
       return result(await reports.getSalesReport(from, to))
     }
     if (path[1] === 'commission' && method === 'GET') {
+      if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
       return result(await reports.getCommissionReport(from, to))
     }
     if (path[1] === 'stock' && method === 'GET') {
       return result(await reports.getStockReport())
     }
     if (path[1] === 'profit' && method === 'GET') {
+      if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
       return result(await reports.getProfitReport(from, to))
     }
     if (
@@ -724,24 +727,25 @@ async function handle(request: NextRequest, context: RouteContext) {
       lower.includes('server has closed the connection')
 
     const status =
-      message === 'Authentication required' ||
-      message === 'Invalid or expired token' ||
-      message === 'Access Denied' ||
-      message === 'Invalid username or password' ||
-      message.startsWith('Invalid username or password') ||
-      message.startsWith('Account temporarily locked') ||
-      message.startsWith('Username and password are required') ||
-      message.startsWith('This account is suspended') ||
       message.startsWith('Too many login attempts')
-        ? 401
-        : message === 'Access denied' ||
-            message.startsWith('Demo account cannot')
-          ? 403
-          : message.startsWith('API route not found')
-            ? 404
-            : isDbTransient
-              ? 503
-              : 400
+        ? 429
+        : message === 'Authentication required' ||
+            message === 'Invalid or expired token' ||
+            message === 'Access Denied' ||
+            message === 'Invalid username or password' ||
+            message.startsWith('Invalid username or password') ||
+            message.startsWith('Account temporarily locked') ||
+            message.startsWith('Username and password are required') ||
+            message.startsWith('This account is suspended')
+          ? 401
+          : message === 'Access denied' ||
+              message.startsWith('Demo account cannot')
+            ? 403
+            : message.startsWith('API route not found')
+              ? 404
+              : isDbTransient
+                ? 503
+                : 400
     // Don't leak stack / internal details
     const safeMessage =
       message.startsWith('JWT_SECRET')

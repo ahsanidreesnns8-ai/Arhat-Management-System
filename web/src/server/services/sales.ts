@@ -1,4 +1,4 @@
-import type { Prisma, SaleSourceType } from '@prisma/client'
+import { Prisma, type SaleSourceType } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { nextInvoiceCode } from '@/server/ids'
 import { amountFromWeight, d, round2, totalWeight } from '@/server/money'
@@ -115,7 +115,29 @@ export async function getSale(id: number | bigint) {
   return saleDto(row)
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: string }).code === 'P2002'
+  )
+}
+
 export async function createSale(input: SaleInput, createdById?: bigint) {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      return await createSaleOnce(input, createdById)
+    } catch (error) {
+      lastError = error
+      if (!isUniqueConstraintError(error) || attempt === 5) throw error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Could not create sale')
+}
+
+async function createSaleOnce(input: SaleInput, createdById?: bigint) {
   if (input.buyerId == null) throw new Error('Buyer is required')
   if (!input.items?.length) throw new Error('At least one sale item is required')
   const invoiceNumber = await nextInvoiceCode()

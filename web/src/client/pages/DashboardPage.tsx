@@ -21,8 +21,10 @@ import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dashboardApi, farmerApi } from '../services/api'
 import { formatCurrency, formatDateTime, formatNumber } from '../utils/format'
 import type { DashboardStats } from '../types'
+import { useAuth } from '../context/AuthContext'
 import { useBusiness } from '../context/BusinessContext'
 import { fadeUp } from '../utils/motion'
+import { isOwnerFinanceRole } from '../../lib/roles'
 
 const emptyWeeklyTrend = [
   { name: 'Mon', sales: 0, stock: 0 },
@@ -49,6 +51,8 @@ const activityLink = (entityType?: string) => {
 
 export default function DashboardPage() {
   const { companyName } = useBusiness()
+  const { user } = useAuth()
+  const showFinance = isOwnerFinanceRole(user?.role)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -151,10 +155,10 @@ export default function DashboardPage() {
     { title: 'Total Buyers', value: view.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'blue' as const, to: '/buyers' },
     { title: 'Total Dheris', value: view.totalDheris, icon: <Package className="h-5 w-5" />, color: 'amber' as const, to: '/dheris' },
     { title: 'Current Stock', value: formatNumber(view.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock', trend: `Extra KG ${formatNumber(view.extraKgStock || 0)} · as of ${view.stockAsOf || 'today'}` },
-    { title: 'Pending Payments', value: formatCurrency(view.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments' },
-    { title: 'Revenue', value: formatCurrency(view.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
-    { title: 'Commission', value: formatCurrency(view.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports' },
-  ]
+    { title: 'Pending Payments', value: formatCurrency(view.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments', ownerOnly: true },
+    { title: 'Revenue', value: formatCurrency(view.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales', ownerOnly: true },
+    { title: 'Commission', value: formatCurrency(view.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports', ownerOnly: true },
+  ].filter((card) => showFinance || !card.ownerOnly)
 
   return (
     <div className="space-y-6">

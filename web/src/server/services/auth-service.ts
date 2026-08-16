@@ -39,7 +39,12 @@ export async function login(
     where: { username: normalized, deleted: false },
   })
 
+  // owner / staff are shared shop logins. Never lock the whole account
+  // because one person mistyped the password — everyone else still needs in.
+  const sharedShopLogin = isAllowedLoginUsername(normalized)
+
   if (
+    !sharedShopLogin &&
     user?.lockedUntil &&
     user.lockedUntil.getTime() > Date.now()
   ) {
@@ -60,6 +65,15 @@ export async function login(
     !!user && (await verifyPassword(password, user.password))
 
   if (!valid) {
+    if (user && sharedShopLogin) {
+      if (user.failedLoginAttempts || user.lockedUntil) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: 0, lockedUntil: null },
+        })
+      }
+      throw new Error('Invalid username or password')
+    }
     if (user) {
       const attempts = user.failedLoginAttempts + 1
       await prisma.user.update({
@@ -154,9 +168,14 @@ export async function heartbeat(token: string | null | undefined) {
   if (!token) throw new Error('Authentication required')
   const payload = await verifyToken(token)
   const sid = payload.sid
-  if (sid == null) return { ok: false }
-  const row = await touchLoginSession(String(sid))
-  return { ok: !!row, lastSeenAt: row?.lastSeenAt?.toISOString() ?? null }
+  if (sid == null) return { ok: true, lastSeenAt: null }
+  try {
+    const row = await touchLoginSession(String(sid))
+    return { ok: true, lastSeenAt: row?.lastSeenAt?.toISOString() ?? null }
+  } catch {
+    // Shared concurrent logins must not fail the browser if a session row is gone.
+    return { ok: true, lastSeenAt: null }
+  }
 }
 
 export async function updateTheme(username: string, theme: string) {

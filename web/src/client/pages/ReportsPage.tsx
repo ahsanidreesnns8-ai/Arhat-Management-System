@@ -11,6 +11,8 @@ import { reportApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { buildReportHtml, openReportPrint } from '../utils/reportPrint'
 import { useLanguage } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
+import { isOwnerFinanceRole } from '../../lib/roles'
 import type { ReportKey, ReportSummary } from '../types'
 
 const REPORT_KEYS: ReportKey[] = ['sales', 'commission', 'stock', 'profit']
@@ -19,7 +21,14 @@ function isReportKey(value: string | null): value is ReportKey {
   return !!value && REPORT_KEYS.includes(value as ReportKey)
 }
 
-const reports: { key: ReportKey; title: string; titleUr: string; description: string; hasRange?: boolean }[] = [
+const reports: {
+  key: ReportKey
+  title: string
+  titleUr: string
+  description: string
+  hasRange?: boolean
+  ownerOnly?: boolean
+}[] = [
   {
     key: 'sales',
     title: 'Sales Report',
@@ -33,6 +42,7 @@ const reports: { key: ReportKey; title: string; titleUr: string; description: st
     titleUr: 'کمیشن رپورٹ',
     description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% of total',
     hasRange: true,
+    ownerOnly: true,
   },
   {
     key: 'stock',
@@ -46,11 +56,15 @@ const reports: { key: ReportKey; title: string; titleUr: string; description: st
     titleUr: 'منافع رپورٹ',
     description: 'Revenue vs commission summary',
     hasRange: true,
+    ownerOnly: true,
   },
 ]
 
 export default function ReportsPage() {
   const { companyName } = useBusiness()
+  const { user } = useAuth()
+  const showFinance = isOwnerFinanceRole(user?.role)
+  const visibleReports = reports.filter((report) => showFinance || !report.ownerOnly)
   const [searchParams, setSearchParams] = useSearchParams()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -62,6 +76,9 @@ export default function ReportsPage() {
   const autoLoaded = useRef<string | null>(null)
 
   const fetchReport = async (key: ReportKey) => {
+    if ((key === 'commission' || key === 'profit') && !showFinance) {
+      throw new Error('Owner only')
+    }
     const res =
       key === 'sales'
         ? await reportApi.sales(from || undefined, to || undefined)
@@ -99,6 +116,9 @@ export default function ReportsPage() {
   useEffect(() => {
     const type = searchParams.get('type')
     if (!isReportKey(type) || autoLoaded.current === type) return
+    if ((type === 'commission' || type === 'profit') && !isOwnerFinanceRole(user?.role)) {
+      return
+    }
     autoLoaded.current = type
     void loadPreview(type, { silent: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,9 +152,9 @@ export default function ReportsPage() {
     custom: {
       preview: () => { void loadPreview(active || 'sales') },
       sales: () => { void loadPreview('sales') },
-      commission: () => { void loadPreview('commission') },
+      commission: () => { if (showFinance) void loadPreview('commission') },
       stock: () => { void loadPreview('stock') },
-      profit: () => { void loadPreview('profit') },
+      profit: () => { if (showFinance) void loadPreview('profit') },
       print: () => { void printReport(active || 'sales', 'en') },
     },
   })
@@ -152,7 +172,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {reports.map((report) => (
+        {visibleReports.map((report) => (
           <div key={report.key} className="card p-6 hover:shadow-card-hover transition-all duration-300">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">

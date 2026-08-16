@@ -270,14 +270,7 @@ export default function LoginPage() {
               </motion.button>
 
               <p className={`text-center text-sm text-slate-400 pt-2 ${isUrdu ? 'font-urdu' : ''}`}>
-                Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  className="login-signup font-semibold"
-                  onClick={() => toast('Ask the owner to create your account', { icon: '👤' })}
-                >
-                  Sign up
-                </button>
+                One owner login and one staff login. Many people can use the same account at the same time.
               </p>
             </motion.form>
           )}

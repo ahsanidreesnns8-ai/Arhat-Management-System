@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { ThemeMode } from '../types'
-import { authApi } from '../services/api'
 
 interface ThemeContextType {
   theme: ThemeMode
@@ -21,10 +20,6 @@ function toMode(preference?: string | null): ThemeMode {
   if (upper === 'LIGHT') return 'light'
   if (upper === 'DARK') return 'dark'
   return 'system'
-}
-
-function toApi(theme: ThemeMode): string {
-  return theme.toUpperCase()
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -54,18 +49,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   const setTheme = (newTheme: ThemeMode) => {
+    // Keep theme on this device only. owner/staff are shared logins — writing
+    // theme to the user row would overwrite every other person's screen.
     setThemeState(newTheme)
-    try {
-      const stored = localStorage.getItem('rehmani_user')
-      if (stored) {
-        authApi.updateTheme(toApi(newTheme)).catch(() => {})
-      }
-    } catch {
-      // ignore persistence errors
-    }
   }
 
   const applyServerTheme = (preference?: string | null) => {
+    if (typeof window !== 'undefined' && localStorage.getItem('rehmani_theme')) {
+      return
+    }
     setThemeState(toMode(preference))
   }
 

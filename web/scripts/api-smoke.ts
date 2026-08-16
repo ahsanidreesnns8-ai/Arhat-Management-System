@@ -81,11 +81,53 @@ async function main() {
   } catch (e) {
     results.push({ name: 'login owner', ok: false, status: 0, detail: String(e) })
   }
+  let staffToken = ''
   try {
-    await login('staff', 'staff123')
+    staffToken = await login('staff', 'staff123')
     results.push({ name: 'login staff', ok: true, status: 200, detail: 'ok' })
   } catch (e) {
     results.push({ name: 'login staff', ok: false, status: 0, detail: String(e) })
+  }
+
+  if (staffToken) {
+    try {
+      const [a, b] = await Promise.all([login('staff', 'staff123'), login('staff', 'staff123')])
+      const pulseA = await req('sync/pulse', { token: a })
+      const pulseB = await req('sync/pulse', { token: b })
+      results.push({
+        name: 'parallel staff sessions',
+        ok: pulseA.status === 200 && pulseB.status === 200 && a !== b,
+        status: pulseA.status,
+        detail: `tokensDistinct=${a !== b} pulseA=${pulseA.status} pulseB=${pulseB.status}`,
+      })
+    } catch (e) {
+      results.push({ name: 'parallel staff sessions', ok: false, status: 0, detail: String(e) })
+    }
+
+    const staffStats = await req('dashboard/stats', { token: staffToken })
+    const data = staffStats.json?.data || {}
+    results.push({
+      name: 'staff dashboard hides finance',
+      ok:
+        staffStats.status === 200 &&
+        Number(data.pendingPayments || 0) === 0 &&
+        Number(data.revenue || 0) === 0 &&
+        Number(data.commission || 0) === 0,
+      status: staffStats.status,
+      detail: `pending=${data.pendingPayments} revenue=${data.revenue} commission=${data.commission}`,
+    })
+    results.push(
+      await check('staff commission blocked', 'reports/commission', {
+        token: staffToken,
+        expect: 403,
+      }),
+    )
+    results.push(
+      await check('staff profit blocked', 'reports/profit', {
+        token: staffToken,
+        expect: 403,
+      }),
+    )
   }
   for (const [u, p] of [
     ['rehmani', 'rehmani123'],

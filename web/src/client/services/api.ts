@@ -103,7 +103,11 @@ api.interceptors.response.use(
     const status = error?.response?.status
     const url = String(config?.url || '')
 
-    if (status === 401 && !url.includes('/auth/login')) {
+    if (
+      status === 401 &&
+      !url.includes('/auth/login') &&
+      !url.includes('/auth/heartbeat')
+    ) {
       localStorage.removeItem('rehmani_user')
       if (!window.location.pathname.startsWith('/login')) {
         window.location.assign('/login')

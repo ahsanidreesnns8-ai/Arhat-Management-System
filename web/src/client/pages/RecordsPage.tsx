@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
   BarChart3,
@@ -21,9 +22,17 @@ import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 import { dailyTradeApi } from '../services/api'
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/format'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { isOwnerFinanceRole } from '../../lib/roles'
 
-const sections = [
+const sections: Array<{
+  to: string
+  icon: LucideIcon
+  title: string
+  description: string
+  ownerOnly?: boolean
+}> = [
   {
     to: '/farmer-product',
     icon: PackagePlus,
@@ -77,6 +86,7 @@ const sections = [
     icon: BarChart3,
     title: 'Commission Records',
     description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% — preview & print',
+    ownerOnly: true,
   },
   {
     to: '/payments',
@@ -119,6 +129,8 @@ type ArchivedDay = {
 
 export default function RecordsPage() {
   const { t } = useLanguage()
+  const { user } = useAuth()
+  const showFinance = isOwnerFinanceRole(user?.role)
   const [days, setDays] = useState<ArchivedDay[]>([])
   const [openId, setOpenId] = useState<number | null>(null)
   const [loadingDays, setLoadingDays] = useState(true)
@@ -247,7 +259,9 @@ export default function RecordsPage() {
       </section>
 
       <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sections.map((section) => (
+        {sections
+          .filter((section) => showFinance || !section.ownerOnly)
+          .map((section) => (
           <StaggerItem key={section.title}>
             <Link to={section.to} className="block h-full group">
               <motion.div
