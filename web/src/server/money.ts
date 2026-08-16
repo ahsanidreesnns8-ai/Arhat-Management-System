@@ -15,6 +15,11 @@ export function round2(value: DecimalInput): Decimal {
   return d(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 }
 
+/** Round rupees: .5 and above go up (10.5 → 11, 10.49 → 10). */
+export function roundRupee(value: DecimalInput): Decimal {
+  return d(value).toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+}
+
 export function totalWeight(
   bags: number | null | undefined,
   weightPerBag: DecimalInput = 40,
@@ -24,7 +29,7 @@ export function totalWeight(
 }
 
 export function amountFromWeight(weight: DecimalInput, rate: DecimalInput): Decimal {
-  return round2(d(weight).div(40).mul(d(rate)))
+  return roundRupee(d(weight).div(40).mul(d(rate)))
 }
 
 export function percentOf(amount: DecimalInput, percentage: DecimalInput): Decimal {

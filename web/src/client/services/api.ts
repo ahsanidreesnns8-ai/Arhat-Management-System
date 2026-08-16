@@ -281,6 +281,32 @@ export const dailyTradeApi = {
       board: any
       message: string
     }>>('/daily-trade/batch-sell', data),
+  nextDheri: () =>
+    api.get<ApiResponse<{ queueNumber: number; dheriCode: string }>>('/daily-trade/next-dheri'),
+  buyerSold: (buyerId: number) =>
+    api.get<ApiResponse<{
+      buyerId: number
+      sales: any[]
+      itemCount: number
+      bags: number
+      amount: number
+    }>>('/daily-trade/buyer-sold', { params: { buyerId } }),
+  markSold: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      sale: Sale
+      dheriId: number
+      dheriCode: string
+      board: any
+      totals: {
+        farmerGross: number
+        commission: number
+        farmerNet: number
+        buyerAmount: number
+        stockAmount: number
+        grandTotal: number
+      }
+      message: string
+    }>>('/daily-trade/mark-sold', data),
 }
 
 export const queueApi = {

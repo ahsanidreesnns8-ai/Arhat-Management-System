@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
   Calculator, Package, Users, Wallet, Warehouse, Receipt,
-  BarChart3, Bot, Truck, ListOrdered, FileText, Shield, Settings, Store,
+  BarChart3, Bot, Truck, ListOrdered, FileText, Shield, Settings, Scale,
 } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
 
@@ -11,7 +11,7 @@ const groups = [
     ur: 'منڈی آپریشنز',
     items: [
       { icon: Calculator, en: 'Price Calculator', ur: 'قیمت کیلکولیٹر', dEn: 'Mann/bag style pricing for quick settlements.', dUr: 'من/بوری انداز کی فوری قیمت۔' },
-      { icon: Store, en: 'Arhat Sale', ur: 'آرھٹ سیل', dEn: 'Sell to buyer or farmer payable with commission shares.', dUr: 'خریدار فروخت یا کسان واجب الادا بمع کمیشن۔' },
+      { icon: Scale, en: 'Daily Trade', ur: 'روزانہ تجارت', dEn: 'Receive and sell bags, Extra KG to stock, EN/UR bills.', dUr: 'بوری آمد و فروخت، اضافی کلو اسٹاک، اردو/انگریزی بل۔' },
       { icon: Package, en: 'Dheri Management', ur: 'ڈھیری مینجمنٹ', dEn: 'Lots with day-wise payment history.', dUr: 'ڈھیریاں بمع دن بہ دن ادائیگی۔' },
       { icon: ListOrdered, en: 'Auction Queue', ur: 'نیلامی قطار', dEn: 'Pending, active and completed queue boards.', dUr: 'زیر التوا، فعال اور مکمل قطار۔' },
       { icon: Truck, en: 'Truck Register', ur: 'ٹرک رجسٹر', dEn: 'Link trucks to farmers and lots.', dUr: 'ٹرک کسان اور ڈھیری سے جوڑیں۔' },
@@ -22,7 +22,7 @@ const groups = [
     en: 'Money & Parties',
     ur: 'رقم اور پارٹیز',
     items: [
-      { icon: Users, en: 'Farmers & Buyers', ur: 'کسان و خریدار', dEn: 'Profiles, CNIC, phone, city, notes, duplicates check.', dUr: 'پروفائل، شناختی کارڈ، فون، شہر، نوٹس۔' },
+      { icon: Users, en: 'Farmers & Buyers', ur: 'کسان و خریدار', dEn: 'Owner-assigned ID, name, father name, address with city, note.', dUr: 'مالک کا آئی ڈی، نام، ولدیت، پتہ مع شہر، نوٹ۔' },
       { icon: Wallet, en: 'Payments', ur: 'ادائیگیاں', dEn: 'Pay / receive, update, settle remaining balance.', dUr: 'ادا / وصول، اپڈیٹ، بقایا سیٹل۔' },
       { icon: Receipt, en: 'Sales Invoices', ur: 'سیلز انوائس', dEn: 'Mixed-source lines and printable bills.', dUr: 'مخلوط سورس لائنز اور قابلِ پرنٹ بل۔' },
       { icon: FileText, en: 'Bilingual Bills', ur: 'دو زبانی بل', dEn: 'EN/UR receipts with logo & Gala Mandi footer.', dUr: 'لوگو اور گالا منڈی فوٹر۔' },

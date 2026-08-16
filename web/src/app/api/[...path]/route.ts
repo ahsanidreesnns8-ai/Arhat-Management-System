@@ -479,6 +479,25 @@ async function dispatch(
       )
       return result(data, data.message)
     }
+    if (path[1] === 'next-dheri' && method === 'GET') {
+      return result(await dailyTrade.nextDeskDheriNumber())
+    }
+    if (path[1] === 'buyer-sold' && method === 'GET') {
+      const buyerId = Number(url.searchParams.get('buyerId'))
+      return result(
+        await dailyTrade.listBuyerSoldToday(
+          buyerId,
+          url.searchParams.get('date'),
+        ),
+      )
+    }
+    if (path[1] === 'mark-sold' && method === 'POST') {
+      const data = await dailyTrade.markDeskSold(
+        payload as dailyTrade.DeskSoldInput,
+        user?.id,
+      )
+      return result(data, data.message)
+    }
   }
 
   if (path[0] === 'calculator') {

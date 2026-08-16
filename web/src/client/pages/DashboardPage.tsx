@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, Store,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,12 +13,12 @@ import toast from 'react-hot-toast'
 import StatCard from '../components/ui/StatCard'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
+import PartyFields, { emptyPartyForm, type PartyFormValues } from '../components/forms/PartyFields'
 import Modal from '../components/ui/Modal'
 import { StatCardSkeleton, Skeleton } from '../components/ui/Skeleton'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 import { useLiveReload } from '../context/SyncContext'
-import { buyerApi, dailyTradeApi, dashboardApi, farmerApi } from '../services/api'
+import { buyerApi, dashboardApi, farmerApi } from '../services/api'
 import { formatCurrency, formatDateTime, formatNumber } from '../utils/format'
 import type { DashboardStats } from '../types'
 import { useBusiness } from '../context/BusinessContext'
@@ -47,45 +47,23 @@ const activityLink = (entityType?: string) => {
   return '/records'
 }
 
-const emptyParty = { name: '', phone: '', city: '', address: '' }
-
 export default function DashboardPage() {
   const { companyName } = useBusiness()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [board, setBoard] = useState<{
-    receivedBags: number
-    soldBags: number
-    stockKg: number
-    balanced: boolean
-  } | null>(null)
   const [farmerOpen, setFarmerOpen] = useState(false)
   const [buyerOpen, setBuyerOpen] = useState(false)
-  const [partyForm, setPartyForm] = useState(emptyParty)
+  const [partyForm, setPartyForm] = useState<PartyFormValues>(emptyPartyForm())
   const [savingParty, setSavingParty] = useState(false)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
     try {
-      const [statsRes, boardRes] = await Promise.all([
+      const [statsRes] = await Promise.all([
         dashboardApi.getStats(),
-        dailyTradeApi.getBoard().catch(() => null),
       ])
       setStats(statsRes.data?.data ?? null)
-      if (boardRes?.data?.data) {
-        const s = boardRes.data.data.session as {
-          receivedBags: number
-          soldBags: number
-          balanced: boolean
-        }
-        setBoard({
-          receivedBags: Number(s.receivedBags || 0),
-          soldBags: Number(s.soldBags || 0),
-          stockKg: Number(boardRes.data.data.stockKgAvailable || 0),
-          balanced: Boolean(s.balanced),
-        })
-      }
       setLoadError(false)
     } catch {
       if (!soft) {
@@ -112,18 +90,32 @@ export default function DashboardPage() {
       toast.error('Name is required')
       return
     }
+    if (!partyForm.code.trim()) {
+      toast.error('Enter the ID you assign')
+      return
+    }
     setSavingParty(true)
     try {
+      const payload = {
+        name: partyForm.name,
+        fatherName: partyForm.fatherName,
+        code: partyForm.code,
+        farmerId: partyForm.code,
+        buyerId: partyForm.code,
+        address: partyForm.address,
+        city: partyForm.city,
+        notes: partyForm.notes,
+      }
       if (kind === 'farmer') {
-        await farmerApi.create(partyForm)
+        await farmerApi.create(payload)
         toast.success('Farmer added')
         setFarmerOpen(false)
       } else {
-        await buyerApi.create(partyForm)
+        await buyerApi.create(payload)
         toast.success('Buyer added')
         setBuyerOpen(false)
       }
-      setPartyForm(emptyParty)
+      setPartyForm(emptyPartyForm())
       void load(true)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -140,6 +132,9 @@ export default function DashboardPage() {
     totalBuyers: 0,
     totalDheris: 0,
     currentStock: 0,
+    extraKgStock: 0,
+    stockAsOf: '',
+    stockLots: [],
     pendingPayments: 0,
     revenue: 0,
     commission: 0,
@@ -155,7 +150,7 @@ export default function DashboardPage() {
     { title: 'Total Farmers', value: view.totalFarmers, icon: <Users className="h-5 w-5" />, color: 'green' as const, to: '/farmers' },
     { title: 'Total Buyers', value: view.totalBuyers, icon: <ShoppingBag className="h-5 w-5" />, color: 'blue' as const, to: '/buyers' },
     { title: 'Total Dheris', value: view.totalDheris, icon: <Package className="h-5 w-5" />, color: 'amber' as const, to: '/dheris' },
-    { title: 'Current Stock', value: formatNumber(view.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock' },
+    { title: 'Current Stock', value: formatNumber(view.currentStock), icon: <Warehouse className="h-5 w-5" />, color: 'green' as const, to: '/stock', trend: `Extra KG ${formatNumber(view.extraKgStock || 0)} · as of ${view.stockAsOf || 'today'}` },
     { title: 'Pending Payments', value: formatCurrency(view.pendingPayments), icon: <DollarSign className="h-5 w-5" />, color: 'red' as const, to: '/payments' },
     { title: 'Revenue', value: formatCurrency(view.revenue), icon: <TrendingUp className="h-5 w-5" />, color: 'teal' as const, to: '/sales' },
     { title: 'Commission', value: formatCurrency(view.commission), icon: <Percent className="h-5 w-5" />, color: 'orange' as const, to: '/reports' },
@@ -168,44 +163,24 @@ export default function DashboardPage() {
         description={`Welcome to ${companyName} — tap any card for full details`}
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Button
           className="h-auto py-3 flex-col sm:flex-row gap-1.5"
-          onClick={() => { setPartyForm(emptyParty); setFarmerOpen(true) }}
+          onClick={() => { setPartyForm(emptyPartyForm()); setFarmerOpen(true) }}
         >
           <UserPlus className="h-4 w-4" /> Add Farmer
         </Button>
         <Button
           className="h-auto py-3 flex-col sm:flex-row gap-1.5"
           variant="secondary"
-          onClick={() => { setPartyForm(emptyParty); setBuyerOpen(true) }}
+          onClick={() => { setPartyForm(emptyPartyForm()); setBuyerOpen(true) }}
         >
           <ShoppingBag className="h-4 w-4" /> Add Buyer
         </Button>
-        <Link to="/arhat-sale" className="contents">
-          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
-            <Store className="h-4 w-4" /> Arhat Sale
-          </Button>
-        </Link>
         <Link to="/daily-trade" className="contents">
           <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
             <Scale className="h-4 w-4" /> Daily Trade
           </Button>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link to="/daily-trade" className="card-3d p-5 block hover:ring-1 hover:ring-primary/30 transition">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving today</p>
-          <p className="text-3xl font-bold mt-1 tabular-nums">{board?.receivedBags ?? 0}</p>
-          <p className="text-sm text-slate-500">bags from farmers · Extra stock {formatNumber(board?.stockKg ?? 0)} kg</p>
-        </Link>
-        <Link to="/daily-trade" className="card-3d p-5 block hover:ring-1 hover:ring-primary/30 transition">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Selling today</p>
-          <p className="text-3xl font-bold mt-1 tabular-nums">{board?.soldBags ?? 0}</p>
-          <p className={`text-sm mt-1 ${board?.balanced ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300'}`}>
-            {board?.balanced ? 'Equal with receiving' : `Need ${(board?.receivedBags ?? 0) - (board?.soldBags ?? 0)} more bags to balance`}
-          </p>
         </Link>
       </div>
 
@@ -228,6 +203,37 @@ export default function DashboardPage() {
             </StaggerItem>
           ))}
         </Stagger>
+      )}
+
+      {(view.stockLots?.length || 0) > 0 && (
+        <div className="card-3d overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
+            <h3 className="font-semibold">Stock details</h3>
+            <span className="text-xs text-slate-500">as of {view.stockAsOf || 'today'}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-2">Product</th>
+                  <th className="px-4 py-2">Remaining kg</th>
+                  <th className="px-4 py-2">Amount</th>
+                  <th className="px-4 py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                {view.stockLots!.map((lot, i) => (
+                  <tr key={`${lot.productName}-${lot.intakeDate}-${i}`}>
+                    <td className="px-4 py-2">{lot.productName}</td>
+                    <td className="px-4 py-2">{formatNumber(lot.remainingKg)} kg</td>
+                    <td className="px-4 py-2">{formatCurrency(lot.amountValue)}</td>
+                    <td className="px-4 py-2">{lot.intakeDate}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -348,43 +354,17 @@ export default function DashboardPage() {
       </motion.div>
 
       <Modal open={farmerOpen} onClose={() => setFarmerOpen(false)} title="Add Farmer">
-        <PartyForm
-          form={partyForm}
-          setForm={setPartyForm}
-          saving={savingParty}
-          onSave={() => void saveParty('farmer')}
-        />
+        <div className="space-y-4">
+          <PartyFields form={partyForm} setForm={setPartyForm} idLabel="Farmer ID" />
+          <Button onClick={() => void saveParty('farmer')} loading={savingParty}>Save</Button>
+        </div>
       </Modal>
       <Modal open={buyerOpen} onClose={() => setBuyerOpen(false)} title="Add Buyer">
-        <PartyForm
-          form={partyForm}
-          setForm={setPartyForm}
-          saving={savingParty}
-          onSave={() => void saveParty('buyer')}
-        />
+        <div className="space-y-4">
+          <PartyFields form={partyForm} setForm={setPartyForm} idLabel="Buyer ID" />
+          <Button onClick={() => void saveParty('buyer')} loading={savingParty}>Save</Button>
+        </div>
       </Modal>
-    </div>
-  )
-}
-
-function PartyForm({
-  form,
-  setForm,
-  saving,
-  onSave,
-}: {
-  form: typeof emptyParty
-  setForm: (v: typeof emptyParty) => void
-  saving: boolean
-  onSave: () => void
-}) {
-  return (
-    <div className="space-y-3">
-      <Input label="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <Input label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-      <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-      <Button onClick={onSave} loading={saving}>Save</Button>
     </div>
   )
 }

@@ -29,7 +29,6 @@ import DheriDetailPage from './pages/DheriDetailPage'
 import StockPage from './pages/StockPage'
 import PriceCalculatorPage from './pages/PriceCalculatorPage'
 import FarmerProductPage from './pages/FarmerProductPage'
-import ArhatSalePage from './pages/ArhatSalePage'
 import DailyTradePage from './pages/DailyTradePage'
 import QueuePage from './pages/QueuePage'
 import SalesPage from './pages/SalesPage'
@@ -88,7 +87,7 @@ function AppRoutes() {
         <Route path="stock" element={<StockPage />} />
         <Route path="calculator" element={<PriceCalculatorPage />} />
         <Route path="farmer-product" element={<FarmerProductPage />} />
-        <Route path="arhat-sale" element={<ArhatSalePage />} />
+        <Route path="arhat-sale" element={<Navigate to="/daily-trade" replace />} />
         <Route path="daily-trade" element={<DailyTradePage />} />
         <Route path="queue" element={<QueuePage />} />
         <Route path="sales" element={<SalesPage />} />

@@ -6,7 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
-import { arhatApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
+import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
 import { useVoicePageActions } from '../context/VoiceControlContext'
@@ -40,8 +40,19 @@ export default function FarmerProductPage() {
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
+  const [dheriCode, setDheriCode] = useState('')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
+
+  const suggestNextDheri = useCallback(async () => {
+    try {
+      const next = await dailyTradeApi.nextDheri()
+      const code = next.data?.data?.dheriCode
+      if (code) setDheriCode(String(code))
+    } catch {
+      /* owner can type the number */
+    }
+  }, [])
 
   const loadLists = useCallback(() => {
     Promise.allSettled([farmerApi.getAll(), settingsApi.getProducts(), dheriApi.getAll()])
@@ -57,6 +68,7 @@ export default function FarmerProductPage() {
   }, [productId])
 
   useEffect(() => { loadLists() }, [loadLists])
+  useEffect(() => { void suggestNextDheri() }, [suggestNextDheri])
 
   const farmerProducts = useMemo(
     () => dheris.filter((d) => !farmerId || String(d.farmerId) === farmerId),
@@ -91,7 +103,9 @@ export default function FarmerProductPage() {
     setMarketRate('0')
     setPaymentNow('0')
     setNotes('')
+    setDheriCode('')
     setResult(emptyResult)
+    void suggestNextDheri()
   }
 
   const handleSave = async () => {
@@ -101,6 +115,10 @@ export default function FarmerProductPage() {
     }
     if (!productId) {
       toast.error('Select a product')
+      return
+    }
+    if (!dheriCode.trim()) {
+      toast.error('Enter the dheri number you assign (first in sells first)')
       return
     }
     if ((parseInt(numberOfBags) || 0) <= 0) {
@@ -118,6 +136,7 @@ export default function FarmerProductPage() {
         settlementType: 'FARMER_PAYABLE',
         farmerId: Number(farmerId),
         productId: Number(productId),
+        dheriCode: dheriCode.trim(),
         ...payload,
         paymentNow: parseFloat(paymentNow) || 0,
         paymentMethod,
@@ -178,6 +197,7 @@ export default function FarmerProductPage() {
                   <th className="px-4 py-2">Product</th>
                   <th className="px-4 py-2">Bags</th>
                   <th className="px-4 py-2">Weight</th>
+                  <th className="px-4 py-2">Extra KG</th>
                   <th className="px-4 py-2">Rate</th>
                   <th className="px-4 py-2">Gross</th>
                   <th className="px-4 py-2">Commission</th>
@@ -197,6 +217,7 @@ export default function FarmerProductPage() {
                     <td className="px-4 py-2">{d.productName}</td>
                     <td className="px-4 py-2">{d.numberOfBags}</td>
                     <td className="px-4 py-2">{formatNumber(d.totalWeight)} kg</td>
+                    <td className="px-4 py-2">{formatNumber(d.partialBagWeight)}</td>
                     <td className="px-4 py-2">{formatCurrency(d.marketRate)}</td>
                     <td className="px-4 py-2">{formatCurrency(d.totalPrice)}</td>
                     <td className="px-4 py-2">{formatCurrency(d.commissionAmount)}</td>
@@ -229,6 +250,12 @@ export default function FarmerProductPage() {
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
+            />
+            <Input
+              label="Dheri no (you assign — first in sells first) *"
+              value={dheriCode}
+              onChange={(e) => setDheriCode(e.target.value)}
+              placeholder="e.g. 1, 2, 3…"
             />
             <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
             <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />

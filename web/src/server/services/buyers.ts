@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { nextBuyerCode } from '@/server/ids'
+import { normalizeOwnerCode } from '@/server/ids'
 import type { PartyInput } from '@/server/services/farmers'
 import { listPaymentsByBuyer } from '@/server/services/payments'
 import { listSalesByBuyer } from '@/server/services/sales'
@@ -14,6 +14,7 @@ export function buyerDto(buyer: BuyerRow) {
     id: Number(buyer.id),
     buyerId: buyer.buyerId,
     name: buyer.name,
+    fatherName: buyer.fatherName,
     cnic: buyer.cnic,
     phone: buyer.phone,
     address: buyer.address,
@@ -57,10 +58,15 @@ export async function getBuyer(id: number | bigint) {
 
 export async function createBuyer(input: PartyInput) {
   if (!input.name?.trim()) throw new Error('Buyer name is required')
+  const buyerId = normalizeOwnerCode(input.code ?? input.buyerId)
+  if (!buyerId) throw new Error('Buyer ID is required — enter the ID you assign')
+  const taken = await prisma.buyer.findFirst({ where: { buyerId, deleted: false } })
+  if (taken) throw new Error(`Buyer ID ${buyerId} is already used`)
   const row = await prisma.buyer.create({
     data: {
-      buyerId: await nextBuyerCode(),
+      buyerId,
       name: input.name.trim(),
+      fatherName: input.fatherName?.trim() || null,
       cnic: input.cnic,
       phone: input.phone,
       address: input.address,
@@ -75,16 +81,26 @@ export async function createBuyer(input: PartyInput) {
 export async function updateBuyer(id: number | bigint, input: PartyInput) {
   await getBuyer(id)
   if (!input.name?.trim()) throw new Error('Buyer name is required')
+  const buyerId = normalizeOwnerCode(input.code ?? input.buyerId)
+  const data: Prisma.BuyerUpdateInput = {
+    name: input.name.trim(),
+    fatherName: input.fatherName?.trim() || null,
+    cnic: input.cnic,
+    phone: input.phone,
+    address: input.address,
+    city: input.city,
+    notes: input.notes,
+  }
+  if (buyerId) {
+    const taken = await prisma.buyer.findFirst({
+      where: { buyerId, deleted: false, id: { not: BigInt(id) } },
+    })
+    if (taken) throw new Error(`Buyer ID ${buyerId} is already used`)
+    data.buyerId = buyerId
+  }
   const row = await prisma.buyer.update({
     where: { id: BigInt(id) },
-    data: {
-      name: input.name.trim(),
-      cnic: input.cnic,
-      phone: input.phone,
-      address: input.address,
-      city: input.city,
-      notes: input.notes,
-    },
+    data,
     include: includeTotals,
   })
   return buyerDto(row)

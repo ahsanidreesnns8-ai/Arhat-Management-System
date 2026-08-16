@@ -8,7 +8,6 @@ import {
   Receipt,
   Scale,
   ShoppingBag,
-  Store,
   Truck,
   Users,
   Wallet,
@@ -25,16 +24,10 @@ const sections = [
     description: 'Farmer product records and new product entry',
   },
   {
-    to: '/arhat-sale',
-    icon: Store,
-    title: 'Arhat Sale',
-    description: 'Sell to buyer or post farmer payable',
-  },
-  {
     to: '/daily-trade',
     icon: Scale,
-    title: 'Daily Trade & Stock',
-    description: 'Extra KG stock, equal receive/sell boards, batch sell',
+    title: 'Daily Trade',
+    description: 'Receive and sell today’s bags, Extra KG stock, bills EN/UR',
   },
   {
     to: '/farmers',

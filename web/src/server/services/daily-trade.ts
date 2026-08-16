@@ -517,3 +517,196 @@ export async function receiveManyIntoBatch(
   }
 }
 
+export async function nextDeskDheriNumber() {
+  const { nextDheriQueueNumber } = await import('@/server/ids')
+  const queueNumber = await nextDheriQueueNumber()
+  return { queueNumber, dheriCode: String(queueNumber) }
+}
+
+export async function listBuyerSoldToday(buyerId: number, sessionDate?: string | null) {
+  if (!buyerId) throw new Error('Buyer is required')
+  const board = await getDailyBoard(sessionDate)
+  const sales = board.sales.filter((s) => Number(s.buyerId) === Number(buyerId))
+  return {
+    buyerId,
+    sales,
+    itemCount: sales.reduce((n, s) => n + s.items.length, 0),
+    bags: sales.reduce((n, s) => n + s.bags, 0),
+    amount: sales.reduce((n, s) => n + s.amount, 0),
+  }
+}
+
+export type DeskSoldInput = {
+  farmerId: number
+  productId: number
+  dheriCode: string
+  farmerBags: number
+  weightPerBag?: number | string
+  extraKg?: number | string
+  farmerRatePer40: number | string
+  buyerId: number
+  buyerBags: number
+  extraBags?: number
+  buyerRatePer40: number | string
+  stockBags?: number
+  stockWeightPerBag?: number | string
+  stockRatePer40?: number | string
+  notes?: string | null
+}
+
+/**
+ * One Daily Trade desk action: receive the farmer dheri (extra KG → stock),
+ * then mark it sold to the chosen buyer. Buyer total has no commission.
+ * Optional extra bags / stock bags are added from Extra KG stock.
+ */
+export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
+  if (input.farmerId == null) throw new Error('Choose a farmer')
+  if (input.buyerId == null) throw new Error('Choose a buyer')
+  if (input.productId == null) throw new Error('Choose dheri type')
+  const dheriCode = String(input.dheriCode || '').trim()
+  if (!dheriCode) throw new Error('Enter the dheri number you assigned at entrance')
+  const farmerBags = Number(input.farmerBags) || 0
+  const buyerBags = Number(input.buyerBags) || 0
+  if (farmerBags <= 0) throw new Error('Farmer bags must be greater than zero')
+  if (buyerBags <= 0) throw new Error('Buyer bags must be greater than zero')
+  const farmerRate = Number(input.farmerRatePer40) || 0
+  const buyerRate = Number(input.buyerRatePer40) || 0
+  if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
+  if (buyerRate <= 0) throw new Error('Enter buyer rate per 40kg')
+
+  const bagKg = Number(input.weightPerBag) || 40
+  const extraKg = Number(input.extraKg) || 0
+  const extraBags = Math.max(0, Number(input.extraBags) || 0)
+  const stockBags = Math.max(0, Number(input.stockBags) || 0)
+  const stockBagKg = Number(input.stockWeightPerBag) || bagKg
+  const stockRate = Number(input.stockRatePer40) || buyerRate
+
+  const { settle } = await import('@/server/services/arhat')
+  const existing = await prisma.dheri.findFirst({
+    where: { dheriId: dheriCode, deleted: false },
+    include: { farmer: true, product: true },
+  })
+
+  let dheriId: number
+  let farmerGross = 0
+  let commission = 0
+  let farmerNet = 0
+
+  if (existing) {
+    if (existing.sellingStatus === 'SOLD') {
+      throw new Error(`Dheri ${dheriCode} is already sold`)
+    }
+    if (Number(existing.farmerId) !== Number(input.farmerId)) {
+      throw new Error(`Dheri ${dheriCode} belongs to another farmer`)
+    }
+    dheriId = Number(existing.id)
+    farmerGross = existing.totalPrice.toNumber()
+    commission = existing.commissionAmount.toNumber()
+    farmerNet = existing.farmerReceivable.toNumber()
+  } else {
+    const row = await settle(
+      {
+        settlementType: 'FARMER_PAYABLE',
+        farmerId: input.farmerId,
+        productId: input.productId,
+        dheriCode,
+        numberOfBags: farmerBags,
+        weightPerBag: bagKg,
+        partialBagWeight: extraKg,
+        marketRate: farmerRate,
+        paymentNow: 0,
+        notes: input.notes ?? undefined,
+      },
+      userId,
+    )
+    if (row.dheriId == null) throw new Error('Could not create dheri')
+    dheriId = Number(row.dheriId)
+    farmerGross = Number(row.totalAmount ?? 0)
+    commission = Number(row.commission ?? 0)
+    farmerNet = Number(row.farmerPayable ?? 0)
+  }
+
+  const stockToSell = extraBags + stockBags
+  let formed = { bagsFromStock: 0, kgUsed: 0, amount: 0, ratePer40Kg: stockRate }
+  if (stockToSell > 0) {
+    const { consumeStockLotsToBags } = await import('@/server/services/stock-lots')
+    formed = await consumeStockLotsToBags({
+      productId: input.productId,
+      bagWeightKg: stockBagKg,
+      highestRateHint: stockRate,
+      createdById: userId,
+      maxBags: stockToSell,
+    })
+    if (formed.bagsFromStock < stockToSell) {
+      throw new Error(
+        `Not enough Extra KG stock to sell ${stockToSell} extra/stock bags (can form ${formed.bagsFromStock})`,
+      )
+    }
+  }
+
+  const sale = await createSale(
+    {
+      buyerId: input.buyerId,
+      notes:
+        input.notes ||
+        `Daily Trade sold dheri ${dheriCode} to buyer`,
+      items: [
+        {
+          productId: input.productId,
+          sourceType: 'FARMER',
+          farmerId: input.farmerId,
+          dheriId,
+          numberOfBags: buyerBags,
+          weightPerBag: bagKg,
+          partialBagWeight: 0,
+          rate: buyerRate,
+        },
+        ...(formed.bagsFromStock > 0
+          ? [
+              {
+                productId: input.productId,
+                sourceType: 'BUSINESS_STOCK' as const,
+                numberOfBags: formed.bagsFromStock,
+                weightPerBag: stockBagKg,
+                partialBagWeight: 0,
+                rate: stockRate,
+                skipStockDeduction: true,
+              },
+            ]
+          : []),
+      ],
+    },
+    userId,
+  )
+
+  await prisma.dheri.update({
+    where: { id: BigInt(dheriId) },
+    data: { sellingStatus: 'SOLD' },
+  })
+
+  const buyerAmount = sale.items
+    .filter((i) => i.sourceType === 'FARMER')
+    .reduce((s, i) => s + i.amount, 0)
+  const stockAmount = sale.items
+    .filter((i) => i.sourceType === 'BUSINESS_STOCK')
+    .reduce((s, i) => s + i.amount, 0)
+
+  const board = await getDailyBoard()
+  return {
+    sale,
+    dheriId,
+    dheriCode,
+    board,
+    totals: {
+      farmerGross,
+      commission,
+      farmerNet,
+      buyerAmount,
+      stockAmount,
+      grandTotal: buyerAmount + stockAmount,
+    },
+    message: `Sold dheri ${dheriCode} — buyer ${sale.invoiceNumber}`,
+  }
+}
+
+

@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { nextFarmerCode } from '@/server/ids'
+import { normalizeOwnerCode } from '@/server/ids'
 import { listDherisByFarmer } from '@/server/services/dheris'
 import { listPaymentsByFarmer } from '@/server/services/payments'
 import { listTrucksByFarmer } from '@/server/services/trucks'
@@ -11,11 +11,21 @@ type FarmerRow = Prisma.FarmerGetPayload<{
 
 export type PartyInput = {
   name?: string
+  fatherName?: string | null
+  code?: string | null
+  farmerId?: string | null
+  buyerId?: string | null
   cnic?: string | null
   phone?: string | null
   address?: string | null
   city?: string | null
   notes?: string | null
+}
+
+function ownerPartyCode(input: PartyInput, kind: 'farmer' | 'buyer') {
+  const raw = normalizeOwnerCode(input.code ?? (kind === 'farmer' ? input.farmerId : input.buyerId))
+  if (!raw) throw new Error(`${kind === 'farmer' ? 'Farmer' : 'Buyer'} ID is required — enter the ID you assign`)
+  return raw
 }
 
 export function farmerDto(farmer: FarmerRow) {
@@ -31,6 +41,7 @@ export function farmerDto(farmer: FarmerRow) {
     id: Number(farmer.id),
     farmerId: farmer.farmerId,
     name: farmer.name,
+    fatherName: farmer.fatherName,
     cnic: farmer.cnic,
     phone: farmer.phone,
     address: farmer.address,
@@ -65,10 +76,16 @@ export async function getFarmer(id: number | bigint) {
 
 export async function createFarmer(input: PartyInput) {
   if (!input.name?.trim()) throw new Error('Farmer name is required')
+  const farmerId = ownerPartyCode(input, 'farmer')
+  const taken = await prisma.farmer.findFirst({
+    where: { farmerId, deleted: false },
+  })
+  if (taken) throw new Error(`Farmer ID ${farmerId} is already used`)
   const row = await prisma.farmer.create({
     data: {
-      farmerId: await nextFarmerCode(),
+      farmerId,
       name: input.name.trim(),
+      fatherName: input.fatherName?.trim() || null,
       cnic: input.cnic,
       phone: input.phone,
       address: input.address,
@@ -83,16 +100,26 @@ export async function createFarmer(input: PartyInput) {
 export async function updateFarmer(id: number | bigint, input: PartyInput) {
   await getFarmer(id)
   if (!input.name?.trim()) throw new Error('Farmer name is required')
+  const farmerId = normalizeOwnerCode(input.code ?? input.farmerId)
+  const data: Prisma.FarmerUpdateInput = {
+    name: input.name.trim(),
+    fatherName: input.fatherName?.trim() || null,
+    cnic: input.cnic,
+    phone: input.phone,
+    address: input.address,
+    city: input.city,
+    notes: input.notes,
+  }
+  if (farmerId) {
+    const taken = await prisma.farmer.findFirst({
+      where: { farmerId, deleted: false, id: { not: BigInt(id) } },
+    })
+    if (taken) throw new Error(`Farmer ID ${farmerId} is already used`)
+    data.farmerId = farmerId
+  }
   const row = await prisma.farmer.update({
     where: { id: BigInt(id) },
-    data: {
-      name: input.name.trim(),
-      cnic: input.cnic,
-      phone: input.phone,
-      address: input.address,
-      city: input.city,
-      notes: input.notes,
-    },
+    data,
     include: includeTotals,
   })
   return farmerDto(row)

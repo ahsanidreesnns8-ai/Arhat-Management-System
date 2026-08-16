@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
-  Calculator, Store, ListOrdered, Receipt, Wallet, BarChart3,
+  Calculator, Scale, ListOrdered, Receipt, Wallet, BarChart3,
   ArrowRight, Shield,
 } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
@@ -18,7 +18,7 @@ const modules = [
   { icon: Package, en: 'Dheris', ur: 'ڈھیری' },
   { icon: Warehouse, en: 'Stock', ur: 'اسٹاک' },
   { icon: Calculator, en: 'Calculator', ur: 'کیلکولیٹر' },
-  { icon: Store, en: 'Arhat Sale', ur: 'آرھٹ سیل' },
+  { icon: Scale, en: 'Daily Trade', ur: 'روزانہ تجارت' },
   { icon: ListOrdered, en: 'Queue', ur: 'قطار' },
   { icon: Receipt, en: 'Sales', ur: 'سیلز' },
   { icon: Wallet, en: 'Payments', ur: 'ادائیگی' },

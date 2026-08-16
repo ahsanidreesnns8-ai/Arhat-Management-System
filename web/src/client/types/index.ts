@@ -123,6 +123,14 @@ export interface DashboardStats {
   totalBuyers: number
   totalDheris: number
   currentStock: number
+  extraKgStock?: number
+  stockAsOf?: string
+  stockLots?: Array<{
+    productName: string
+    remainingKg: number
+    amountValue: number
+    intakeDate: string
+  }>
   pendingPayments: number
   revenue: number
   commission: number
@@ -141,6 +149,7 @@ export interface Farmer {
   id: number
   farmerId: string
   name: string
+  fatherName?: string | null
   cnic?: string
   phone?: string
   address?: string
@@ -156,6 +165,7 @@ export interface Buyer {
   id: number
   buyerId: string
   name: string
+  fatherName?: string | null
   cnic?: string
   phone?: string
   address?: string

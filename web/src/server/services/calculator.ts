@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { d, percentOf, round2, totalWeight } from '@/server/money'
+import { d, percentOf, round2, roundRupee, totalWeight } from '@/server/money'
 
 export type PriceInput = {
   numberOfBags?: number | null
@@ -62,11 +62,11 @@ export async function calculatePrice(input: PriceInput) {
     weight.sub(weightPerBag.mul(totalUnitsWhole)),
   )
   const totalMann = weight.div(40)
-  const totalAmount = round2(totalMann.mul(d(input.marketRate ?? 0)))
-  const arhatShare = percentOf(totalAmount, arhatPct)
-  const munshiNigranShare = percentOf(totalAmount, supervisorPct)
-  const workersShare = percentOf(totalAmount, laborPct)
-  const commission = arhatShare.add(munshiNigranShare).add(workersShare)
+  const totalAmount = roundRupee(totalMann.mul(d(input.marketRate ?? 0)))
+  const arhatShare = roundRupee(percentOf(totalAmount, arhatPct))
+  const munshiNigranShare = roundRupee(percentOf(totalAmount, supervisorPct))
+  const workersShare = roundRupee(percentOf(totalAmount, laborPct))
+  const commission = roundRupee(arhatShare.add(munshiNigranShare).add(workersShare))
 
   return {
     totalWeight: weight.toNumber(),
@@ -76,7 +76,7 @@ export async function calculatePrice(input: PriceInput) {
     totalAmount: totalAmount.toNumber(),
     commissionPercentage: round2(commissionPct).toNumber(),
     commission: commission.toNumber(),
-    farmerFinalBalance: totalAmount.sub(commission).toNumber(),
+    farmerFinalBalance: roundRupee(totalAmount.sub(commission)).toNumber(),
     arhatShare: arhatShare.toNumber(),
     munshiNigranShare: munshiNigranShare.toNumber(),
     workersShare: workersShare.toNumber(),

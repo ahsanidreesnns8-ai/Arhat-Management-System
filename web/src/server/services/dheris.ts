@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { nextDheriCode } from '@/server/ids'
+import { nextDheriCode, nextDheriQueueNumber, normalizeOwnerCode } from '@/server/ids'
 import { calculatePrice, type PriceInput } from '@/server/services/calculator'
 
 const dheriInclude = {
@@ -17,6 +17,8 @@ export type DheriInput = PriceInput & {
   truckId?: number | null
   productId?: number | null
   dayBatchId?: number | null
+  dheriCode?: string | null
+  queueNumber?: number | null
   notes?: string | null
 }
 
@@ -118,13 +120,22 @@ export async function createDheri(input: DheriInput) {
     const batch = await getOrCreateReceivingBatch()
     dayBatchId = BigInt(batch.id)
   }
+  const requested = normalizeOwnerCode(input.dheriCode)
+  const dheriId = requested || (await nextDheriCode())
+  const taken = await prisma.dheri.findFirst({
+    where: { dheriId, deleted: false },
+  })
+  if (taken) throw new Error(`Dheri number ${dheriId} is already used`)
+  const numericQueue = requested && /^\d+$/.test(requested) ? Number(requested) : null
+  const queueNumber = input.queueNumber ?? numericQueue ?? (await nextDheriQueueNumber())
   const row = await prisma.dheri.create({
     data: {
-      dheriId: await nextDheriCode(),
+      dheriId,
       farmerId: BigInt(input.farmerId!),
       truckId: input.truckId == null ? null : BigInt(input.truckId),
       productId: BigInt(input.productId!),
       dayBatchId,
+      queueNumber,
       numberOfBags: input.numberOfBags ?? 0,
       weightPerBag: String(input.weightPerBag ?? 40),
       partialBagWeight: String(input.partialBagWeight ?? 0),

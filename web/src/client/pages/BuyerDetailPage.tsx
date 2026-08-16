@@ -142,9 +142,10 @@ export default function BuyerDetailPage() {
           tone={settled ? 'good' : 'warn'}
         />
         <div className="card-3d p-5">
-          <p className="text-sm text-gray-500">Contact</p>
-          <p className="mt-1 font-medium">{buyer.phone || '—'}</p>
-          <p className="text-sm text-gray-500">{buyer.city || buyer.address || ''}</p>
+          <p className="text-sm text-gray-500">Father / address</p>
+          <p className="mt-1 font-medium">{buyer.fatherName || '—'}</p>
+          <p className="text-sm text-gray-500">{[buyer.address, buyer.city].filter(Boolean).join(', ') || ''}</p>
+          {buyer.notes ? <p className="mt-2 text-sm text-gray-500">{buyer.notes}</p> : null}
           {settled && (
             <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records

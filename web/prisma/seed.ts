@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 
 const products = [
   ['WHT-001', 'Wheat'],
-  ['RCE-001', 'Rice'],
+  ['RCE-001', 'Paddy'],
   ['MAZ-001', 'Maize'],
   ['BAR-001', 'Barley'],
 ] as const
@@ -49,6 +49,10 @@ async function ensureProducts(workspace: 'live' | 'demo') {
       create: { workspace, productId: product.id, quantity: '0.00' },
     })
   }
+  await prisma.product.updateMany({
+    where: { workspace, name: 'Rice' },
+    data: { name: 'Paddy' },
+  })
 }
 
 async function ensureSync(id: number, workspace: 'live' | 'demo') {

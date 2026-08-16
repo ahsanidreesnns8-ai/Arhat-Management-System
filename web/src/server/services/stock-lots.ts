@@ -205,6 +205,7 @@ export async function consumeStockLotsToBags(input: {
   highestRateHint?: number | string
   createdById?: bigint
   saleId?: number
+  maxBags?: number
 }) {
   const bagWeight = round2(input.bagWeightKg ?? 40)
   if (bagWeight.lte(0)) throw new Error('Bag weight must be greater than zero')
@@ -217,7 +218,11 @@ export async function consumeStockLotsToBags(input: {
     (sum, lot) => sum.add(d(lot.remainingKg.toString())),
     d(0),
   )
-  const bagsFromStock = Math.floor(totalAvailable.div(bagWeight).toNumber())
+  const wholeAvailable = Math.floor(totalAvailable.div(bagWeight).toNumber())
+  const bagsFromStock =
+    input.maxBags != null && input.maxBags >= 0
+      ? Math.min(wholeAvailable, input.maxBags)
+      : wholeAvailable
   const kgNeeded = bagWeight.mul(bagsFromStock)
   if (bagsFromStock <= 0) {
     return {

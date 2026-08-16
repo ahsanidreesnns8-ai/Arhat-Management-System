@@ -102,9 +102,10 @@ export default function FarmerDetailPage() {
         <MoneyCard label="Amount paid to farmer" value={totalPaid} tone="good" />
         <MoneyCard label="Remaining to pay" value={farmer.outstandingBalance} tone={settled ? 'good' : 'warn'} />
         <div className="card-3d p-5">
-          <p className="text-sm text-gray-500">Contact</p>
-          <p className="mt-1 font-medium">{farmer.phone || '—'}</p>
-          <p className="text-sm text-gray-500">{farmer.city || farmer.address || ''}</p>
+          <p className="text-sm text-gray-500">Father / address</p>
+          <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
+          <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
+          {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
           {settled && (
             <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records

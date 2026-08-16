@@ -77,7 +77,7 @@ docker compose up -d --build
 
 ## Modules
 
-Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Arhat Sale · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant · Global Search · Bilingual bills
+Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Daily Trade · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant · Global Search · Bilingual bills
 
 ## AI keys (server env only)
 

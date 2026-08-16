@@ -74,12 +74,18 @@ export async function getDashboardStats() {
     return {
       name: DAY_NAMES[dayStart.getUTCDay()],
       sales: salesByDay.get(key) ?? 0,
-      // Show live stock on today only; prior days stay 0 until history exists
-      stock: index === 6 ? currentStock + extraKg : 0,
+      stock: index === 6 ? currentStock : 0,
     }
   })
 
   const todaySales = sales._sum.totalAmount?.toNumber() ?? 0
+  const stockAsOf = start.toISOString().slice(0, 10)
+  const lotRows = await prisma.stockLot.findMany({
+    where: { remainingKg: { gt: 0 } },
+    include: { product: true },
+    orderBy: { intakeDate: 'desc' },
+    take: 12,
+  })
   return {
     todaySales,
     currentQueue,
@@ -87,6 +93,14 @@ export async function getDashboardStats() {
     totalBuyers,
     totalDheris,
     currentStock,
+    extraKgStock: extraKg,
+    stockAsOf,
+    stockLots: lotRows.map((lot) => ({
+      productName: lot.product.name,
+      remainingKg: lot.remainingKg.toNumber(),
+      amountValue: lot.amountValue.toNumber(),
+      intakeDate: lot.intakeDate.toISOString().slice(0, 10),
+    })),
     pendingPayments: outstanding._sum.outstandingBalance?.toNumber() ?? 0,
     revenue: todaySales,
     commission: commission._sum.arhatShare?.toNumber() ?? 0,

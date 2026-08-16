@@ -29,6 +29,19 @@ export async function nextDheriCode() {
   return nextCode(rows.map((row) => row.dheriId), 'DHR')
 }
 
+export function normalizeOwnerCode(value: string | null | undefined) {
+  return String(value ?? '').trim()
+}
+
+export async function nextDheriQueueNumber() {
+  const last = await prisma.dheri.findFirst({
+    where: { deleted: false, queueNumber: { not: null } },
+    orderBy: { queueNumber: 'desc' },
+    select: { queueNumber: true },
+  })
+  return (last?.queueNumber ?? 0) + 1
+}
+
 export async function nextInvoiceCode() {
   const rows = await prisma.sale.findMany({ select: { invoiceNumber: true } })
   return nextCode(rows.map((row) => row.invoiceNumber), 'INV', '-')

@@ -158,7 +158,7 @@ export default function StockPage() {
             </div>
             {lots.length === 0 ? (
               <p className="p-6 text-sm text-gray-500">
-                No Extra KG batches yet. Save farmer product with Extra KG → Stock on Arhat Sale.
+                No Extra KG batches yet. Save farmer product or Daily Trade with Extra KG — it goes to stock automatically.
               </p>
             ) : (
               <div className="overflow-x-auto">

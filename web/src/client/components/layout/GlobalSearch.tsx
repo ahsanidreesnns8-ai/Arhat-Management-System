@@ -25,7 +25,6 @@ const MODULE_SHORTCUTS: {
   { id: 'stock', to: '/stock', labelKey: 'stock', keywords: ['stock', 'inventory', 'اسٹاک'] },
   { id: 'calculator', to: '/calculator', labelKey: 'calculator', keywords: ['calculator', 'price', 'کیلکولیٹر'] },
   { id: 'farmer-product', to: '/farmer-product', labelKey: 'farmerProduct', keywords: ['farmer product', 'کسان پروڈکٹ'] },
-  { id: 'arhat-sale', to: '/arhat-sale', labelKey: 'arhatSale', keywords: ['arhat sale', 'آرھٹ'] },
   { id: 'daily-trade', to: '/daily-trade', labelKey: 'dailyTrade', keywords: ['daily trade', 'stock sell', 'extra kg', 'روزانہ'] },
   { id: 'queue', to: '/queue', labelKey: 'queue', keywords: ['queue', 'قطار'] },
   { id: 'sales', to: '/sales', labelKey: 'sales', keywords: ['sales', 'invoice', 'فروخت', 'انوائس'] },

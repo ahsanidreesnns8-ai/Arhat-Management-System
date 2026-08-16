@@ -4,7 +4,6 @@ import { Plus, Pencil, Trash2, Search, Eye, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
@@ -13,11 +12,10 @@ import PaymentModal from '../components/payments/PaymentModal'
 import DuplicateSuggestions, { findPersonDuplicates } from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import PartyFields, { emptyPartyForm, type PartyFormValues } from '../components/forms/PartyFields'
 import { buyerApi } from '../services/api'
 import { formatCurrency } from '../utils/format'
 import type { Buyer, Sale } from '../types'
-
-const emptyForm = { name: '', cnic: '', phone: '', address: '', city: '', notes: '' }
 
 export default function BuyersPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -26,7 +24,7 @@ export default function BuyersPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [editing, setEditing] = useState<Buyer | null>(null)
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState<PartyFormValues>(emptyPartyForm())
   const [saving, setSaving] = useState(false)
   const [payBuyer, setPayBuyer] = useState<Buyer | null>(null)
   const [paySales, setPaySales] = useState<Sale[]>([])
@@ -46,31 +44,32 @@ export default function BuyersPage() {
     const q = search.toLowerCase()
     return (b.name || '').toLowerCase().includes(q)
       || (b.buyerId || '').toLowerCase().includes(q)
-      || (b.phone || '').includes(search)
-      || (b.cnic || '').includes(search)
+      || (b.fatherName || '').toLowerCase().includes(q)
+      || (b.city || '').toLowerCase().includes(q)
   })
 
   const duplicates = useMemo(() => {
-    if (editing) return findPersonDuplicates(buyers, form, (b) => ({
-      id: b.id, code: b.buyerId, name: b.name, phone: b.phone, cnic: b.cnic, link: `/buyers/${b.id}`, reason: '',
+    const shaped = { name: form.name, phone: '', cnic: '' }
+    if (editing) return findPersonDuplicates(buyers, shaped, (b) => ({
+      id: b.id, code: b.buyerId, name: b.name, extra: b.fatherName || undefined, link: `/buyers/${b.id}`, reason: '',
     }), editing.id)
-    return findPersonDuplicates(buyers, form, (b) => ({
-      id: b.id, code: b.buyerId, name: b.name, phone: b.phone, cnic: b.cnic, link: `/buyers/${b.id}`, reason: '',
+    return findPersonDuplicates(buyers, shaped, (b) => ({
+      id: b.id, code: b.buyerId, name: b.name, extra: b.fatherName || undefined, link: `/buyers/${b.id}`, reason: '',
     }))
   }, [buyers, form, editing])
 
   const openCreate = () => {
     setEditing(null)
-    setForm(emptyForm)
+    setForm(emptyPartyForm())
     setModalOpen(true)
   }
 
   const openEdit = (buyer: Buyer) => {
     setEditing(buyer)
     setForm({
+      code: buyer.buyerId,
       name: buyer.name,
-      cnic: buyer.cnic || '',
-      phone: buyer.phone || '',
+      fatherName: buyer.fatherName || '',
       address: buyer.address || '',
       city: buyer.city || '',
       notes: buyer.notes || '',
@@ -83,23 +82,37 @@ export default function BuyersPage() {
       toast.error('Name is required')
       return
     }
-    if (!editing && duplicates.some((d) => d.reason.includes('same phone') || d.reason.includes('same CNIC') || d.reason.includes('same name'))) {
+    if (!form.code.trim()) {
+      toast.error('Enter the buyer ID you assign')
+      return
+    }
+    if (!editing && duplicates.some((d) => d.reason.includes('same name'))) {
       const ok = window.confirm('A similar buyer already exists. Create anyway?')
       if (!ok) return
     }
     setSaving(true)
     try {
+      const payload = {
+        name: form.name,
+        fatherName: form.fatherName,
+        code: form.code,
+        buyerId: form.code,
+        address: form.address,
+        city: form.city,
+        notes: form.notes,
+      }
       if (editing) {
-        await buyerApi.update(editing.id, form)
+        await buyerApi.update(editing.id, payload)
         toast.success('Buyer updated')
       } else {
-        await buyerApi.create(form)
+        await buyerApi.create(payload)
         toast.success('Buyer created')
       }
       setModalOpen(false)
       load()
-    } catch {
-      toast.error('Failed to save buyer')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Failed to save buyer')
     } finally {
       setSaving(false)
     }
@@ -143,7 +156,7 @@ export default function BuyersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             className="input-field pl-10"
-            placeholder="Search by ID, name, CNIC, phone..."
+            placeholder="Search by ID, name, father name, city..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -161,7 +174,7 @@ export default function BuyersPage() {
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Status</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Buyer ID</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Name</th>
-                  <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Phone</th>
+                  <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">Father</th>
                   <th className="text-left p-4 font-semibold text-gray-600 dark:text-gray-400">City</th>
                   <th className="text-right p-4 font-semibold text-gray-600 dark:text-gray-400">Total billed</th>
                   <th className="text-right p-4 font-semibold text-gray-600 dark:text-gray-400">Paid</th>
@@ -195,7 +208,7 @@ export default function BuyersPage() {
                         <SettledBadge settled={settled} />
                       </Link>
                     </td>
-                    <td className="p-4 text-gray-600 dark:text-gray-400">{buyer.phone || '—'}</td>
+                    <td className="p-4 text-gray-600 dark:text-gray-400">{buyer.fatherName || '—'}</td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{buyer.city || '—'}</td>
                     <td className="p-4 text-right">{formatCurrency(buyer.totalBilled || 0)}</td>
                     <td className="p-4 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(buyer.totalPaid || 0)}</td>
@@ -246,18 +259,7 @@ export default function BuyersPage() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Buyer' : 'Add Buyer'}>
         <div className="space-y-4">
           {!editing && <DuplicateSuggestions matches={duplicates} entityLabel="buyer" />}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input label="CNIC" value={form.cnic} onChange={(e) => setForm({ ...form, cnic: e.target.value })} />
-            <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            <Input label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            <div className="sm:col-span-2">
-              <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </div>
-            <div className="sm:col-span-2">
-              <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </div>
-          </div>
+          <PartyFields form={form} setForm={setForm} idLabel="Buyer ID" />
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
