@@ -9,11 +9,11 @@ interface AnimatedNumberProps {
 /** Counts up numeric values; passes through currency/formatted strings gracefully. */
 export default function AnimatedNumber({ value, className }: AnimatedNumberProps) {
   const raw = String(value)
-  const numericMatch = raw.replace(/,/g, '').match(/-?\d+(\.\d+)?/)
-  const target = numericMatch ? parseFloat(numericMatch[0]) : NaN
-  const prefix = numericMatch ? raw.slice(0, raw.indexOf(numericMatch[0])) : ''
-  const suffix = numericMatch ? raw.slice(raw.indexOf(numericMatch[0]) + numericMatch[0].length) : ''
-  const decimals = numericMatch?.[1] ? numericMatch[1].length - 1 : 0
+  const match = raw.match(/-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/)
+  const target = match ? parseFloat(match[0].replace(/,/g, '')) : NaN
+  const prefix = match && match.index != null ? raw.slice(0, match.index) : ''
+  const suffix = match && match.index != null ? raw.slice(match.index + match[0].length) : ''
+  const decimals = match?.[0].includes('.') ? match[0].split('.')[1].length : 0
 
   if (Number.isNaN(target)) {
     return <span className={className}>{raw}</span>
@@ -26,7 +26,8 @@ export default function AnimatedNumber({ value, className }: AnimatedNumberProps
       suffix={suffix}
       decimals={decimals}
       className={className}
-      hasCommas={raw.includes(',')}
+      hasCommas={match![0].includes(',')}
+      finalText={raw}
     />
   )
 }
@@ -38,6 +39,7 @@ function AnimatedNumeric({
   decimals,
   className,
   hasCommas,
+  finalText,
 }: {
   target: number
   prefix: string
@@ -45,9 +47,11 @@ function AnimatedNumeric({
   decimals: number
   className?: string
   hasCommas: boolean
+  finalText: string
 }) {
   const spring = useSpring(0, { stiffness: 90, damping: 22, mass: 0.6 })
   const display = useTransform(spring, (latest) => {
+    if (Math.abs(latest - target) < 0.0005) return finalText
     const fixed = latest.toFixed(decimals)
     const [intPart, decPart] = fixed.split('.')
     const formattedInt = hasCommas

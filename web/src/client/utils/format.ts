@@ -10,12 +10,12 @@ export function areAmountsHidden(): boolean {
 
 export function formatCurrency(value: number | undefined | null): string {
   if (areAmountsHidden()) return '••••••'
-  const num = value ?? 0
+  const num = Math.round(value ?? 0)
   return new Intl.NumberFormat('en-PK', {
     style: 'currency',
     currency: 'PKR',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(num)
 }
 

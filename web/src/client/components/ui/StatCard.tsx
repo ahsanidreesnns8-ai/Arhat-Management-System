@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import AnimatedNumber from '../motion/AnimatedNumber'
 
 interface StatCardProps {
   title: string
@@ -35,10 +34,7 @@ export default function StatCard({ title, value, icon, trend, color = 'teal', to
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-          <AnimatedNumber
-            value={value}
-            className="text-xl font-bold text-slate-900 dark:text-white mt-1 block"
-          />
+          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 block">{value}</p>
           {trend && <p className="text-xs text-slate-400 mt-1">{trend}</p>}
           {to && (
             <p className="text-xs text-primary dark:text-accent-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
