@@ -50,6 +50,7 @@ function sessionDto(row: {
   highestRate: { toNumber(): number }
   detailsJson: unknown
   closedAt: Date | null
+  createdAt: Date
   product?: { name: string } | null
 }) {
   const receivedBags = row.receivedBags
@@ -73,6 +74,7 @@ function sessionDto(row: {
     remainingBags: receivedBags - soldBags,
     details: row.detailsJson,
     closedAt: row.closedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
   }
 }
 
@@ -93,12 +95,18 @@ export async function getDailyBoard(
   const session = await getOrCreateOpenSession(sessionDate)
   const day = dateOnly(sessionDate)
   const scopedId = parseBatchId(batchId)
+  // Batches/sales from before this open session belong to an archived day.
+  const liveCutoff = new Date(session.createdAt)
 
   const [lots, batchInfo] = await Promise.all([
     listStockLots(),
     import('@/server/services/day-batches').then((m) => m.listDayBatches(sessionDate)),
   ])
-  const dayBatchIds = batchInfo.batches.map((b) => BigInt(b.id))
+  const liveBatches =
+    scopedId != null
+      ? batchInfo.batches.filter((b) => Number(b.id) === scopedId)
+      : batchInfo.batches.filter((b) => new Date(b.createdAt) >= liveCutoff)
+  const dayBatchIds = liveBatches.map((b) => BigInt(b.id))
 
   const dheriWhere =
     scopedId != null
@@ -107,21 +115,27 @@ export async function getDailyBoard(
         ? { deleted: false, dayBatchId: { in: dayBatchIds } }
         : { deleted: false, id: { in: [] as bigint[] } }
 
+  const saleOr: object[] = []
+  if (dayBatchIds.length) {
+    saleOr.push({ items: { some: { dheri: { dayBatchId: { in: dayBatchIds } } } } })
+  }
+  if (scopedId == null) {
+    saleOr.push({
+      saleDate: day,
+      createdAt: { gte: liveCutoff },
+      items: { some: { sourceType: 'BUSINESS_STOCK' } },
+    })
+  }
+
   const saleWhere =
     scopedId != null
       ? {
           deleted: false,
           items: { some: { dheri: { dayBatchId: BigInt(scopedId) } } },
         }
-      : {
-          deleted: false,
-          OR: [
-            { saleDate: day },
-            ...(dayBatchIds.length
-              ? [{ items: { some: { dheri: { dayBatchId: { in: dayBatchIds } } } } }]
-              : []),
-          ],
-        }
+      : saleOr.length
+        ? { deleted: false, OR: saleOr }
+        : { deleted: false, id: { in: [] as bigint[] } }
 
   const [dheris, sales] = await Promise.all([
     prisma.dheri.findMany({
@@ -257,41 +271,94 @@ export async function getDailyBoard(
         batchNumber: item.dheri?.dayBatch?.batchNumber ?? null,
       })),
     })).filter((sale) => scopedId == null || sale.items.length > 0),
-    batches: batchInfo.batches,
-    receivingBatch: batchInfo.receivingBatch,
+    batches: scopedId != null ? batchInfo.batches : liveBatches,
+    receivingBatch: liveBatches.find((b) => b.status === 'RECEIVING') ?? null,
     activeSellBatch: batchInfo.activeSellBatch,
   }
 }
 
-export async function listDailyHistory(limit = 30) {
+export async function listDailyHistory(limit = 60) {
   const rows = await prisma.dailyTradeSession.findMany({
     where: { status: 'ARCHIVED' },
     include: { product: true },
     orderBy: [{ sessionDate: 'desc' }, { closedAt: 'desc' }],
     take: limit,
   })
-  return rows.map(sessionDto)
+  return rows
+    .map((row) => {
+      const dto = sessionDto(row)
+      const details =
+        row.detailsJson && typeof row.detailsJson === 'object'
+          ? (row.detailsJson as Record<string, unknown>)
+          : {}
+      const receives = Array.isArray(details.receives) ? details.receives : []
+      const sales = Array.isArray(details.sales) ? details.sales : []
+      return {
+        ...dto,
+        receiveCount: receives.length,
+        saleCount: sales.length,
+        receives,
+        sales,
+      }
+    })
+    .filter((row) => row.receiveCount > 0 || row.saleCount > 0)
 }
 
-/** Archive current open session into history and open a fresh board */
+/** Save today’s board to Records, close open batches, and start from zero. */
 export async function refreshDailyBoard(sessionDate?: string | null) {
+  const day = dateOnly(sessionDate)
   const board = await getDailyBoard(sessionDate)
-  await prisma.dailyTradeSession.update({
-    where: { id: BigInt(board.session.id) },
-    data: {
-      status: 'ARCHIVED',
-      closedAt: new Date(),
-      detailsJson: {
-        ...(typeof board.session.details === 'object' && board.session.details
-          ? (board.session.details as object)
-          : {}),
-        archivedAt: new Date().toISOString(),
-        receives: board.receives,
-        sales: board.sales,
-        stockLots: board.stockLots,
+  const now = new Date()
+  const hasWork = board.receives.length > 0 || board.sales.length > 0
+  const sessionId = BigInt(board.session.id)
+
+  if (hasWork) {
+    await prisma.dailyTradeSession.update({
+      where: { id: sessionId },
+      data: {
+        status: 'ARCHIVED',
+        closedAt: now,
+        receivedBags: board.session.receivedBags,
+        receivedWeightKg: Number(board.session.receivedWeightKg).toFixed(2),
+        soldBags: board.session.soldBags,
+        soldWeightKg: Number(board.session.soldWeightKg).toFixed(2),
+        stockInKg: Number(board.session.stockInKg).toFixed(2),
+        stockOutKg: Number(board.session.stockOutKg).toFixed(2),
+        detailsJson: {
+          archivedAt: now.toISOString(),
+          sessionDate: board.session.sessionDate,
+          receives: board.receives,
+          sales: board.sales,
+          stockLots: board.stockLots,
+          farmerBags: board.farmerBags,
+          stockBagsSold: board.stockBagsSold,
+          stockKgAvailable: board.stockKgAvailable,
+          batches: board.batches,
+        },
       },
+    })
+  } else {
+    await prisma.dailyTradeSession.update({
+      where: { id: sessionId },
+      data: {
+        createdAt: now,
+        receivedBags: 0,
+        receivedWeightKg: '0.00',
+        soldBags: 0,
+        soldWeightKg: '0.00',
+        detailsJson: { receives: [], sales: [] },
+      },
+    })
+  }
+
+  await prisma.dayBatch.updateMany({
+    where: {
+      batchDate: day,
+      status: { in: ['RECEIVING', 'SELLING'] },
     },
+    data: { status: 'CLOSED', closedAt: now },
   })
+
   return getDailyBoard(sessionDate)
 }
 

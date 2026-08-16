@@ -469,7 +469,7 @@ async function dispatch(
           (payload.date as string | undefined) ??
             url.searchParams.get('date'),
         ),
-        'Daily board archived and refreshed',
+        'Today saved to Records. Daily Trade starts from zero',
       )
     }
     if (path[1] === 'batch-sell' && method === 'POST') {

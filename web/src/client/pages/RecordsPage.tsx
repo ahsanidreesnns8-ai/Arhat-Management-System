@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
   BarChart3,
+  ChevronDown,
+  ChevronRight,
+  History,
   Package,
   PackagePlus,
   Receipt,
@@ -15,6 +19,8 @@ import {
 } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
+import { dailyTradeApi } from '../services/api'
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/format'
 
 const sections = [
   {
@@ -27,7 +33,7 @@ const sections = [
     to: '/daily-trade',
     icon: Scale,
     title: 'Daily Trade',
-    description: 'Receive and sell today’s bags, Extra KG stock, bills EN/UR',
+    description: 'Today’s board. Refresh saves the day here and starts from zero.',
   },
   {
     to: '/farmers',
@@ -79,13 +85,165 @@ const sections = [
   },
 ]
 
+type ArchivedReceive = {
+  dheriId?: string
+  farmerName?: string
+  productName?: string
+  bags?: number
+  weight?: number
+  sellingStatus?: string
+}
+
+type ArchivedSale = {
+  invoiceNumber?: string
+  buyerName?: string
+  bags?: number
+  amount?: number
+  items?: Array<{ dheriCode?: string; sourceType?: string }>
+}
+
+type ArchivedDay = {
+  id: number
+  sessionDate: string
+  closedAt: string | null
+  receivedBags: number
+  soldBags: number
+  receivedWeightKg: number
+  soldWeightKg: number
+  receiveCount: number
+  saleCount: number
+  receives: ArchivedReceive[]
+  sales: ArchivedSale[]
+}
+
 export default function RecordsPage() {
+  const [days, setDays] = useState<ArchivedDay[]>([])
+  const [openId, setOpenId] = useState<number | null>(null)
+  const [loadingDays, setLoadingDays] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void dailyTradeApi
+      .getHistory()
+      .then((res) => {
+        if (!cancelled) setDays((res.data.data || []) as ArchivedDay[])
+      })
+      .catch(() => {
+        if (!cancelled) setDays([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDays(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Records"
-        description="Open any record module — each card goes to its working page"
+        description="Saved Daily Trade days plus every record module"
       />
+
+      <section className="card-3d overflow-hidden">
+        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+          <History className="h-4 w-4 text-[#C5A059]" />
+          Daily Trade — saved days
+        </div>
+        {loadingDays && (
+          <p className="p-4 text-sm text-slate-500">Loading saved days…</p>
+        )}
+        {!loadingDays && !days.length && (
+          <p className="p-4 text-sm text-slate-500">
+            No saved days yet. On Daily Trade, tap Refresh — next day (Save today to Records).
+          </p>
+        )}
+        <div className="divide-y divide-slate-100 dark:divide-white/10">
+          {days.map((day) => {
+            const open = openId === day.id
+            return (
+              <div key={day.id}>
+                <button
+                  type="button"
+                  className="w-full px-5 py-3 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-white/5"
+                  onClick={() => setOpenId(open ? null : day.id)}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    {open ? (
+                      <ChevronDown className="h-4 w-4 shrink-0 text-primary" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                    )}
+                    <span className="font-medium truncate">
+                      {formatDate(day.sessionDate)}
+                      {day.closedAt ? ` · saved ${formatDateTime(day.closedAt)}` : ''}
+                    </span>
+                  </span>
+                  <span className="text-xs text-slate-500 shrink-0">
+                    In {day.receivedBags} bags · Out {day.soldBags} bags
+                  </span>
+                </button>
+                {open && (
+                  <div className="px-5 pb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-white/10">
+                      <div className="px-3 py-2 text-sm font-semibold bg-emerald-700 text-white">
+                        Receiving · {day.receiveCount} · {formatNumber(day.receivedWeightKg)} kg
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead className="text-left bg-emerald-50 dark:bg-emerald-950/20">
+                          <tr>
+                            <th className="px-3 py-2">Dheri</th>
+                            <th className="px-3 py-2">Farmer</th>
+                            <th className="px-3 py-2">Bags</th>
+                            <th className="px-3 py-2">Weight</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                          {day.receives.map((row, idx) => (
+                            <tr key={`${day.id}-r-${idx}`}>
+                              <td className="px-3 py-2">{row.dheriId || '—'}</td>
+                              <td className="px-3 py-2">{row.farmerName || '—'}</td>
+                              <td className="px-3 py-2">{row.bags ?? 0}</td>
+                              <td className="px-3 py-2">{formatNumber(row.weight)} kg</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-white/10">
+                      <div className="px-3 py-2 text-sm font-semibold bg-[#002D62] text-white">
+                        Selling · {day.saleCount} · {formatNumber(day.soldWeightKg)} kg
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead className="text-left bg-slate-50 dark:bg-slate-800/50">
+                          <tr>
+                            <th className="px-3 py-2">Invoice</th>
+                            <th className="px-3 py-2">Seller</th>
+                            <th className="px-3 py-2">Bags</th>
+                            <th className="px-3 py-2">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                          {day.sales.map((row, idx) => (
+                            <tr key={`${day.id}-s-${idx}`}>
+                              <td className="px-3 py-2">{row.invoiceNumber || '—'}</td>
+                              <td className="px-3 py-2">{row.buyerName || '—'}</td>
+                              <td className="px-3 py-2">{row.bags ?? 0}</td>
+                              <td className="px-3 py-2">{formatCurrency(row.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
       <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sections.map((section) => (
           <StaggerItem key={section.title}>

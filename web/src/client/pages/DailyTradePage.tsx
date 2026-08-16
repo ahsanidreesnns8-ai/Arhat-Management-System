@@ -182,11 +182,35 @@ export default function DailyTradePage() {
   }, [buyerId, loadBuyerSales])
 
   const refreshDay = async () => {
+    const ok = window.confirm(
+      'Save today’s receiving and selling tables to Records and start Daily Trade from zero?\n\nFarmers, buyers, dheris, sales, and Extra KG stock are kept. Only this board is cleared.',
+    )
+    if (!ok) return
     setRefreshing(true)
     try {
-      await dailyTradeApi.refresh()
-      toast.success('Today archived to Records. Fresh board opened for the next day.')
-      await load(true)
+      const res = await dailyTradeApi.refresh()
+      const next = res.data.data as Board
+      setBoard(next)
+      setFarmerId('')
+      setBuyerId('')
+      setFarmerBags('')
+      setExtraKg('0')
+      setFarmerRate('')
+      setBuyerBags('')
+      setExtraBags('0')
+      setBuyerRate('')
+      setStockBags('')
+      setStockRate('')
+      setShowDetails(false)
+      setBuyerSales([])
+      setPickedItemIds([])
+      try {
+        const nxt = await dailyTradeApi.nextDheri()
+        setDheriNo(String(nxt.data.data.dheriCode || ''))
+      } catch {
+        setDheriNo('')
+      }
+      toast.success('Today saved to Records. Daily Trade is empty — start from zero.')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Could not refresh for next day')
@@ -318,8 +342,13 @@ export default function DailyTradePage() {
             <Button variant="secondary" onClick={() => void load()}>
               <RefreshCw className="h-4 w-4" /> Reload
             </Button>
+            <Link to="/records">
+              <Button variant="secondary">
+                <History className="h-4 w-4" /> Records
+              </Button>
+            </Link>
             <Button loading={refreshing} onClick={() => void refreshDay()}>
-              <History className="h-4 w-4" /> Refresh — next day (save today to Records)
+              <History className="h-4 w-4" /> Refresh — next day (Save today to Records)
             </Button>
           </div>
         }
