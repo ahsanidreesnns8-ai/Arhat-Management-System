@@ -181,7 +181,7 @@ async function main() {
     const create = await req('farmers', {
       method: 'POST',
       token,
-      body: { name: 'Smoke Test Farmer', phone: '03001110000', city: 'Lahore' },
+      body: { name: 'Smoke Test Farmer', phone: '03001110000', city: 'Lahore', code: `SMK-${Date.now()}` },
     })
     results.push({
       name: 'create farmer',
