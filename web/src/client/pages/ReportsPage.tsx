@@ -10,6 +10,7 @@ import { useVoicePageActions } from '../context/VoiceControlContext'
 import { reportApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { buildReportHtml, openReportPrint } from '../utils/reportPrint'
+import { useLanguage } from '../context/LanguageContext'
 import type { ReportKey, ReportSummary } from '../types'
 
 const REPORT_KEYS: ReportKey[] = ['sales', 'commission', 'stock', 'profit']
@@ -50,6 +51,7 @@ const reports: { key: ReportKey; title: string; titleUr: string; description: st
 
 export default function ReportsPage() {
   const { companyName } = useBusiness()
+  const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -277,7 +279,7 @@ function PreviewTable({ reportKey, data }: { reportKey: ReportKey; data: ReportS
               <th className="px-3 py-2">Invoice</th>
               <th className="px-3 py-2">Date</th>
               <th className="px-3 py-2">Buyer</th>
-              <th className="px-3 py-2">Bags</th>
+              <th className="px-3 py-2">{t('bags')}</th>
               <th className="px-3 py-2">Amount</th>
               <th className="px-3 py-2">Paid</th>
             </tr>

@@ -8,9 +8,11 @@ import { TableSkeleton } from '../components/ui/Skeleton'
 import { billApi, buyerApi, saleApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Sale } from '../types'
 
 export default function SaleDetailPage() {
+  const { t } = useLanguage()
   const { id } = useParams()
   const saleId = Number(id)
   const [sale, setSale] = useState<Sale | null>(null)
@@ -97,7 +99,7 @@ export default function SaleDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Stat label="Total amount" value={formatCurrency(sale.totalAmount)} />
         <Stat label="Paid" value={formatCurrency(sale.paidAmount)} />
-        <Stat label="Bags" value={String(sale.totalBags)} />
+        <Stat label={t('bags')} value={String(sale.totalBags)} />
         <Stat label="Status" value={sale.paymentStatus} />
       </div>
 
@@ -134,7 +136,7 @@ export default function SaleDetailPage() {
                 <th className="px-4 py-2">Source</th>
                 <th className="px-4 py-2">Dheri</th>
                 <th className="px-4 py-2">Product</th>
-                <th className="px-4 py-2">Bags</th>
+                <th className="px-4 py-2">{t('bags')}</th>
                 <th className="px-4 py-2">Weight</th>
                 <th className="px-4 py-2">Rate</th>
                 <th className="px-4 py-2">Amount</th>

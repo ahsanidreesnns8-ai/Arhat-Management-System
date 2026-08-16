@@ -13,10 +13,12 @@ import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { dheriApi, farmerApi, settingsApi } from '../services/api'
+import { useLanguage } from '../context/LanguageContext'
 import { formatCurrency } from '../utils/format'
 import type { Dheri, Farmer, Product } from '../types'
 
 export default function DheriesPage() {
+  const { t } = useLanguage()
   const [dheris, setDheris] = useState<Dheri[]>([])
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -49,7 +51,7 @@ export default function DheriesPage() {
       .map((d) => ({
         id: d.id,
         code: d.dheriId,
-        name: `${d.productName || 'Product'} · ${d.numberOfBags} bags`,
+        name: `${d.productName || 'Product'} · ${d.numberOfBags} ${t('bags')}`,
         extra: d.sellingStatus,
         link: `/dheris/${d.id}`,
         reason: 'previous dheri for this farmer',
@@ -117,7 +119,7 @@ export default function DheriesPage() {
                   <th className="text-left p-4 font-semibold text-gray-600">Dheri ID</th>
                   <th className="text-left p-4 font-semibold text-gray-600">Farmer</th>
                   <th className="text-left p-4 font-semibold text-gray-600">Product</th>
-                  <th className="text-right p-4 font-semibold text-gray-600">Bags</th>
+                  <th className="text-right p-4 font-semibold text-gray-600">{t('bags')}</th>
                   <th className="text-left p-4 font-semibold text-gray-600">Status</th>
                   <th className="text-right p-4 font-semibold text-gray-600">Amount</th>
                   <th className="text-right p-4 font-semibold text-gray-600">Actions</th>
@@ -153,8 +155,8 @@ export default function DheriesPage() {
             options={[{ value: '', label: 'Select' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]} />
           <Select label="Product *" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...products.map((p) => ({ value: p.id, label: p.name }))]} />
-          <Input label="Number of Bags" type="number" value={form.numberOfBags} onChange={(e) => setForm({ ...form, numberOfBags: e.target.value })} />
-          <Input label="Weight per Bag (kg)" type="number" value={form.weightPerBag} onChange={(e) => setForm({ ...form, weightPerBag: e.target.value })} />
+          <Input label={t('numberOfBags')} type="number" value={form.numberOfBags} onChange={(e) => setForm({ ...form, numberOfBags: e.target.value })} />
+          <Input label={t('weightPerBag')} type="number" value={form.weightPerBag} onChange={(e) => setForm({ ...form, weightPerBag: e.target.value })} />
           <Input label="Market Rate (per Mann)" type="number" value={form.marketRate} onChange={(e) => setForm({ ...form, marketRate: e.target.value })} />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>

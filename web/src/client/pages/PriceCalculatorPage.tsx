@@ -5,10 +5,11 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
+import { useLanguage } from '../context/LanguageContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { calculatorApi, dheriApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, PriceCalculationResult } from '../types'
-import { useVoicePageActions } from '../context/VoiceControlContext'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -26,6 +27,7 @@ const emptyResult: PriceCalculationResult = {
 }
 
 export default function PriceCalculatorPage() {
+  const { t } = useLanguage()
   const [dheris, setDheris] = useState<Dheri[]>([])
   const [selectedDheriId, setSelectedDheriId] = useState<string>('')
   const [numberOfBags, setNumberOfBags] = useState('0')
@@ -131,8 +133,8 @@ export default function PriceCalculatorPage() {
                 })),
               ]}
             />
-            <Input label="Number of Bags" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight per Bag (kg)" type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label={t('numberOfBags')} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+            <Input label={t('weightPerBag')} type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input label="Extra KG" type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
             <Input label="Rate / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
 

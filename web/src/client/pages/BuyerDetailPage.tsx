@@ -10,9 +10,11 @@ import PaymentModal from '../components/payments/PaymentModal'
 import { buyerApi, paymentApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Payment, Sale } from '../types'
 
 export default function BuyerDetailPage() {
+  const { t } = useLanguage()
   const { id } = useParams()
   const buyerId = Number(id)
   const [buyer, setBuyer] = useState<Buyer | null>(null)
@@ -260,7 +262,7 @@ export default function BuyerDetailPage() {
                   <th className="px-4 py-2">Dheri</th>
                   <th className="px-4 py-2">Farmer</th>
                   <th className="px-4 py-2">Product</th>
-                  <th className="px-4 py-2">Bags</th>
+                  <th className="px-4 py-2">{t('bags')}</th>
                   <th className="px-4 py-2">Weight</th>
                   <th className="px-4 py-2">Rate</th>
                   <th className="px-4 py-2">Amount</th>

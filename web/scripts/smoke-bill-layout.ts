@@ -66,6 +66,16 @@ async function main() {
       const html = await farmerBill(farmer.id, 'en')
       writeFileSync('/opt/cursor/artifacts/farmer_bill_layout.html', html)
 
+      const urduHtml = await farmerBill(farmer.id, 'ur')
+      writeFileSync('/opt/cursor/artifacts/farmer_bill_urdu_bori.html', urduHtml)
+      assert(urduHtml.includes('بوریاں'), 'Urdu farmer bill must use بوریاں')
+      assert(urduHtml.includes('بوری وزن'), 'Urdu farmer bill must use بوری وزن')
+      assert(!urduHtml.includes('تھیلی'), 'Urdu farmer bill must not use تھیلی')
+
+      const urduBuyer = await buyerBill(buyer.id, 'ur')
+      assert(urduBuyer.includes('بوریاں'), 'Urdu buyer bill must use بوریاں')
+      assert(!urduBuyer.includes('تھیلی'), 'Urdu buyer bill must not use تھیلی')
+
       assert(!html.includes('Bags amount'), 'farmer bill still has Bags amount column')
       assert(!html.includes('Extra KG amount'), 'farmer bill still has Extra KG amount column')
       assert(!html.includes('Stock amount'), 'farmer bill still has Stock amount')

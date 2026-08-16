@@ -8,6 +8,7 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import { arhatApi, buyerApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Dheri, Farmer, PriceCalculationResult, Product } from '../types'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 
@@ -29,6 +30,7 @@ const emptyResult: PriceCalculationResult = {
 type Mode = 'FARMER_PAYABLE' | 'BUYER_SALE'
 
 export default function ArhatSalePage() {
+  const { t } = useLanguage()
   const [mode, setMode] = useState<Mode>('BUYER_SALE')
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -256,8 +258,8 @@ export default function ArhatSalePage() {
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
             />
 
-            <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input
               label="Extra KG → Stock"
               type="number"

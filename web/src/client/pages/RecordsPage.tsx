@@ -21,6 +21,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
 import { dailyTradeApi } from '../services/api'
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 
 const sections = [
   {
@@ -117,6 +118,7 @@ type ArchivedDay = {
 }
 
 export default function RecordsPage() {
+  const { t } = useLanguage()
   const [days, setDays] = useState<ArchivedDay[]>([])
   const [openId, setOpenId] = useState<number | null>(null)
   const [loadingDays, setLoadingDays] = useState(true)
@@ -181,7 +183,7 @@ export default function RecordsPage() {
                     </span>
                   </span>
                   <span className="text-xs text-slate-500 shrink-0">
-                    In {day.receivedBags} bags · Out {day.soldBags} bags
+                    In {day.receivedBags} {t('bags')} · Out {day.soldBags} {t('bags')}
                   </span>
                 </button>
                 {open && (
@@ -195,7 +197,7 @@ export default function RecordsPage() {
                           <tr>
                             <th className="px-3 py-2">Dheri</th>
                             <th className="px-3 py-2">Farmer</th>
-                            <th className="px-3 py-2">Bags</th>
+                            <th className="px-3 py-2">{t('bags')}</th>
                             <th className="px-3 py-2">Weight</th>
                           </tr>
                         </thead>
@@ -220,7 +222,7 @@ export default function RecordsPage() {
                           <tr>
                             <th className="px-3 py-2">Invoice</th>
                             <th className="px-3 py-2">Seller</th>
-                            <th className="px-3 py-2">Bags</th>
+                            <th className="px-3 py-2">{t('bags')}</th>
                             <th className="px-3 py-2">Amount</th>
                           </tr>
                         </thead>

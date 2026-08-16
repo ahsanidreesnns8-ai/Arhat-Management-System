@@ -9,9 +9,11 @@ import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { dheriApi, farmerApi, paymentApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Dheri, Payment } from '../types'
 
 export default function DheriDetailPage() {
+  const { t } = useLanguage()
   const { id } = useParams()
   const dheriId = Number(id)
   const [dheri, setDheri] = useState<Dheri | null>(null)
@@ -64,7 +66,7 @@ export default function DheriDetailPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat label="Bags" value={String(dheri.numberOfBags)} />
+        <Stat label={t('bags')} value={String(dheri.numberOfBags)} />
         <Stat label="Total weight" value={`${formatNumber(dheri.totalWeight)} kg`} />
         <Stat label="Total price" value={formatCurrency(dheri.totalPrice)} />
         <Stat label="Farmer receivable" value={formatCurrency(dheri.farmerReceivable)} />

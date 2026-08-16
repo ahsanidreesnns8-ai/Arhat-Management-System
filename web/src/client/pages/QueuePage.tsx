@@ -9,9 +9,11 @@ import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { queueApi, dheriApi } from '../services/api'
+import { useLanguage } from '../context/LanguageContext'
 import type { Dheri, QueueEntry } from '../types'
 
 export default function QueuePage() {
+  const { t } = useLanguage()
   const [pending, setPending] = useState<QueueEntry[]>([])
   const [active, setActive] = useState<QueueEntry[]>([])
   const [completed, setCompleted] = useState<QueueEntry[]>([])
@@ -71,7 +73,7 @@ export default function QueuePage() {
             <th className="text-left p-3 font-semibold text-gray-600">Dheri</th>
             <th className="text-left p-3 font-semibold text-gray-600">Farmer</th>
             <th className="text-left p-3 font-semibold text-gray-600">Product</th>
-            <th className="text-right p-3 font-semibold text-gray-600">Bags</th>
+            <th className="text-right p-3 font-semibold text-gray-600">{t('bags')}</th>
             {showActions && <th className="text-right p-3 font-semibold text-gray-600">Actions</th>}
           </tr>
         </thead>

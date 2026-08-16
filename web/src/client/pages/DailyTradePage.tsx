@@ -13,6 +13,7 @@ import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dailyTradeApi, farmerApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Farmer, Product } from '../types'
 
 function roundRupee(n: number) {
@@ -73,6 +74,7 @@ type Board = {
 const COMMISSION_PCT = 4
 
 export default function DailyTradePage() {
+  const { t, isUrdu } = useLanguage()
   const [board, setBoard] = useState<Board | null>(null)
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -336,7 +338,11 @@ export default function DailyTradePage() {
     <div className="space-y-5">
       <PageHeader
         title="Daily Trade"
-        description="Receive and sell today’s bags. Extra KG goes to stock. First dheri number in is first sold."
+        description={
+          isUrdu
+            ? 'آج کی بوریاں وصول کریں اور فروخت کریں۔ اضافی کلو اسٹاک میں جاتا ہے۔ پہلے نمبر والی ڈھیری پہلے بکنی ہے۔'
+            : 'Receive and sell today’s bags. Extra KG goes to stock. First dheri number in is first sold.'
+        }
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void load()}>
@@ -357,7 +363,7 @@ export default function DailyTradePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card-3d overflow-hidden">
           <div className="px-4 py-3 bg-emerald-700 text-white font-semibold">
-            Receiving today · {receivedBags} bags · {formatNumber(board?.session.receivedWeightKg || 0)} kg
+            {isUrdu ? 'آج آمد' : 'Receiving today'} · {receivedBags} {t('bags')} · {formatNumber(board?.session.receivedWeightKg || 0)} kg
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[560px]">
@@ -366,7 +372,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Dheri no</th>
                   <th className="px-3 py-2">Farmer</th>
                   <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Bags</th>
+                  <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Weight</th>
                   <th className="px-3 py-2">Extra KG</th>
                   <th className="px-3 py-2">Status</th>
@@ -387,16 +393,24 @@ export default function DailyTradePage() {
               </tbody>
             </table>
             {!board?.receives?.length && (
-              <p className="p-4 text-sm text-slate-500">No bags received today yet.</p>
+              <p className="p-4 text-sm text-slate-500">
+                {isUrdu ? 'آج ابھی کوئی بوری موصول نہیں ہوئی۔' : 'No bags received today yet.'}
+              </p>
             )}
           </div>
         </div>
 
         <div className="card-3d overflow-hidden">
           <div className="px-4 py-3 bg-[#002D62] text-white font-semibold">
-            Selling today · {soldBags} bags · {formatNumber(board?.session.soldWeightKg || 0)} kg
+            {isUrdu ? 'آج فروخت' : 'Selling today'} · {soldBags} {t('bags')} · {formatNumber(board?.session.soldWeightKg || 0)} kg
             <span className={`ml-2 text-xs ${balanced ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {balanced ? 'Equal with receiving' : `Need ${receivedBags - soldBags} more bags to equal`}
+              {balanced
+                ? isUrdu
+                  ? 'آمد کے برابر'
+                  : 'Equal with receiving'
+                : isUrdu
+                  ? `برابر کے لیے ${receivedBags - soldBags} بوریاں اور درکار`
+                  : `Need ${receivedBags - soldBags} more bags to equal`}
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -406,7 +420,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Invoice</th>
                   <th className="px-3 py-2">Seller</th>
                   <th className="px-3 py-2">Dheri</th>
-                  <th className="px-3 py-2">Bags</th>
+                  <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Amount</th>
                 </tr>
               </thead>
@@ -427,7 +441,9 @@ export default function DailyTradePage() {
               </tbody>
             </table>
             {!board?.sales?.length && (
-              <p className="p-4 text-sm text-slate-500">No bags sold today yet.</p>
+              <p className="p-4 text-sm text-slate-500">
+                {isUrdu ? 'آج ابھی کوئی بوری فروخت نہیں ہوئی۔' : 'No bags sold today yet.'}
+              </p>
             )}
           </div>
         </div>
@@ -455,8 +471,8 @@ export default function DailyTradePage() {
             />
             <Input label="Address" value={farmer ? [farmer.address, farmer.city].filter(Boolean).join(', ') : ''} readOnly />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="No. of bags *" type="number" value={farmerBags} onChange={(e) => setFarmerBags(e.target.value)} />
-              <Input label="Qty of one bag (kg) *" type="number" step="0.01" value={bagKg} onChange={(e) => setBagKg(e.target.value)} />
+              <Input label={`${t('noOfBags')} *`} type="number" value={farmerBags} onChange={(e) => setFarmerBags(e.target.value)} />
+              <Input label={`${t('qtyOfOneBag')} *`} type="number" step="0.01" value={bagKg} onChange={(e) => setBagKg(e.target.value)} />
             </div>
             <Select
               label="Dheri type *"
@@ -500,8 +516,8 @@ export default function DailyTradePage() {
             <Input label="Address" value={buyer ? [buyer.address, buyer.city].filter(Boolean).join(', ') : ''} readOnly />
             <Input label="Buyer ID" value={buyer?.buyerId || ''} readOnly />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="No. of bags *" type="number" value={buyerBags} onChange={(e) => setBuyerBags(e.target.value)} />
-              <Input label="Extra bag" type="number" value={extraBags} onChange={(e) => setExtraBags(e.target.value)} />
+              <Input label={`${t('noOfBags')} *`} type="number" value={buyerBags} onChange={(e) => setBuyerBags(e.target.value)} />
+              <Input label={t('extraBag')} type="number" value={extraBags} onChange={(e) => setExtraBags(e.target.value)} />
             </div>
             <Input
               label="Total weight"
@@ -521,8 +537,8 @@ export default function DailyTradePage() {
           <Warehouse className="h-4 w-4 text-[#C5A059]" /> Stock details
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-5 gap-3 bg-white dark:bg-slate-900">
-          <Input label="No. of bags" type="number" value={stockBags} onChange={(e) => setStockBags(e.target.value)} />
-          <Input label="Weight per bag" type="number" step="0.01" value={stockBagKg} onChange={(e) => setStockBagKg(e.target.value)} />
+          <Input label={t('noOfBags')} type="number" value={stockBags} onChange={(e) => setStockBags(e.target.value)} />
+          <Input label={t('weightPerBag')} type="number" step="0.01" value={stockBagKg} onChange={(e) => setStockBagKg(e.target.value)} />
           <Input label="Total weight" value={stockWeight ? `${formatNumber(stockWeight)} kg` : '—'} readOnly />
           <Input label="Rate / 40kg" type="number" step="0.01" value={stockRate} onChange={(e) => setStockRate(e.target.value)} />
           <Input label="Stock amount" value={stockAmount ? formatCurrency(stockAmount) : '—'} readOnly />
@@ -532,7 +548,13 @@ export default function DailyTradePage() {
           <span className="font-semibold">
             {formatCurrency(grandTotal)}
           </span>
-          {stockFilled ? ' (buyer + stock)' : ' (buyer only — fill stock bags to add stock amount)'}
+          {stockFilled
+            ? isUrdu
+              ? ' (خریدار + اسٹاک)'
+              : ' (buyer + stock)'
+            : isUrdu
+              ? ' (صرف خریدار — اسٹاک بوری بھرنے سے اسٹاک رقم شامل ہوگی)'
+              : ' (buyer only — fill stock bags to add stock amount)'}
           {product ? ` · ${product.name}` : ''}
         </div>
       </div>
@@ -600,7 +622,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Invoice</th>
                   <th className="px-3 py-2">Dheri</th>
                   <th className="px-3 py-2">Farmer</th>
-                  <th className="px-3 py-2">Bags</th>
+                  <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Bills</th>
                 </tr>

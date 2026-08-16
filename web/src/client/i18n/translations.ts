@@ -84,6 +84,13 @@ export const translations = {
     allRights: 'All rights reserved.',
     goBack: 'Back',
     loginHero: 'Professional grain trading management with real-time stock, intelligent pricing, and complete business records.',
+    bags: 'Bags',
+    bag: 'bag',
+    numberOfBags: 'Number of bags',
+    noOfBags: 'No. of bags',
+    extraBag: 'Extra bag',
+    weightPerBag: 'Weight per bag (kg)',
+    qtyOfOneBag: 'Qty of one bag (kg)',
   },
   ur: {
     brandName: 'رحمانی',
@@ -168,6 +175,13 @@ export const translations = {
     allRights: 'جملہ حقوق محفوظ ہیں۔',
     goBack: 'واپس',
     loginHero: 'ریئل ٹائم اسٹاک، ذہین قیمتوں اور مکمل کاروباری ریکارڈ کے ساتھ پیشہ ورانہ اناج تجارت کا نظام۔',
+    bags: 'بوریاں',
+    bag: 'بوری',
+    numberOfBags: 'بوریاں کی تعداد',
+    noOfBags: 'بوریاں کی تعداد',
+    extraBag: 'اضافی بوری',
+    weightPerBag: 'ایک بوری کا وزن (کلو)',
+    qtyOfOneBag: 'ایک بوری کا وزن (کلو)',
   },
 } as const
 

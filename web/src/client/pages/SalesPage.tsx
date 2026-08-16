@@ -13,6 +13,7 @@ import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { buyerApi, dheriApi, farmerApi, saleApi, settingsApi, stockApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Dheri, Farmer, Product, Sale, SaleItem, StockItem } from '../types'
 
 const emptyItem = (): SaleItem => ({
@@ -25,6 +26,7 @@ const emptyItem = (): SaleItem => ({
 })
 
 export default function SalesPage() {
+  const { t } = useLanguage()
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -162,7 +164,7 @@ export default function SalesPage() {
                   <th className="px-4 py-3 font-medium">Invoice</th>
                   <th className="px-4 py-3 font-medium">Buyer</th>
                   <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Bags</th>
+                  <th className="px-4 py-3 font-medium">{t('bags')}</th>
                   <th className="px-4 py-3 font-medium">Amount</th>
                   <th className="px-4 py-3 font-medium">Paid</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -243,7 +245,7 @@ export default function SalesPage() {
                       </option>
                     ))}
                   </Select>
-                  <Input label="Bags" type="number" min="1" value={String(item.numberOfBags)} onChange={(e) => updateItem(index, { numberOfBags: parseInt(e.target.value) || 0 })} />
+                  <Input label={t('bags')} type="number" min="1" value={String(item.numberOfBags)} onChange={(e) => updateItem(index, { numberOfBags: parseInt(e.target.value) || 0 })} />
                   <Input label="Rate / 40kg" type="number" min="0" value={String(item.rate)} onChange={(e) => updateItem(index, { rate: parseFloat(e.target.value) || 0 })} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">

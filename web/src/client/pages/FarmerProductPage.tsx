@@ -6,10 +6,11 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
+import { useLanguage } from '../context/LanguageContext'
+import { useVoicePageActions } from '../context/VoiceControlContext'
 import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
-import { useVoicePageActions } from '../context/VoiceControlContext'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -27,6 +28,7 @@ const emptyResult: PriceCalculationResult = {
 }
 
 export default function FarmerProductPage() {
+  const { t } = useLanguage()
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [dheris, setDheris] = useState<Dheri[]>([])
@@ -195,7 +197,7 @@ export default function FarmerProductPage() {
                   <th className="px-4 py-2">Dheri</th>
                   <th className="px-4 py-2">Farmer</th>
                   <th className="px-4 py-2">Product</th>
-                  <th className="px-4 py-2">Bags</th>
+                  <th className="px-4 py-2">{t('bags')}</th>
                   <th className="px-4 py-2">Weight</th>
                   <th className="px-4 py-2">Extra KG</th>
                   <th className="px-4 py-2">Rate</th>
@@ -257,8 +259,8 @@ export default function FarmerProductPage() {
               onChange={(e) => setDheriCode(e.target.value)}
               placeholder="e.g. 1, 2, 3…"
             />
-            <Input label="Number of Bags *" type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label="Weight per Bag (kg)" type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input
               label="Extra KG → Stock"
               type="number"

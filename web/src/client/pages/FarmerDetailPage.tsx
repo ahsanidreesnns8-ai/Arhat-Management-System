@@ -10,9 +10,11 @@ import PaymentModal from '../components/payments/PaymentModal'
 import { farmerApi, paymentApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
+import { useLanguage } from '../context/LanguageContext'
 import type { Dheri, Farmer, Payment, Truck } from '../types'
 
 export default function FarmerDetailPage() {
+  const { t } = useLanguage()
   const { id } = useParams()
   const farmerId = Number(id)
   const [farmer, setFarmer] = useState<Farmer | null>(null)
@@ -114,7 +116,7 @@ export default function FarmerDetailPage() {
         </div>
       </div>
 
-      <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', 'Bags', 'Farmer amount', 'Status']}>
+      <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', t('bags'), 'Farmer amount', 'Status']}>
         {dheris.map((d) => (
           <tr key={d.id}>
             <td className="px-4 py-2"><Link className="text-primary" to={`/dheris/${d.id}`}>{d.dheriId}</Link></td>

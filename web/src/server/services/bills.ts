@@ -266,6 +266,52 @@ th{
 </html>`
 }
 
+/** Work sack wording: Urdu uses بوری, never تھیلی. */
+function bagWord(urdu: boolean) {
+  return {
+    bag: urdu ? 'بوری' : 'Bag',
+    bags: urdu ? 'بوریاں' : 'Bags',
+    bagsKg: urdu ? 'بوری وزن' : 'Bags kg',
+    totals: urdu ? 'کل' : 'Totals',
+    farmerTitle: urdu
+      ? 'کسان بل / ادائیگی رسید (بوریاں + اسٹاک)'
+      : 'Farmer Bill / Payment Receipt (Bags + Extra KG Stock)',
+    farmerCols: urdu
+      ? [
+          'تاریخ',
+          'ڈھیری',
+          'پروڈکٹ',
+          'بوریاں',
+          'بوری وزن',
+          'اضافی کلو',
+          'کل وزن',
+          'ریٹ/40کلو',
+          'مجموعی',
+          'کمیشن',
+          'قابل ادائیگی',
+        ]
+      : [
+          'Date',
+          'Dheri',
+          'Product',
+          'Bags',
+          'Bags kg',
+          'Extra KG',
+          'Total kg',
+          'Rate/40kg',
+          'Gross',
+          'Commission',
+          'Payable',
+        ],
+    buyerCols: urdu
+      ? ['تاریخ فروخت', 'انوائس', 'پروڈکٹ', 'ڈھیری', 'ڈھیری تاریخ', 'بوریاں', 'وزن', 'ریٹ/40کلو', 'رقم']
+      : ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+    saleCols: urdu
+      ? ['تاریخ', 'پارٹی', 'پروڈکٹ', 'ڈھیری', 'ڈھیری تاریخ', 'بوریاں', 'وزن', 'ریٹ/40کلو', 'رقم']
+      : ['Date', 'Party', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+  }
+}
+
 function table(headers: string[], rows: string[][], footer?: string[]) {
   return `<table><thead><tr>${headers.map((item) => `<th>${escape(item)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((item) => `<td>${escape(item)}</td>`).join('')}</tr>`).join('')}</tbody>${footer ? `<tfoot><tr class="totals">${footer.map((item) => `<td>${escape(item)}</td>`).join('')}</tr></tfoot>` : ''}</table>`
 }
@@ -317,6 +363,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   if (!farmer) throw new Error('Farmer not found')
 
   const urdu = lang === 'ur'
+  const w = bagWord(urdu)
   const lines = farmer.dheris.map((item) => {
     const bagsWeight = item.numberOfBags * item.weightPerBag.toNumber()
     const extraKg = item.partialBagWeight.toNumber()
@@ -435,41 +482,13 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   })
 
   return page(
-    urdu
-      ? 'کسان بل / ادائیگی رسید (تھیلیاں + اسٹاک)'
-      : 'Farmer Bill / Payment Receipt (Bags + Extra KG Stock)',
+    w.farmerTitle,
     partyHtml,
     table(
-      urdu
-        ? [
-            'تاریخ',
-            'ڈھیری',
-            'پروڈکٹ',
-            'تھیلیاں',
-            'تھیلی وزن',
-            'اضافی کلو',
-            'کل وزن',
-            'ریٹ/40کلو',
-            'مجموعی',
-            'کمیشن',
-            'قابل ادائیگی',
-          ]
-        : [
-            'Date',
-            'Dheri',
-            'Product',
-            'Bags',
-            'Bags kg',
-            'Extra KG',
-            'Total kg',
-            'Rate/40kg',
-            'Gross',
-            'Commission',
-            'Payable',
-          ],
+      w.farmerCols,
       rows,
       [
-        urdu ? 'کل' : 'Totals',
+        w.totals,
         '',
         '',
         String(bags),
@@ -505,6 +524,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   })
   if (!buyer) throw new Error('Buyer not found')
   const urdu = lang === 'ur'
+  const w = bagWord(urdu)
   const flat = buyer.sales.flatMap((sale) =>
     sale.items.map((item) => ({
       saleDate: sale.saleDate.toISOString().slice(0, 10),
@@ -572,10 +592,10 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
       urdu,
     }),
     table(
-      ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+      w.buyerCols,
       rows,
       [
-        'Totals',
+        w.totals,
         '',
         '',
         '',
@@ -603,6 +623,7 @@ export async function buyerBillSelected(
   })
   if (!buyer) throw new Error('Buyer not found')
   const urdu = lang === 'ur'
+  const w = bagWord(urdu)
 
   const items = await prisma.saleItem.findMany({
     where: {
@@ -644,14 +665,18 @@ export async function buyerBillSelected(
     const amount = sum(chunk.map((x) => x.amount.toNumber()))
     const title =
       chunks.length > 1
-        ? `Buyer Bill — Part ${index + 1} of ${chunks.length}`
-        : 'Buyer Bill / Selected Lines'
+        ? urdu
+          ? `خریدار بل — حصہ ${index + 1} از ${chunks.length}`
+          : `Buyer Bill — Part ${index + 1} of ${chunks.length}`
+        : urdu
+          ? 'خریدار بل / منتخب قطاریں'
+          : 'Buyer Bill / Selected Lines'
     return `<div class="bill-block">
       <h3 class="section-title" style="margin-top:0">${escape(title)}</h3>
       ${table(
-        ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+        w.buyerCols,
         rows,
-        ['Totals', '', '', '', '', String(bags), money(weight), '', money(amount)],
+        [w.totals, '', '', '', '', String(bags), money(weight), '', money(amount)],
       )}
     </div>`
   })
@@ -687,6 +712,7 @@ export async function saleBill(
   })
   if (!sale) throw new Error('Sale not found')
   const urdu = lang === 'ur'
+  const w = bagWord(urdu)
   const items =
     party === 'farmer'
       ? sale.items.filter((item) => item.sourceType === 'FARMER')
@@ -710,10 +736,16 @@ export async function saleBill(
       : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div></div></div>`
 
   return page(
-    party === 'farmer' ? 'Farmer Sale Bill' : 'Buyer Sale Bill',
+    party === 'farmer'
+      ? urdu
+        ? 'کسان فروخت بل'
+        : 'Farmer Sale Bill'
+      : urdu
+        ? 'خریدار فروخت بل'
+        : 'Buyer Sale Bill',
     partyHtml,
     table(
-      ['Date', 'Party', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+      w.saleCols,
       items.map((item) => [
         sale.saleDate.toISOString().slice(0, 10),
         party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
@@ -726,7 +758,7 @@ export async function saleBill(
         money(item.rate),
         money(item.amount),
       ]),
-      ['Totals', '', '', '', '', String(bags), money(weight), '', money(amount)],
+      [w.totals, '', '', '', '', String(bags), money(weight), '', money(amount)],
     ),
     urdu,
   )
