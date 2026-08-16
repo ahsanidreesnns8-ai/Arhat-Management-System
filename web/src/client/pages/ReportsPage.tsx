@@ -51,7 +51,6 @@ const reports: { key: ReportKey; title: string; titleUr: string; description: st
 
 export default function ReportsPage() {
   const { companyName } = useBusiness()
-  const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -264,6 +263,7 @@ function PreviewMetrics({ reportKey, data }: { reportKey: ReportKey; data: Repor
 }
 
 function PreviewTable({ reportKey, data }: { reportKey: ReportKey; data: ReportSummary }) {
+  const { t } = useLanguage()
   const lines = data.lines || []
   if (reportKey === 'profit') return null
   if (!lines.length) {

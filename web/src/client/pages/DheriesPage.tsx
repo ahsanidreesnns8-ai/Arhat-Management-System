@@ -56,7 +56,7 @@ export default function DheriesPage() {
         link: `/dheris/${d.id}`,
         reason: 'previous dheri for this farmer',
       }))
-  }, [form.farmerId, dheris])
+  }, [form.farmerId, dheris, t])
 
   const handleCreate = async () => {
     if (!form.farmerId || !form.productId) {
