@@ -66,6 +66,7 @@ async function main() {
       dheriIds: [] as bigint[],
       saleIds: [] as bigint[],
     }
+    let stockQtyBefore: Array<{ id: bigint; quantity: unknown }> = []
     try {
       const paddy = await prisma.product.findFirst({
         where: { productCode: 'RCE-001', deleted: false },
@@ -125,6 +126,7 @@ async function main() {
 
       const statsBefore = await getDashboardStats()
       const extraBefore = statsBefore.extraKgStock || 0
+      stockQtyBefore = await prisma.stock.findMany({ select: { id: true, quantity: true } })
 
       const sold = await markDeskSold({
         farmerId: farmer.id,
@@ -181,6 +183,12 @@ async function main() {
         lots: statsAfter.stockLots?.length,
       })
     } finally {
+      for (const row of stockQtyBefore) {
+        await prisma.stock.update({
+          where: { id: row.id },
+          data: { quantity: row.quantity as never },
+        })
+      }
       await cleanup(ids)
       console.log('demo workspace cleanup done')
     }
