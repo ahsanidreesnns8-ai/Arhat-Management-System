@@ -29,7 +29,28 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
-        // Cache static assets aggressively
+        source: '/login',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+          { key: 'Clear-Site-Data', value: '"cache"' },
+        ],
+      },
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        source: '/service-worker.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        // Cache hashed bundles aggressively
         source: '/_next/static/(.*)',
         headers: [
           {

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useLanguage } from '../../context/LanguageContext'
 import { useBusiness } from '../../context/BusinessContext'
-import { RTC_LOGO_PATH, resolveRtcLogo } from '@/lib/branding'
+import RtcMark from './RtcMark'
 
 interface RhmaniLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'hero'
@@ -28,37 +27,15 @@ export default function RhmaniLogo({
   className = '',
 }: RhmaniLogoProps) {
   const { isUrdu } = useLanguage()
-  const { settings, companyName } = useBusiness()
+  const { companyName } = useBusiness()
   const s = sizeMap[size]
-  const src = useMemo(
-    () => resolveRtcLogo(settings?.companyLogoUrl),
-    [settings?.companyLogoUrl],
-  )
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
 
   const nameColor = light ? '#FFFFFF' : '#002D62'
   const tagColor = light ? '#E8C87A' : '#C5A059'
   const displayName = companyName || (isUrdu ? 'رحمانی' : 'REHMANI')
-  const alt = 'RTC'
 
-  const mark = failed ? (
-    <div
-      className={`${variant === 'full' ? s.full : 'w-full h-full'} flex items-center justify-center rounded-full bg-[#002D62] text-[#C5A059] font-bold tracking-[0.12em]`}
-      style={{ fontFamily: 'Georgia, serif' }}
-    >
-      RTC
-    </div>
-  ) : (
-    <img
-      src={src || RTC_LOGO_PATH}
-      alt={alt}
-      className={variant === 'full' ? `${s.full} h-auto object-contain drop-shadow-md` : 'w-full h-full object-contain'}
-      draggable={false}
-      onError={() => setFailed(true)}
-    />
+  const mark = (
+    <RtcMark className={variant === 'full' ? `${s.full} h-auto drop-shadow-md` : 'w-full h-full'} />
   )
 
   if (variant === 'full') {

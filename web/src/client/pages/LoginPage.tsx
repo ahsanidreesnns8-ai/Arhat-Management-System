@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import CopyrightLine from '../components/brand/CopyrightLine'
-import { RTC_LOGO_PATH } from '@/lib/branding'
+import RtcMark from '../components/brand/RtcMark'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -132,13 +132,8 @@ export default function LoginPage() {
         transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="flex flex-col items-center mb-6">
-          <div className="rounded-2xl bg-white px-4 py-2.5 mb-4 shadow-md">
-            <img
-              src={RTC_LOGO_PATH}
-              alt="RTC"
-              className="w-24 h-24 object-contain"
-              draggable={false}
-            />
+          <div className="rounded-full bg-white p-1.5 mb-4 shadow-md" data-brand="rtc-mark">
+            <RtcMark className="w-24 h-24" />
           </div>
           <h1 className={`login-heading text-2xl font-extrabold tracking-[0.04em] text-center ${isUrdu ? 'font-urdu' : ''}`}>
             {t('welcomeBack')}

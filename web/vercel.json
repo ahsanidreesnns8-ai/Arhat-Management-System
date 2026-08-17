@@ -3,6 +3,22 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "regions": ["iad1"],
+  "headers": [
+    {
+      "source": "/login",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Clear-Site-Data", "value": "\"cache\"" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ],
   "crons": [
     {
       "path": "/api/health",

@@ -17,8 +17,16 @@ export function middleware(request: NextRequest) {
     response.headers.set(key, value)
   }
 
-  // Block obvious probe paths early
   const path = request.nextUrl.pathname.toLowerCase()
+
+  // Login must never be served from an old cached SPA shell (wheat crest + old copy).
+  if (path === '/login') {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Clear-Site-Data', '"cache"')
+  }
+
+  // Block obvious probe paths early
   if (
     path.includes('wp-admin') ||
     path.includes('phpmyadmin') ||
