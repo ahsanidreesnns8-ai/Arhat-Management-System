@@ -39,9 +39,10 @@ export default function RhmaniLogo({
     setFailed(false)
   }, [src])
 
-  const alt = 'RTC'
   const nameColor = light ? '#FFFFFF' : '#002D62'
   const tagColor = light ? '#E8C87A' : '#C5A059'
+  const displayName = companyName || (isUrdu ? 'رحمانی' : 'REHMANI')
+  const alt = 'RTC'
 
   const mark = failed ? (
     <div
@@ -74,7 +75,7 @@ export default function RhmaniLogo({
               className={`mt-2 ${s.text} font-bold leading-tight ${isUrdu ? 'font-urdu' : 'tracking-[0.08em]'}`}
               style={{ color: nameColor }}
             >
-              {isUrdu ? 'رحمانی' : 'REHMANI'}
+              {isUrdu ? 'رحمانی' : displayName}
             </h1>
             <p
               className={`${s.tag} font-semibold uppercase ${isUrdu ? 'font-urdu normal-case' : 'tracking-[0.18em]'}`}
@@ -109,7 +110,7 @@ export default function RhmaniLogo({
             className={`${s.text} font-bold leading-tight truncate ${isUrdu ? 'font-urdu' : 'tracking-[0.04em]'}`}
             style={{ color: nameColor }}
           >
-            {isUrdu ? 'رحمانی' : 'REHMANI'}
+            {isUrdu ? 'رحمانی' : displayName}
           </h1>
           <p
             className={`${s.tag} font-semibold uppercase truncate ${isUrdu ? 'font-urdu normal-case' : 'tracking-[0.18em]'}`}

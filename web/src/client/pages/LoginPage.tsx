@@ -133,7 +133,7 @@ export default function LoginPage() {
       >
         <div className="flex flex-col items-center mb-6">
           <div className="rounded-2xl bg-white px-4 py-2.5 mb-4 shadow-md">
-            <RhmaniLogo variant="full" size="md" />
+            <RhmaniLogo variant="full" size="md" showText={false} />
           </div>
           <h1 className={`login-heading text-2xl font-extrabold tracking-[0.04em] text-center ${isUrdu ? 'font-urdu' : ''}`}>
             {t('welcomeBack')}

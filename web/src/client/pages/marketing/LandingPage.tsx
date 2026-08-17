@@ -9,6 +9,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useBusiness } from '../../context/BusinessContext'
 import { fadeUp, staggerContainer, staggerItem } from '../../utils/motion'
 import RhmaniLogo from '../../components/brand/RhmaniLogo'
+import CopyrightLine from '../../components/brand/CopyrightLine'
 import { GHALLA_MANDI_EN, GHALLA_MANDI_UR } from '@/lib/branding'
 
 /** Each module gets a fixed place in the 3×4 grid */
@@ -49,7 +50,7 @@ export default function LandingPage() {
               isUrdu ? 'font-urdu tracking-normal' : ''
             }`}
           >
-            {isUrdu ? 'رحمانی ٹریڈنگ' : 'REHMANI TRADING'}
+            {isUrdu ? 'رحمانی ٹریڈنگ' : companyName || 'REHMANI TRADING'}
           </h1>
           <p className={`text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C5A059] ${isUrdu ? 'font-urdu tracking-normal' : ''}`}>
             {isUrdu ? GHALLA_MANDI_UR : GHALLA_MANDI_EN}
@@ -135,15 +136,7 @@ export default function LandingPage() {
             {isUrdu ? 'ایپ کھولیں' : 'Open App'}
             <ArrowRight className={`h-4 w-4 ${isUrdu ? 'rotate-180' : ''}`} />
           </Link>
-          <p
-            className={`text-center text-[10px] text-slate-400 ${
-              isUrdu ? 'font-urdu' : ''
-            }`}
-          >
-            {companyName}
-            {' · '}
-            {isUrdu ? 'عملہ لاگ اِن درکار' : 'Staff login required'}
-          </p>
+          <CopyrightLine className="text-[10px]" />
         </div>
       </motion.div>
     </div>

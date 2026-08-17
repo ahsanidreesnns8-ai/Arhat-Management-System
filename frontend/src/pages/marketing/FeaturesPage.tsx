@@ -25,7 +25,7 @@ const groups = [
       { icon: Users, en: 'Farmers & Buyers', ur: 'کسان و خریدار', dEn: 'Profiles, CNIC, phone, city, notes, duplicates check.', dUr: 'پروفائل، شناختی کارڈ، فون، شہر، نوٹس۔' },
       { icon: Wallet, en: 'Payments', ur: 'ادائیگیاں', dEn: 'Pay / receive, update, settle remaining balance.', dUr: 'ادا / وصول، اپڈیٹ، بقایا سیٹل۔' },
       { icon: Receipt, en: 'Sales Invoices', ur: 'سیلز انوائس', dEn: 'Mixed-source lines and printable bills.', dUr: 'مخلوط سورس لائنز اور قابلِ پرنٹ بل۔' },
-      { icon: FileText, en: 'Bilingual Bills', ur: 'دو زبانی بل', dEn: 'EN/UR receipts with logo & Gala Mandi footer.', dUr: 'لوگو اور گالا منڈی فوٹر۔' },
+      { icon: FileText, en: 'Bilingual Bills', ur: 'دو زبانی بل', dEn: 'EN/UR receipts with logo & Ghalla Mandi footer.', dUr: 'لوگو اور غلّہ منڈی فوٹر۔' },
     ],
   },
   {

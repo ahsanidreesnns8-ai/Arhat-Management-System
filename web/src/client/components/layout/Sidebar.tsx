@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import RhmaniLogo from '../brand/RhmaniLogo'
+import CopyrightLine from '../brand/CopyrightLine'
 import { navItem, staggerContainer } from '../../utils/motion'
 import type { TranslationKey } from '../../i18n/translations'
 
@@ -104,6 +105,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   </motion.div>
                 ))}
             </motion.nav>
+            <div className="px-3 py-3 border-t border-white/10">
+              <CopyrightLine light className="text-[10px] text-slate-400" />
+            </div>
           </div>
         </motion.aside>
       )}

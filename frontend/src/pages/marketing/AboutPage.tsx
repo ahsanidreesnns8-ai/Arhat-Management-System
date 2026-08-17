@@ -14,8 +14,8 @@ export default function AboutPage() {
           <h1 className={`mkt-h1 mt-3 ${isUrdu ? 'font-urdu' : ''}`}>{companyName}</h1>
           <p className={`mt-3 text-slate-600 ${isUrdu ? 'font-urdu' : ''}`}>
             {isUrdu
-              ? 'گالا منڈی ننکانہ صاحب میں اناج تجارت اور آڑھت کے لیے جدید ڈیجیٹل پلیٹ فارم۔'
-              : 'A modern digital platform for grain trading and arhat at Gala Mandi Nankana Sahib.'}
+              ? 'غلّہ منڈی ننکانہ صاحب میں اناج تجارت اور آڑھت کے لیے جدید ڈیجیٹل پلیٹ فارم۔'
+              : 'A modern digital platform for grain trading and arhat at Ghalla Mandi Nankana Sahib.'}
           </p>
         </div>
       </section>
@@ -54,7 +54,7 @@ export default function AboutPage() {
               <div>
                 <dt className="text-slate-500">{isUrdu ? 'مقام' : 'Location'}</dt>
                 <dd className="font-semibold text-slate-900">
-                  {settings?.address || (isUrdu ? 'گالا منڈی، ننکانہ صاحب' : 'Gala Mandi, Nankana Sahib')}
+                  {settings?.address || (isUrdu ? 'غلّہ منڈی، ننکانہ صاحب' : 'Ghalla Mandi, Nankana Sahib')}
                 </dd>
               </div>
               <div>
