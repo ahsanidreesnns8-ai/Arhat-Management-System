@@ -22,8 +22,6 @@ export function copyrightText(
   return `© ${year} ${company} · ${place} · ${rights}`
 }
 
-export function resolveRtcLogo(custom?: string | null) {
-  const value = String(custom || '').trim()
-  if (value && !/rehmani-(logo|mark)\.svg$/i.test(value)) return value
+export function resolveRtcLogo(_custom?: string | null) {
   return RTC_LOGO_PATH
 }
