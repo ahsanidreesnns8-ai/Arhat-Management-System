@@ -421,3 +421,36 @@ export interface ReportSummary {
 }
 
 export type ThemeMode = 'light' | 'dark' | 'system'
+
+export interface RegisterParty {
+  id: number
+  kind: string
+  name: string
+  address?: string | null
+  notes?: string | null
+  createdAt: string
+}
+
+export interface RegisterEntry {
+  id: number
+  kind: string
+  amount: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+  partyId?: number | null
+  farmerId?: number | null
+  paymentId?: number | null
+  partyName?: string | null
+  partyAddress?: string | null
+  farmerCode?: string | null
+}
+
+export interface ZakatSummary {
+  allTime: number
+  last12Months: number
+  yearStart: string
+  entries: RegisterEntry[]
+}

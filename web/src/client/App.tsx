@@ -38,6 +38,7 @@ import PaymentsPage from './pages/PaymentsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import OwnerPage from './pages/OwnerPage'
+import ArhatRegisterPage from './pages/ArhatRegisterPage'
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -95,6 +96,10 @@ function AppRoutes() {
         <Route path="records" element={<RecordsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route
+          path="arhat-register"
+          element={isOwner ? <ArhatRegisterPage /> : <Navigate to="/dashboard" replace />}
+        />
         <Route path="settings" element={<SettingsPage />} />
         <Route
           path="owner"

@@ -22,6 +22,8 @@ export type PaymentInput = {
   paymentDate?: string | Date | null
   referenceNumber?: string | null
   notes?: string | null
+  /** Farmer payout may exceed current payable (advance / credit). */
+  allowAdvance?: boolean
 }
 
 export function paymentDto(row: PaymentRow) {
@@ -163,7 +165,7 @@ export async function recordPayment(input: PaymentInput, createdById?: bigint) {
       })
       if (!farmer) throw new Error('Farmer not found')
       const outstanding = d(farmer.outstandingBalance.toString())
-      if (amount.gt(outstanding)) {
+      if (!input.allowAdvance && amount.gt(outstanding)) {
         throw new Error(
           `Amount exceeds farmer outstanding balance of PKR ${outstanding}`,
         )

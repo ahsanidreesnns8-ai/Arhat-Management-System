@@ -67,11 +67,19 @@ function formatBillDates() {
 async function page(title: string, partyHtml: string, body: string, urdu: boolean) {
   const settings = await prisma.businessSettings.findFirst()
   const dates = formatBillDates()
+  const company = settings?.companyName ?? 'Rehmani Trading Company'
+  const rtcMark = `<div class="rtc-mark" aria-label="RTC">
+    <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" stroke-width="3.5"/>
+      <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" stroke-width="0.8" opacity="0.55"/>
+      <text x="36" y="43" text-anchor="middle" fill="#C5A059" font-size="16" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1">RTC</text>
+    </svg>
+  </div>`
   return `<!doctype html>
 <html lang="${urdu ? 'ur' : 'en'}" dir="${urdu ? 'rtl' : 'ltr'}">
 <head>
 <meta charset="utf-8">
-<title>${escape(title)}</title>
+<title>${escape(title || company)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
@@ -97,6 +105,11 @@ body{
   border-bottom:2px solid var(--gold);
   padding-bottom:14px;
   margin-bottom:18px;
+}
+.rtc-mark{
+  width:76px;
+  height:76px;
+  margin:0 auto 10px;
 }
 .brand h1{
   margin:0;
@@ -238,6 +251,13 @@ th{
 }
 .payment-totals .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 .payment-totals .value{font-size:15px;font-weight:700;margin-top:4px;color:var(--navy)}
+.paid-note{
+  margin-top:6px;
+  font-size:12px;
+  font-weight:500;
+  color:#334155;
+  line-height:1.45;
+}
 .bill-block{page-break-inside:avoid;margin-bottom:48px;padding-bottom:24px;border-bottom:1px dashed #94a3b8}
 .bill-block:last-child{border-bottom:none;margin-bottom:0}
 @media print{
@@ -250,8 +270,9 @@ th{
 <body>
 <div class="sheet">
   <div class="brand">
-    <h1>${escape(settings?.companyName ?? 'Rehmani Trading Company')}</h1>
-    <h2 class="${urdu ? 'urdu' : ''}">${escape(title)}</h2>
+    ${rtcMark}
+    <h1>${escape(company)}</h1>
+    ${title ? `<h2 class="${urdu ? 'urdu' : ''}">${escape(title)}</h2>` : ''}
   </div>
   <div class="dates">
     <span><strong>${urdu ? 'دن' : 'Day'}</strong> ${escape(urdu ? dates.dayUr : dates.dayEn)}</span>
@@ -273,43 +294,52 @@ function bagWord(urdu: boolean) {
     bags: urdu ? 'بوریاں' : 'Bags',
     bagsKg: urdu ? 'بوری وزن' : 'Bags kg',
     totals: urdu ? 'کل' : 'Totals',
-    farmerTitle: urdu
-      ? 'کسان بل / ادائیگی رسید (بوریاں + اسٹاک)'
-      : 'Farmer Bill / Payment Receipt (Bags + Extra KG Stock)',
+    farmerTitle: '',
     farmerCols: urdu
       ? [
-          'تاریخ',
-          'ڈھیری',
           'پروڈکٹ',
           'بوریاں',
-          'بوری وزن',
+          'ایک بوری مقدار',
           'اضافی کلو',
           'کل وزن',
+          'کل من',
           'ریٹ/40کلو',
           'مجموعی',
           'کمیشن',
           'قابل ادائیگی',
         ]
       : [
-          'Date',
-          'Dheri',
           'Product',
           'Bags',
-          'Bags kg',
+          'Qty of one bag',
           'Extra KG',
           'Total kg',
+          'Total man',
           'Rate/40kg',
           'Gross',
           'Commission',
           'Payable',
         ],
     buyerCols: urdu
-      ? ['تاریخ فروخت', 'انوائس', 'پروڈکٹ', 'ڈھیری', 'ڈھیری تاریخ', 'بوریاں', 'وزن', 'ریٹ/40کلو', 'رقم']
-      : ['Sale date', 'Invoice', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+      ? ['انوائس', 'پروڈکٹ', 'بوریاں', 'ایک بوری مقدار', 'وزن', 'ریٹ/40کلو', 'رقم']
+      : ['Invoice', 'Product', 'Bags', 'Qty of one bag', 'Weight', 'Rate/40kg', 'Amount'],
     saleCols: urdu
-      ? ['تاریخ', 'پارٹی', 'پروڈکٹ', 'ڈھیری', 'ڈھیری تاریخ', 'بوریاں', 'وزن', 'ریٹ/40کلو', 'رقم']
-      : ['Date', 'Party', 'Product', 'Dheri', 'Dheri date', 'Bags', 'Weight', 'Rate/40kg', 'Amount'],
+      ? ['پارٹی', 'پروڈکٹ', 'بوریاں', 'ایک بوری مقدار', 'وزن', 'ریٹ/40کلو', 'رقم']
+      : ['Party', 'Product', 'Bags', 'Qty of one bag', 'Weight', 'Rate/40kg', 'Amount'],
   }
+}
+
+function qtyLabel(value: number) {
+  if (!Number.isFinite(value)) return '0'
+  if (Number.isInteger(value)) return String(value)
+  return String(Number(value.toFixed(2)))
+}
+
+/** 140.34 means 140 man and 34 extra kg (decimal is extra kg, not a fraction of a man). */
+export function formatMann(bagsKg: number, extraKg: number) {
+  const whole = Math.round(bagsKg / 40)
+  const extra = Math.max(0, Math.round(extraKg))
+  return `${whole}.${String(extra).padStart(2, '0')}`
 }
 
 function table(headers: string[], rows: string[][], footer?: string[]) {
@@ -349,7 +379,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       dheris: {
         where: { deleted: false },
         include: { product: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'asc' },
       },
       payments: {
         orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
@@ -365,16 +395,17 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const urdu = lang === 'ur'
   const w = bagWord(urdu)
   const lines = farmer.dheris.map((item) => {
-    const bagsWeight = item.numberOfBags * item.weightPerBag.toNumber()
+    const bagQty = item.weightPerBag.toNumber()
+    const bagsWeight = item.numberOfBags * bagQty
     const extraKg = item.partialBagWeight.toNumber()
     return {
-      date: item.createdAt.toISOString().slice(0, 10),
-      dheriId: item.dheriId,
       product: item.product.name,
       bags: item.numberOfBags,
+      bagQty,
       bagsWeight,
       extraKg,
       totalWeight: item.totalWeight.toNumber(),
+      mann: formatMann(bagsWeight, extraKg),
       rate: item.marketRate.toNumber(),
       gross: item.totalPrice.toNumber(),
       commission: item.commissionAmount.toNumber(),
@@ -383,13 +414,12 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   })
 
   const rows = lines.map((item) => [
-    item.date,
-    item.dheriId,
     item.product,
     String(item.bags),
-    money(item.bagsWeight),
-    money(item.extraKg),
+    qtyLabel(item.bagQty),
+    qtyLabel(item.extraKg),
     money(item.totalWeight),
+    item.mann,
     money(item.rate),
     money(item.gross),
     money(item.commission),
@@ -404,6 +434,9 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const commission = sum(lines.map((x) => x.commission))
   const payable = sum(lines.map((x) => x.payable))
   const paid = farmer.payments.reduce((s, item) => s + item.amount.toNumber(), 0)
+  const paidNotes = farmer.payments
+    .map((p) => String(p.notes ?? '').trim())
+    .filter(Boolean)
 
   // Extra KG stock has no dheri column — batches are tracked by date/product only.
   const stockRows = farmer.stockLots.map((lot) => [
@@ -415,12 +448,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   ])
   const stockOriginal = sum(farmer.stockLots.map((x) => x.originalKg.toNumber()))
   const stockRemaining = sum(farmer.stockLots.map((x) => x.remainingKg.toNumber()))
-
-  const summary = `<div class="summary">
-    <div><div class="label">${urdu ? 'کل اضافی کلو (ہر قطار کا مجموعہ)' : 'Total Extra KG (sum of rows)'}</div><div class="value">${money(extraKg)} kg</div></div>
-    <div><div class="label">${urdu ? 'کل مجموعی' : 'Total gross'}</div><div class="value">PKR ${money(gross)}</div></div>
-    <div><div class="label">${urdu ? 'کسان قابل ادائیگی' : 'Farmer payable'}</div><div class="value">PKR ${money(payable)}</div></div>
-  </div>`
 
   const stockSection =
     farmer.stockLots.length > 0
@@ -445,9 +472,15 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     p.paymentDate.toISOString().slice(0, 10),
     money(p.amount),
     String(p.paymentMethod || 'CASH'),
-    p.referenceNumber || '—',
-    String(p.status || 'APPROVED'),
+    p.referenceNumber === 'ADVANCE' ? (urdu ? 'ایڈوانس' : 'Advance') : (p.referenceNumber || '—'),
+    String(p.notes || '—'),
   ])
+
+  const latestPaidNote = paidNotes.join(' · ')
+  const remaining = farmer.outstandingBalance.toNumber()
+  const remainingLabel = remaining < 0
+    ? (urdu ? 'ایڈوانس باقی' : 'Advance credit')
+    : (urdu ? 'باقی رقم' : 'Remaining balance')
 
   const paymentBox = `<div class="payment-box">
     <div class="head ${urdu ? 'urdu' : ''}">${urdu ? 'ادائیگیوں کا ریکارڈ (حالیہ)' : 'Payment record (recent)'}</div>
@@ -457,15 +490,19 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
           ? `<p style="margin:0;color:#64748b">${urdu ? 'ابھی کوئی ادائیگی درج نہیں۔' : 'No payments recorded yet.'}</p>`
           : table(
               urdu
-                ? ['تاریخ', 'رقم', 'طریقہ', 'حوالہ', 'حالت']
-                : ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Status'],
+                ? ['تاریخ', 'رقم', 'طریقہ', 'حوالہ', 'نوٹ']
+                : ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Note'],
               paymentRows,
             )
       }
       <div class="payment-totals">
         <div><div class="label">${urdu ? 'کل قابل ادائیگی' : 'Total payable'}</div><div class="value">PKR ${money(payable)}</div></div>
-        <div><div class="label">${urdu ? 'ادا شدہ (کل)' : 'Total paid'}</div><div class="value">PKR ${money(paid)}</div></div>
-        <div><div class="label">${urdu ? 'باقی رقم' : 'Remaining balance'}</div><div class="value">PKR ${money(farmer.outstandingBalance)}</div></div>
+        <div>
+          <div class="label">${urdu ? 'ادا شدہ (کل)' : 'Total paid'}</div>
+          <div class="value">PKR ${money(paid)}</div>
+          ${latestPaidNote ? `<div class="paid-note">${escape(latestPaidNote)}</div>` : ''}
+        </div>
+        <div><div class="label">${remainingLabel}</div><div class="value">PKR ${money(Math.abs(remaining))}${remaining < 0 ? (urdu ? ' (کریڈٹ)' : ' (credit)') : ''}</div></div>
       </div>
     </div>
   </div>`
@@ -482,26 +519,24 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   })
 
   return page(
-    w.farmerTitle,
+    '',
     partyHtml,
     table(
       w.farmerCols,
       rows,
       [
         w.totals,
-        '',
-        '',
         String(bags),
-        money(bagsWeight),
-        money(extraKg),
+        '',
+        qtyLabel(extraKg),
         money(weight),
+        formatMann(bagsWeight, extraKg),
         '',
         money(gross),
         money(commission),
         money(payable),
       ],
     ) +
-      summary +
       stockSection +
       paymentBox,
     urdu,
@@ -527,26 +562,20 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   const w = bagWord(urdu)
   const flat = buyer.sales.flatMap((sale) =>
     sale.items.map((item) => ({
-      saleDate: sale.saleDate.toISOString().slice(0, 10),
       invoice: sale.invoiceNumber,
       product: item.product.name,
-      dheri: item.dheri?.dheriId ?? '—',
-      dheriDate:
-        item.dheri?.createdAt?.toISOString().slice(0, 10) ??
-        sale.saleDate.toISOString().slice(0, 10),
       bags: item.numberOfBags,
+      bagQty: item.weightPerBag.toNumber(),
       weight: item.totalWeight.toNumber(),
       rate: item.rate.toNumber(),
       amount: item.amount.toNumber(),
     })),
   )
   const rows = flat.map((item) => [
-    item.saleDate,
     item.invoice,
     item.product,
-    item.dheri,
-    item.dheriDate,
     String(item.bags),
+    qtyLabel(item.bagQty),
     money(item.weight),
     money(item.rate),
     money(item.amount),
@@ -597,10 +626,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
       [
         w.totals,
         '',
-        '',
-        '',
-        '',
         String(sum(flat.map((x) => x.bags))),
+        '',
         money(sum(flat.map((x) => x.weight))),
         '',
         money(billed),
@@ -649,13 +676,10 @@ export async function buyerBillSelected(
 
   const sheets = chunks.map((chunk, index) => {
     const rows = chunk.map((item) => [
-      item.sale.saleDate.toISOString().slice(0, 10),
       item.sale.invoiceNumber,
       item.product.name,
-      item.dheri?.dheriId ?? (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—'),
-      item.dheri?.createdAt?.toISOString().slice(0, 10) ??
-        item.sale.saleDate.toISOString().slice(0, 10),
       String(item.numberOfBags),
+      qtyLabel(item.weightPerBag.toNumber()),
       money(item.totalWeight),
       money(item.rate),
       money(item.amount),
@@ -676,7 +700,7 @@ export async function buyerBillSelected(
       ${table(
         w.buyerCols,
         rows,
-        [w.totals, '', '', '', '', String(bags), money(weight), '', money(amount)],
+        [w.totals, '', String(bags), '', money(weight), '', money(amount)],
       )}
     </div>`
   })
@@ -747,19 +771,58 @@ export async function saleBill(
     table(
       w.saleCols,
       items.map((item) => [
-        sale.saleDate.toISOString().slice(0, 10),
         party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
         item.product.name,
-        item.dheri?.dheriId ?? (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—'),
-        item.dheri?.createdAt?.toISOString().slice(0, 10) ??
-          sale.saleDate.toISOString().slice(0, 10),
         String(item.numberOfBags),
+        qtyLabel(item.weightPerBag.toNumber()),
         money(item.totalWeight),
         money(item.rate),
         money(item.amount),
       ]),
-      [w.totals, '', '', '', '', String(bags), money(weight), '', money(amount)],
+      [w.totals, '', String(bags), '', money(weight), '', money(amount)],
     ),
     urdu,
   )
+}
+
+export async function registerEntryBill(id: number | bigint, lang = 'en') {
+  const entry = await prisma.registerEntry.findFirst({
+    where: { id: BigInt(id) },
+    include: { party: true, farmer: true },
+  })
+  if (!entry) throw new Error('Register entry not found')
+  const urdu = lang === 'ur'
+  const kind = entry.kind
+  const title =
+    kind === 'GIVING'
+      ? urdu ? 'دی گئی رقم' : 'Giving Amount'
+      : kind === 'RECEIVING'
+        ? urdu ? 'وصول شدہ رقم' : 'Receiving Amount'
+        : kind === 'ZAKAT'
+          ? urdu ? 'زکوٰۃ' : 'Zakat Amount'
+          : urdu ? 'کسان ایڈوانس' : 'Advance to Farmer'
+  const who =
+    entry.farmer?.name ||
+    entry.party?.name ||
+    (kind === 'ZAKAT' ? (urdu ? 'زکوٰۃ' : 'Zakat') : '—')
+  const address = entry.farmer?.address || entry.party?.address || ''
+  const dates = formatBillDates()
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(who)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'قسم' : 'Type'}</span><div class="value">${escape(title)}</div></div>
+      <div><span class="label">${urdu ? 'رقم' : 'Amount'}</span><div class="value">PKR ${money(entry.amount)}</div></div>
+      <div><span class="label">${urdu ? 'دن' : 'Day'}</span><div class="value">${escape(dates.dayEn)}</div></div>
+      <div><span class="label">${urdu ? 'تاریخ' : 'Date'}</span><div class="value">${escape(dates.dateEn)}</div></div>
+      <div><span class="label">${urdu ? 'وقت' : 'Time'}</span><div class="value">${escape(dates.timeEn)}</div></div>
+      ${address ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(address)}</div></div>` : ''}
+      ${entry.notes ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'نوٹ' : 'Note'}</span><div class="value">${dash(entry.notes)}</div></div>` : ''}
+    </div>
+  </div>`
+  const body = table(
+    urdu ? ['تفصیل', 'رقم'] : ['Particulars', 'Amount (PKR)'],
+    [[title, money(entry.amount)]],
+    [urdu ? 'کل' : 'Total', money(entry.amount)],
+  )
+  return page(title, partyHtml, body, urdu)
 }

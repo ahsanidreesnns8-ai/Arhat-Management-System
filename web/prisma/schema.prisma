@@ -191,6 +191,7 @@ model Farmer {
   payments           Payment[]
   saleItems          SaleItem[]
   stockLots          StockLot[]
+  registerEntries    RegisterEntry[]
 
   @@unique([workspace, farmerId])
   @@index([workspace])
@@ -519,4 +520,39 @@ model DailyTradeSession {
   @@index([workspace, status])
   @@index([workspace, sessionDate])
   @@map("daily_trade_sessions")
+}
+
+/// Cash-book person for Arhat Register giving / receiving
+model RegisterParty {
+  id        BigInt           @id @default(autoincrement())
+  workspace String           @default("live") @db.VarChar(20)
+  kind      String           @db.VarChar(20)
+  name      String           @db.VarChar(255)
+  address   String?
+  notes     String?
+  deleted   Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  entries   RegisterEntry[]
+
+  @@index([workspace, kind])
+  @@map("register_parties")
+}
+
+/// Giving, receiving, zakat, or farmer-advance ledger line
+model RegisterEntry {
+  id        BigInt         @id @default(autoincrement())
+  workspace String         @default("live") @db.VarChar(20)
+  kind      String         @db.VarChar(20)
+  partyId   BigInt?        @map("party_id")
+  farmerId  BigInt?        @map("farmer_id")
+  paymentId BigInt?        @map("payment_id")
+  amount    Decimal        @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  party     RegisterParty? @relation(fields: [partyId], references: [id])
+  farmer    Farmer?        @relation(fields: [farmerId], references: [id])
+
+  @@index([workspace, kind, createdAt])
+  @@map("register_entries")
 }

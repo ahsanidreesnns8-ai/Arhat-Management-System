@@ -29,6 +29,7 @@ import * as arhat from '@/server/services/arhat'
 import * as stockLots from '@/server/services/stock-lots'
 import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
+import * as register from '@/server/services/register'
 import { isOwnerFinanceRole } from '@/lib/roles'
 
 type RouteContext = {
@@ -628,8 +629,34 @@ async function dispatch(
     }
   }
 
+  if (path[0] === 'register') {
+    if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
+    if (path[1] === 'parties' && method === 'GET') {
+      return result(await register.listParties(url.searchParams.get('kind') ?? ''))
+    }
+    if (path[1] === 'parties' && method === 'POST') {
+      return result(await register.createParty(payload as Parameters<typeof register.createParty>[0]), 'Person added', 201)
+    }
+    if (path[1] === 'entries' && method === 'GET') {
+      return result(await register.listEntries(url.searchParams.get('kind')))
+    }
+    if (path[1] === 'entries' && method === 'POST') {
+      return result(
+        await register.createEntry(payload as Parameters<typeof register.createEntry>[0], user?.id),
+        'Amount recorded',
+        201,
+      )
+    }
+    if (path[1] === 'zakat' && method === 'GET') {
+      return result(await register.zakatSummary())
+    }
+  }
+
   if (path[0] === 'bills' && method === 'GET') {
     const lang = url.searchParams.get('lang') ?? 'en'
+    if (path[1] === 'register' && path.length === 3) {
+      return html(await bills.registerEntryBill(numericId(path[2]), lang))
+    }
     if (path[1] === 'farmer' && path.length === 3) {
       return html(await bills.farmerBill(numericId(path[2]), lang))
     }

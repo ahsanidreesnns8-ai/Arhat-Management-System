@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -167,7 +167,7 @@ export default function DashboardPage() {
         description={`Welcome to ${companyName} — tap any card for full details`}
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Button
           className="h-auto py-3 flex-col sm:flex-row gap-1.5"
           onClick={() => { setPartyForm(emptyPartyForm()); setFarmerOpen(true) }}
@@ -186,6 +186,13 @@ export default function DashboardPage() {
             <Scale className="h-4 w-4" /> Daily Trade
           </Button>
         </Link>
+        {showFinance && (
+          <Link to="/arhat-register" className="contents">
+            <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+              <BookOpen className="h-4 w-4" /> Arhat Register
+            </Button>
+          </Link>
+        )}
       </div>
 
       {loadError && !loading && (

@@ -225,7 +225,17 @@ export default function PaymentModal({
         )}
 
         <Input label="Reference / receipt #" value={reference} onChange={(e) => setReference(e.target.value)} />
-        <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {type === 'FARMER' ? 'Note (appears on farmer bill · Total paid)' : 'Note'}
+          </label>
+          <textarea
+            className="input-field min-h-[88px] py-2"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={type === 'FARMER' ? 'Write anything — it prints on the bill' : 'Optional note'}
+          />
+        </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>

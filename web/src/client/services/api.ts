@@ -3,7 +3,7 @@ import type {
   ApiResponse, AiChatResponse, BusinessSettings, Buyer, DashboardStats,
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
-  SyncPulse, SystemUser, Truck, User, WeatherCalendar,
+  SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
 } from '../types'
 
 const api = axios.create({
@@ -212,6 +212,19 @@ export const billApi = {
   buyer: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/buyer/${id}`, lang),
   saleFarmer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/farmer`, lang),
   saleBuyer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/buyer`, lang),
+  register: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/register/${id}`, lang),
+}
+
+export const registerApi = {
+  parties: (kind: 'GIVING' | 'RECEIVING') =>
+    api.get<ApiResponse<RegisterParty[]>>('/register/parties', { params: { kind } }),
+  addParty: (data: { kind: string; name: string; address?: string; notes?: string }) =>
+    api.post<ApiResponse<RegisterParty>>('/register/parties', data),
+  entries: (kind?: string) =>
+    api.get<ApiResponse<RegisterEntry[]>>('/register/entries', { params: kind ? { kind } : {} }),
+  addEntry: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<RegisterEntry>>('/register/entries', data),
+  zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
 }
 
 export const truckApi = {
