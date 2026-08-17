@@ -8,6 +8,8 @@ import {
 import { useLanguage } from '../../context/LanguageContext'
 import { useBusiness } from '../../context/BusinessContext'
 import { fadeUp, staggerContainer, staggerItem } from '../../utils/motion'
+import RhmaniLogo from '../../components/brand/RhmaniLogo'
+import { GHALLA_MANDI_EN, GHALLA_MANDI_UR } from '@/lib/branding'
 
 /** Each module gets a fixed place in the 3×4 grid */
 const modules = [
@@ -41,9 +43,7 @@ export default function LandingPage() {
       >
         {/* Clean brand mark — no oversized crest image */}
         <div className="flex flex-col items-center text-center">
-          <div className="welcome-brand-mark" aria-hidden>
-            <span>RTC</span>
-          </div>
+          <RhmaniLogo variant="full" size="lg" showText={false} />
           <h1
             className={`mt-3 text-lg font-bold tracking-[0.14em] text-[#002D62] ${
               isUrdu ? 'font-urdu tracking-normal' : ''
@@ -51,8 +51,8 @@ export default function LandingPage() {
           >
             {isUrdu ? 'رحمانی ٹریڈنگ' : 'REHMANI TRADING'}
           </h1>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C5A059]">
-            {isUrdu ? 'گالا منڈی · ننکانہ صاحب' : 'Gala Mandi · Nankana Sahib'}
+          <p className={`text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C5A059] ${isUrdu ? 'font-urdu tracking-normal' : ''}`}>
+            {isUrdu ? GHALLA_MANDI_UR : GHALLA_MANDI_EN}
           </p>
           <p
             className={`mt-3 text-[13px] text-slate-600 leading-snug max-w-xs ${

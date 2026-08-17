@@ -11,7 +11,7 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: '', phone: '', message: '' })
   const phone = settings?.phone || '+92 300 0000000'
   const email = settings?.email || 'info@rehmani.trading'
-  const address = settings?.address || (isUrdu ? 'گالا منڈی، ننکانہ صاحب، پنجاب' : 'Gala Mandi, Nankana Sahib, Punjab')
+  const address = settings?.address || (isUrdu ? 'غلّہ منڈی، ننکانہ صاحب، پنجاب' : 'Ghalla Mandi, Nankana Sahib, Punjab')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

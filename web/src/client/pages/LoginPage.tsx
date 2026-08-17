@@ -4,9 +4,9 @@ import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from
 import { Eye, EyeOff, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
-import { useBusiness } from '../context/BusinessContext'
 import { useLanguage } from '../context/LanguageContext'
 import RhmaniLogo from '../components/brand/RhmaniLogo'
+import CopyrightLine from '../components/brand/CopyrightLine'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -18,7 +18,6 @@ export default function LoginPage() {
   const [userFocused, setUserFocused] = useState(false)
   const [passFocused, setPassFocused] = useState(false)
   const { login } = useAuth()
-  const { companyName } = useBusiness()
   const { t, isUrdu, lang, setLang } = useLanguage()
   const navigate = useNavigate()
   const sceneRef = useRef<HTMLDivElement>(null)
@@ -268,18 +267,12 @@ export default function LoginPage() {
                 </span>
                 <span className="login-cta-shine" />
               </motion.button>
-
-              <p className={`text-center text-sm text-slate-400 pt-2 ${isUrdu ? 'font-urdu' : ''}`}>
-                One owner login and one staff login. Many people can use the same account at the same time.
-              </p>
             </motion.form>
           )}
         </AnimatePresence>
       </motion.div>
 
-      <p className={`absolute bottom-5 z-10 text-xs text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}>
-        © {new Date().getFullYear()} {companyName || t('brandName')}
-      </p>
+      <CopyrightLine light className="absolute bottom-5 z-10 text-[11px] px-4" />
     </div>
   )
 }

@@ -1,33 +1,5 @@
 import { prisma } from '@/server/db'
-
-const HIJRI_MONTHS_EN = [
-  'Muharram',
-  'Safar',
-  'Rabi al-Awwal',
-  'Rabi al-Thani',
-  'Jumada al-Awwal',
-  'Jumada al-Thani',
-  'Rajab',
-  "Sha'ban",
-  'Ramadan',
-  'Shawwal',
-  "Dhu al-Qa'dah",
-  'Dhu al-Hijjah',
-]
-const HIJRI_MONTHS_UR = [
-  'محرم',
-  'صفر',
-  'ربیع الاول',
-  'ربیع الثانی',
-  'جمادی الاول',
-  'جمادی الثانی',
-  'رجب',
-  'شعبان',
-  'رمضان',
-  'شوال',
-  'ذوالقعدہ',
-  'ذوالحجہ',
-]
+import { gregorianParts, hijriInfo, safeTimeZone } from '@/lib/hijri'
 
 type WeatherParts = {
   weatherAvailable: boolean
@@ -41,21 +13,6 @@ let cache:
   | { key: string; expiresAt: number; value: WeatherParts }
   | undefined
 
-function dateParts(date: Date, timezone: string, calendar?: string) {
-  const locale = calendar
-    ? `en-u-ca-${calendar}-nu-latn`
-    : 'en-CA-u-nu-latn'
-  const parts = new Intl.DateTimeFormat(locale, {
-    timeZone: timezone,
-    day: 'numeric',
-    month: 'numeric',
-    year: 'numeric',
-  }).formatToParts(date)
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value)
-  return { day: get('day'), month: get('month'), year: get('year') }
-}
-
 function weatherLabel(code: number, urdu = false) {
   if (code === 0) return urdu ? 'صاف' : 'Clear'
   if (code <= 2) return urdu ? 'جزوی ابر' : 'Partly cloudy'
@@ -65,10 +22,6 @@ function weatherLabel(code: number, urdu = false) {
   }
   if (code >= 71 && code <= 77) return urdu ? 'برف' : 'Snow'
   return urdu ? 'ہوا' : 'Windy'
-}
-
-function urduDigits(value: number) {
-  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
 }
 
 async function fetchWeather(
@@ -128,19 +81,8 @@ export async function getWeather() {
   if (!settings) throw new Error('Settings not found')
   const latitude = settings.weatherLatitude.toNumber()
   const longitude = settings.weatherLongitude.toNumber()
-  let timezone = settings.weatherTimezone || 'Asia/Karachi'
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: timezone })
-  } catch {
-    timezone = 'Asia/Karachi'
-  }
-  const adjusted = new Date(
-    Date.now() + settings.hijriAdjustmentDays * 86_400_000,
-  )
-  const hijri = dateParts(adjusted, timezone, 'islamic-umalqura')
-  const gregorian = dateParts(new Date(), timezone)
-  const monthEn = HIJRI_MONTHS_EN[hijri.month - 1] ?? ''
-  const monthUr = HIJRI_MONTHS_UR[hijri.month - 1] ?? ''
+  const timezone = safeTimeZone(settings.weatherTimezone)
+  const gregorian = gregorianParts(new Date(), timezone)
   const weather = await fetchWeather(latitude, longitude, timezone)
   return {
     locationLabel: settings.weatherLocationLabel,
@@ -151,14 +93,6 @@ export async function getWeather() {
     conditionEn: weatherLabel(weather.weatherCode),
     conditionUr: weatherLabel(weather.weatherCode, true),
     gregorianDate: `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`,
-    hijri: {
-      ...hijri,
-      monthNameEn: monthEn,
-      monthNameUr: monthUr,
-      adjustmentDays: settings.hijriAdjustmentDays,
-      formattedEn: `${hijri.day} ${monthEn} ${hijri.year} AH`,
-      formattedUr: `${urduDigits(hijri.day)} ${monthUr} ${urduDigits(hijri.year)} ھ`,
-      autoDaily: settings.hijriAdjustmentDays === 0,
-    },
+    hijri: hijriInfo(settings.hijriAdjustmentDays, timezone),
   }
 }

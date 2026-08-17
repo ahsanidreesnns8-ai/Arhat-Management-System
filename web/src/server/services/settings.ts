@@ -1,5 +1,6 @@
 import type { BusinessSettings, Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
+import { computeHijriAdjustment, safeTimeZone } from '@/lib/hijri'
 import { d, round2 } from '@/server/money'
 
 export type SettingsInput = Partial<{
@@ -54,41 +55,6 @@ export async function getSettings() {
   const row = await prisma.businessSettings.findFirst()
   if (!row) throw new Error('Settings not found')
   return settingsDto(row)
-}
-
-function hijriParts(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat(
-    'en-u-ca-islamic-umalqura-nu-latn',
-    {
-      timeZone: timezone,
-      day: 'numeric',
-      month: 'numeric',
-      year: 'numeric',
-    },
-  ).formatToParts(date)
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value)
-  return { day: get('day'), month: get('month'), year: get('year') }
-}
-
-function computeHijriAdjustment(
-  target: { day: number; month: number; year: number },
-  timezone: string,
-) {
-  for (let offset = -3; offset <= 3; offset += 1) {
-    const date = new Date(Date.now() + offset * 86_400_000)
-    const current = hijriParts(date, timezone)
-    if (
-      current.day === target.day &&
-      current.month === target.month &&
-      current.year === target.year
-    ) {
-      return offset
-    }
-  }
-  throw new Error(
-    'Islamic date correction is more than ±3 days from the calculated date. Check the values.',
-  )
 }
 
 export async function updateSettings(input: SettingsInput) {
@@ -152,9 +118,9 @@ export async function updateSettings(input: SettingsInput) {
     input.hijriCorrectYear != null
   ) {
     const target = {
-      day: input.hijriCorrectDay,
-      month: input.hijriCorrectMonth,
-      year: input.hijriCorrectYear,
+      day: Number(input.hijriCorrectDay),
+      month: Number(input.hijriCorrectMonth),
+      year: Number(input.hijriCorrectYear),
     }
     if (
       target.day < 1 ||
@@ -170,14 +136,14 @@ export async function updateSettings(input: SettingsInput) {
     }
     data.hijriAdjustmentDays = computeHijriAdjustment(
       target,
-      String(data.weatherTimezone ?? existing.weatherTimezone),
+      safeTimeZone(String(data.weatherTimezone ?? existing.weatherTimezone)),
     )
   } else if (input.hijriAdjustmentDays != null) {
     if (
-      input.hijriAdjustmentDays < -3 ||
-      input.hijriAdjustmentDays > 3
+      input.hijriAdjustmentDays < -7 ||
+      input.hijriAdjustmentDays > 7
     ) {
-      throw new Error('Hijri adjustment must be between -3 and +3 days.')
+      throw new Error('Hijri adjustment must be between -7 and +7 days.')
     }
     data.hijriAdjustmentDays = input.hijriAdjustmentDays
   }

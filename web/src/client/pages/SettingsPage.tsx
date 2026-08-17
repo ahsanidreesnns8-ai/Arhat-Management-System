@@ -106,12 +106,17 @@ export default function SettingsPage() {
         weatherLongitude: Number(settings.weatherLongitude ?? 74.3587),
         weatherLocationLabel: settings.weatherLocationLabel || 'Lahore',
         weatherTimezone: settings.weatherTimezone || 'Asia/Karachi',
+        hijriCorrectDay: hijriDay,
+        hijriCorrectMonth: hijriMonth,
+        hijriCorrectYear: hijriYear,
       }
       delete payload.geminiApiKey
-      delete payload.hijriCorrectDay
-      delete payload.hijriCorrectMonth
-      delete payload.hijriCorrectYear
       delete payload.resetHijriAuto
+      if (!preview?.hijri) {
+        delete payload.hijriCorrectDay
+        delete payload.hijriCorrectMonth
+        delete payload.hijriCorrectYear
+      }
       const res = await settingsApi.update(payload)
       setSettings(res.data.data)
       await refresh()
@@ -371,29 +376,27 @@ export default function SettingsPage() {
             <Input label={t('companyName')} value={settings?.companyName || ''} onChange={(e) => update('companyName', e.target.value)} />
             <Input
               label={t('logoUrl')}
-              placeholder="/rehmani-logo.svg"
+              placeholder="/rtc-logo.svg"
               value={settings?.companyLogoUrl || ''}
               onChange={(e) => update('companyLogoUrl', e.target.value)}
             />
             <p className="text-xs text-gray-500 -mt-2">
-              Default: <code className="text-primary">/rehmani-logo.svg</code> (shown on login &amp; sidebar). Paste a full image URL if you host your own logo.
+              Default: <code className="text-primary">/rtc-logo.svg</code> — the RTC mark is used on login, sidebar, and bills.
             </p>
-            {(settings?.companyLogoUrl || '/rehmani-logo.svg') && (
-              <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white p-4 flex justify-center">
-                <img
-                  key={settings?.companyLogoUrl || '/rehmani-logo.svg'}
-                  src={settings?.companyLogoUrl || '/rehmani-logo.svg'}
-                  alt="Logo preview"
-                  className="h-28 w-auto object-contain"
-                  onError={(e) => {
-                    const img = e.currentTarget
-                    if (img.dataset.fallback === '1') return
-                    img.dataset.fallback = '1'
-                    img.src = '/rehmani-mark.svg'
-                  }}
-                />
-              </div>
-            )}
+            <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white p-4 flex justify-center">
+              <img
+                key={settings?.companyLogoUrl || '/rtc-logo.svg'}
+                src={settings?.companyLogoUrl && !/rehmani-(logo|mark)\.svg$/i.test(settings.companyLogoUrl) ? settings.companyLogoUrl : '/rtc-logo.svg'}
+                alt="RTC"
+                className="h-20 w-20 object-contain"
+                onError={(e) => {
+                  const img = e.currentTarget
+                  if (img.dataset.fallback === '1') return
+                  img.dataset.fallback = '1'
+                  img.src = '/rtc-logo.svg'
+                }}
+              />
+            </div>
             <Input label={t('address')} value={settings?.address || ''} onChange={(e) => update('address', e.target.value)} />
             <Input label={t('phone')} value={settings?.phone || ''} onChange={(e) => update('phone', e.target.value)} />
             <Input label={t('email')} value={settings?.email || ''} onChange={(e) => update('email', e.target.value)} />

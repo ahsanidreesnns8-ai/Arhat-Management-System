@@ -5,15 +5,12 @@ import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import AmbientScene from './AmbientScene'
 import MobileToolsDock from './MobileToolsDock'
-import { useBusiness } from '../../context/BusinessContext'
-import { useLanguage } from '../../context/LanguageContext'
 import { usePrivacy } from '../../context/PrivacyContext'
 import { pageVariants } from '../../utils/motion'
+import CopyrightLine from '../brand/CopyrightLine'
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const { companyName } = useBusiness()
-  const { t, isUrdu } = useLanguage()
   const { amountsHidden } = usePrivacy()
   const location = useLocation()
 
@@ -66,13 +63,8 @@ export default function AppLayout() {
             </AnimatePresence>
           </div>
         </main>
-        <footer
-          className={`app-footer px-4 py-2 text-center text-[11px] text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}
-        >
-          &copy; {new Date().getFullYear()}{' '}
-          <span className="font-semibold text-[#002D62] dark:text-[#E8C87A]">
-            {companyName || t('companyFallback')}
-          </span>
+        <footer className="app-footer px-4 py-2">
+          <CopyrightLine className="text-[11px]" />
         </footer>
       </div>
 

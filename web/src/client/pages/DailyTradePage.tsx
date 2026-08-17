@@ -472,8 +472,9 @@ export default function DailyTradePage() {
             <Input label="Address" value={farmer ? [farmer.address, farmer.city].filter(Boolean).join(', ') : ''} readOnly />
             <div className="grid grid-cols-2 gap-3">
               <Input label={`${t('noOfBags')} *`} type="number" value={farmerBags} onChange={(e) => setFarmerBags(e.target.value)} />
-              <Input label={`${t('qtyOfOneBag')} *`} type="number" step="0.01" value={bagKg} onChange={(e) => setBagKg(e.target.value)} />
+              <Input label={`${t('extraKg')} → stock`} type="number" step="0.01" value={extraKg} onChange={(e) => setExtraKg(e.target.value)} />
             </div>
+            <Input label={`${t('qtyOfOneBag')} *`} type="number" step="0.01" value={bagKg} onChange={(e) => setBagKg(e.target.value)} />
             <Select
               label="Dheri type *"
               value={productId}
@@ -488,7 +489,6 @@ export default function DailyTradePage() {
               value={dheriNo}
               onChange={(e) => setDheriNo(e.target.value)}
             />
-            <Input label="Extra KG → stock" type="number" step="0.01" value={extraKg} onChange={(e) => setExtraKg(e.target.value)} />
             <Input label="Total weight" value={farmerWeight ? `${formatNumber(farmerWeight)} kg` : '—'} readOnly />
             <Input label="Rate / 40kg *" type="number" step="0.01" value={farmerRate} onChange={(e) => setFarmerRate(e.target.value)} />
             <Input label="Total price (includes Extra KG)" value={farmerGross ? formatCurrency(farmerGross) : '—'} readOnly />

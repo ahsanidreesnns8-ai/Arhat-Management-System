@@ -258,18 +258,20 @@ export default function ArhatSalePage() {
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
             />
 
-            <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input
-              label="Extra KG → Stock"
-              type="number"
-              step="0.01"
-              value={partialBagWeight}
-              onChange={(e) => setPartialBagWeight(e.target.value)}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+              <Input
+                label={`${t('extraKg')} → Stock`}
+                type="number"
+                step="0.01"
+                value={partialBagWeight}
+                onChange={(e) => setPartialBagWeight(e.target.value)}
+              />
+            </div>
             <p className="-mt-2 text-xs text-slate-500">
-              Enter 0 if none. Extra KG is priced at market rate, paid to farmer, and deposited into stock for forming bags.
+              Extra KG sits beside bags. Enter 0 if none. Extra KG is priced at market rate, paid to farmer, and deposited into stock.
             </p>
+            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input label="Market Rate / 40kg (optional — winning buyer rate set when selling)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input

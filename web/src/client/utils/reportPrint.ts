@@ -47,7 +47,7 @@ const LABELS = {
     yes: 'Low',
     no: 'OK',
     noRows: 'No rows in this period.',
-    footer: 'Gala Mandi Nankana Sahib',
+    footer: 'Ghalla Mandi Nankana Sahib',
   },
   ur: {
     companyFallback: 'رحمانی ٹریڈنگ کمپنی',
@@ -91,7 +91,7 @@ const LABELS = {
     yes: 'کم',
     no: 'ٹھیک',
     noRows: 'اس مدت میں کوئی ریکارڈ نہیں۔',
-    footer: 'گالا منڈی ننکانہ صاحب',
+    footer: 'غلّہ منڈی ننکانہ صاحب',
   },
 } as const
 
@@ -224,10 +224,12 @@ export function buildReportHtml(
       : ''
   const generated = `${t.generated}: ${new Date().toLocaleString(urdu ? 'ur-PK' : 'en-PK')}`
   const body = buildBody(key, data, lang)
+  const year = new Date().getFullYear()
+  const rights = urdu ? 'جملہ حقوق محفوظ ہیں۔' : 'All rights reserved.'
   const logoUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/rehmani-logo.svg`
-      : '/rehmani-logo.svg'
+      ? `${window.location.origin}/rtc-logo.svg`
+      : '/rtc-logo.svg'
 
   return `<!DOCTYPE html>
 <html lang="${urdu ? 'ur' : 'en'}" dir="${urdu ? 'rtl' : 'ltr'}">
@@ -259,14 +261,14 @@ export function buildReportHtml(
 <body>
   <div class="sheet">
     <div class="brand">
-      <img src="${esc(logoUrl)}" alt="Logo" onerror="this.style.display='none'"/>
+      <img src="${esc(logoUrl)}" alt="RTC" onerror="this.style.display='none'"/>
       <h1>${esc(company)}</h1>
       <div class="title">${esc(title)}</div>
       ${period ? `<div class="meta">${esc(period)}</div>` : ''}
       <div class="meta">${esc(generated)}</div>
     </div>
     ${body}
-    <div class="footer">${esc(t.footer)}</div>
+    <div class="footer">${esc(t.footer)}<br/><span style="font-weight:500;font-size:12px">© ${year} ${esc(company)} · ${esc(rights)}</span></div>
   </div>
   <script>window.focus(); setTimeout(function(){ window.print(); }, 250);</script>
 </body>

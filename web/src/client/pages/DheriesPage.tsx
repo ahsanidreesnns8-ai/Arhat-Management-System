@@ -25,7 +25,7 @@ export default function DheriesPage() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [form, setForm] = useState({ farmerId: '', productId: '', numberOfBags: '0', weightPerBag: '40', marketRate: '0', notes: '' })
+  const [form, setForm] = useState({ farmerId: '', productId: '', numberOfBags: '0', partialBagWeight: '0', weightPerBag: '40', marketRate: '0', notes: '' })
   const [saving, setSaving] = useState(false)
 
   const load = useCallback((soft = false) => {
@@ -70,6 +70,7 @@ export default function DheriesPage() {
         productId: parseInt(form.productId),
         numberOfBags: parseInt(form.numberOfBags) || 0,
         weightPerBag: parseFloat(form.weightPerBag) || 40,
+        partialBagWeight: parseFloat(form.partialBagWeight) || 0,
         marketRate: parseFloat(form.marketRate) || 0,
         notes: form.notes,
       })
@@ -156,6 +157,7 @@ export default function DheriesPage() {
           <Select label="Product *" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...products.map((p) => ({ value: p.id, label: p.name }))]} />
           <Input label={t('numberOfBags')} type="number" value={form.numberOfBags} onChange={(e) => setForm({ ...form, numberOfBags: e.target.value })} />
+          <Input label={t('extraKg')} type="number" value={form.partialBagWeight} onChange={(e) => setForm({ ...form, partialBagWeight: e.target.value })} />
           <Input label={t('weightPerBag')} type="number" value={form.weightPerBag} onChange={(e) => setForm({ ...form, weightPerBag: e.target.value })} />
           <Input label="Market Rate (per Mann)" type="number" value={form.marketRate} onChange={(e) => setForm({ ...form, marketRate: e.target.value })} />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

@@ -61,7 +61,7 @@ export const translations = {
     islamicYear: 'Year (AH)',
     applyIslamicDate: 'Apply corrected Islamic date',
     resetIslamicAuto: 'Use automatic daily Islamic date',
-    islamicAutoHint: 'Auto mode recalculates every day. Manual correction stores a ±3 day offset for local moon-sighting.',
+    islamicAutoHint: 'Auto mode recalculates every day. Change day/month/year and tap Save or Apply if local moon-sighting differs (up to ±7 days).',
     liveSyncOn: 'Live sync active — shared data updates across sessions',
     liveSyncOff: 'Live sync reconnecting…',
     aiTitle: 'AI Assistant',
@@ -92,6 +92,7 @@ export const translations = {
     extraBag: 'Extra bag',
     weightPerBag: 'Weight per bag (kg)',
     qtyOfOneBag: 'Qty of one bag (kg)',
+    extraKg: 'Extra KG',
   },
   ur: {
     brandName: 'رحمانی',
@@ -153,7 +154,7 @@ export const translations = {
     islamicYear: 'سال (ھ)',
     applyIslamicDate: 'درست اسلامی تاریخ لاگو کریں',
     resetIslamicAuto: 'خودکار روزانہ اسلامی تاریخ',
-    islamicAutoHint: 'خودکار موڈ ہر روز نئی تاریخ نکالتا ہے۔ دستی درستگی مقامی چاند دیکھنے کے فرق کے لیے ±۳ دن محفوظ کرتی ہے۔',
+    islamicAutoHint: 'خودکار موڈ ہر روز نئی تاریخ نکالتا ہے۔ چاند دیکھنے میں فرق ہو تو دن/مہینہ/سال بدل کر محفوظ یا لاگو دبائیں (±۷ دن)۔',
     liveSyncOn: 'لائیو سنک فعال — تمام سیشنز پر ڈیٹا ایک جیسا',
     liveSyncOff: 'لائیو سنک دوبارہ جڑ رہا ہے…',
     aiTitle: 'اے آئی اسسٹنٹ',
@@ -184,6 +185,7 @@ export const translations = {
     extraBag: 'اضافی بوری',
     weightPerBag: 'ایک بوری کا وزن (کلو)',
     qtyOfOneBag: 'ایک بوری کا وزن (کلو)',
+    extraKg: 'اضافی کلو',
   },
 } as const
 

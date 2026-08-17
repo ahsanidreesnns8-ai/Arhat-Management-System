@@ -5,17 +5,7 @@ import { useBusiness } from '../../context/BusinessContext'
 import { useSync } from '../../context/SyncContext'
 import { weatherApi } from '../../services/api'
 import type { WeatherCalendar } from '../../types'
-
-const HIJRI_MONTHS_EN = [
-  'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
-  'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', "Sha'ban",
-  'Ramadan', 'Shawwal', "Dhu al-Qa'dah", 'Dhu al-Hijjah',
-]
-const HIJRI_MONTHS_UR = [
-  'محرم', 'صفر', 'ربیع الاول', 'ربیع الثانی',
-  'جمادی الاول', 'جمادی الثانی', 'رجب', 'شعبان',
-  'رمضان', 'شوال', 'ذوالقعدہ', 'ذوالحجہ',
-]
+import { hijriInfo } from '@/lib/hijri'
 
 function weatherIcon(code: number) {
   if (code === 0) return Sun
@@ -35,36 +25,6 @@ function weatherLabel(code: number, urdu: boolean) {
   return urdu ? 'ہوا' : 'Windy'
 }
 
-function toUrduDigits(value: number) {
-  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
-}
-
-function buildHijri(adjustmentDays: number): WeatherCalendar['hijri'] {
-  const base = new Date()
-  base.setDate(base.getDate() + (adjustmentDays || 0))
-  const parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
-    day: 'numeric',
-    month: 'numeric',
-    year: 'numeric',
-  }).formatToParts(base)
-  const day = Number(parts.find((p) => p.type === 'day')?.value || 1)
-  const month = Number(parts.find((p) => p.type === 'month')?.value || 1)
-  const year = Number(parts.find((p) => p.type === 'year')?.value || 1447)
-  const monthEn = HIJRI_MONTHS_EN[Math.max(0, Math.min(11, month - 1))]
-  const monthUr = HIJRI_MONTHS_UR[Math.max(0, Math.min(11, month - 1))]
-  return {
-    day,
-    month,
-    year,
-    monthNameEn: monthEn,
-    monthNameUr: monthUr,
-    adjustmentDays: adjustmentDays || 0,
-    formattedEn: `${day} ${monthEn} ${year} AH`,
-    formattedUr: `${toUrduDigits(day)} ${monthUr} ${toUrduDigits(year)} ھ`,
-    autoDaily: !adjustmentDays,
-  }
-}
-
 function formatGregorian(raw: string, locale: string) {
   const d = new Date(`${raw}T12:00:00`)
   if (Number.isNaN(d.getTime())) return raw
@@ -82,7 +42,7 @@ async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: strin
   if (!res.ok) throw new Error('weather failed')
   const json = await res.json()
   const code = Number(json?.current?.weather_code ?? 0)
-  const hijri = buildHijri(adjustment)
+  const hijri = hijriInfo(adjustment, tz)
   return {
     locationLabel: label,
     latitude: lat,

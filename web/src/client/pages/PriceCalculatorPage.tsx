@@ -133,9 +133,11 @@ export default function PriceCalculatorPage() {
                 })),
               ]}
             />
-            <Input label={t('numberOfBags')} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label={t('numberOfBags')} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
+              <Input label={t('extraKg')} type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
+            </div>
             <Input label={t('weightPerBag')} type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
-            <Input label="Extra KG" type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
             <Input label="Rate / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
 
             <div className="flex gap-3 pt-2">

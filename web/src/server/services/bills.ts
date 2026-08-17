@@ -1,4 +1,6 @@
 import { prisma } from '@/server/db'
+import { copyrightText, rtcMarkHtml } from '@/lib/branding'
+import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 
 function escape(value: unknown) {
   return String(value ?? '')
@@ -22,9 +24,9 @@ function dash(value: string | null | undefined) {
   return v ? escape(v) : '—'
 }
 
-function formatBillDates() {
+function formatBillDates(adjustmentDays = 0, timeZone = 'Asia/Karachi') {
   const now = new Date()
-  const tz = 'Asia/Karachi'
+  const tz = safeTimeZone(timeZone)
   const dayEn = now.toLocaleDateString('en-PK', { weekday: 'long', timeZone: tz })
   const dayUr = now.toLocaleDateString('ur-PK-u-nu-latn', { weekday: 'long', timeZone: tz })
   const dateEn = now.toLocaleDateString('en-PK', {
@@ -51,30 +53,19 @@ function formatBillDates() {
     hour12: true,
     timeZone: tz,
   })
-  const parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: tz,
-  }).formatToParts(now)
-  const hijriDay = parts.find((p) => p.type === 'day')?.value ?? ''
-  const hijriMonth = parts.find((p) => p.type === 'month')?.value ?? ''
-  const hijriYear = parts.find((p) => p.type === 'year')?.value ?? ''
-  const hijriEn = `${hijriDay} ${hijriMonth} ${hijriYear} AH`
-  return { dayEn, dayUr, dateEn, dateUr, timeEn, timeUr, hijriEn }
+  const hijri = hijriInfo(adjustmentDays, tz, now)
+  return { dayEn, dayUr, dateEn, dateUr, timeEn, timeUr, hijriEn: hijri.formattedEn, hijriUr: hijri.formattedUr }
 }
 
 async function page(title: string, partyHtml: string, body: string, urdu: boolean) {
   const settings = await prisma.businessSettings.findFirst()
-  const dates = formatBillDates()
+  const dates = formatBillDates(
+    settings?.hijriAdjustmentDays ?? 0,
+    settings?.weatherTimezone || 'Asia/Karachi',
+  )
   const company = settings?.companyName ?? 'Rehmani Trading Company'
-  const rtcMark = `<div class="rtc-mark" aria-label="RTC">
-    <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" stroke-width="3.5"/>
-      <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" stroke-width="0.8" opacity="0.55"/>
-      <text x="36" y="43" text-anchor="middle" fill="#C5A059" font-size="16" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1">RTC</text>
-    </svg>
-  </div>`
+  const rtcMark = rtcMarkHtml()
+  const copy = copyrightText(company, urdu)
   return `<!doctype html>
 <html lang="${urdu ? 'ur' : 'en'}" dir="${urdu ? 'rtl' : 'ltr'}">
 <head>
@@ -260,6 +251,15 @@ th{
 }
 .bill-block{page-break-inside:avoid;margin-bottom:48px;padding-bottom:24px;border-bottom:1px dashed #94a3b8}
 .bill-block:last-child{border-bottom:none;margin-bottom:0}
+.copyright{
+  margin-top:28px;
+  padding-top:12px;
+  border-top:1.5px solid var(--gold);
+  text-align:center;
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:.01em;
+}
 @media print{
   body{padding:12px}
   .bill-block{page-break-after:always;border-bottom:none}
@@ -278,10 +278,11 @@ th{
     <span><strong>${urdu ? 'دن' : 'Day'}</strong> ${escape(urdu ? dates.dayUr : dates.dayEn)}</span>
     <span><strong>${urdu ? 'تاریخ' : 'Date'}</strong> ${escape(urdu ? dates.dateUr : dates.dateEn)}</span>
     <span><strong>${urdu ? 'وقت' : 'Time'}</strong> ${escape(urdu ? dates.timeUr : dates.timeEn)}</span>
-    <span><strong>Hijri</strong> ${escape(dates.hijriEn)}</span>
+    <span><strong>Hijri</strong> ${escape(urdu ? dates.hijriUr : dates.hijriEn)}</span>
   </div>
   ${partyHtml}
   ${body}
+  <div class="copyright ${urdu ? 'urdu' : ''}">${escape(copy)}</div>
 </div>
 </body>
 </html>`

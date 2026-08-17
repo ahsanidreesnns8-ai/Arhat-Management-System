@@ -92,6 +92,9 @@ async function main() {
       assert(html.includes('10.05'), 'farmer bill missing man 10.05 for 10×40kg + 5 extra')
       assert(!html.includes('<th>Dheri</th>'), 'farmer bill still has Dheri column')
       assert(html.includes('aria-label="RTC"'), 'farmer bill missing RTC logo')
+      assert(html.includes('copyright'), 'farmer bill missing copyright')
+      assert(html.includes('غلّہ منڈی') || html.includes('Ghalla Mandi'), 'farmer bill missing Ghalla Mandi')
+      assert(html.includes('All rights reserved'), 'farmer bill missing all rights reserved')
       assert(html.includes('Gross'), 'farmer bill should still show Gross')
       assert(html.includes('Payable'), 'farmer bill should still show Payable')
 

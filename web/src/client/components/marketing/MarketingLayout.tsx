@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
+import CopyrightLine from '../brand/CopyrightLine'
 
 /**
  * Minimal marketing chrome — the home welcome gate owns branding.
@@ -30,6 +31,9 @@ export default function MarketingLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
+      <footer className="px-4 py-3 border-t border-slate-200 bg-white">
+        <CopyrightLine className="text-[11px]" />
+      </footer>
     </div>
   )
 }
