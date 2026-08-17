@@ -1,6 +1,6 @@
 import type { BusinessSettings, Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { computeHijriAdjustment, safeTimeZone } from '@/lib/hijri'
+import { clampHijriAdjustment, computeHijriAdjustment, safeTimeZone } from '@/lib/hijri'
 import { d, round2 } from '@/server/money'
 
 export type SettingsInput = Partial<{
@@ -24,6 +24,7 @@ export type SettingsInput = Partial<{
   hijriCorrectDay: number
   hijriCorrectMonth: number
   hijriCorrectYear: number
+  hijriNudgeDays: number
   resetHijriAuto: boolean
 }>
 
@@ -112,6 +113,10 @@ export async function updateSettings(input: SettingsInput) {
 
   if (input.resetHijriAuto) {
     data.hijriAdjustmentDays = 0
+  } else if (input.hijriNudgeDays != null) {
+    data.hijriAdjustmentDays = clampHijriAdjustment(
+      (existing.hijriAdjustmentDays || 0) + Number(input.hijriNudgeDays),
+    )
   } else if (
     input.hijriCorrectDay != null &&
     input.hijriCorrectMonth != null &&
@@ -140,12 +145,12 @@ export async function updateSettings(input: SettingsInput) {
     )
   } else if (input.hijriAdjustmentDays != null) {
     if (
-      input.hijriAdjustmentDays < -7 ||
-      input.hijriAdjustmentDays > 7
+      input.hijriAdjustmentDays < -14 ||
+      input.hijriAdjustmentDays > 14
     ) {
-      throw new Error('Hijri adjustment must be between -7 and +7 days.')
+      throw new Error('Hijri adjustment must be between -14 and +14 days.')
     }
-    data.hijriAdjustmentDays = input.hijriAdjustmentDays
+    data.hijriAdjustmentDays = clampHijriAdjustment(input.hijriAdjustmentDays)
   }
 
   const row = await prisma.businessSettings.update({

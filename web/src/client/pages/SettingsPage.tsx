@@ -50,15 +50,16 @@ export default function SettingsPage() {
   const [hijriDay, setHijriDay] = useState(1)
   const [hijriMonth, setHijriMonth] = useState(1)
   const [hijriYear, setHijriYear] = useState(1447)
+  const [hijriDirty, setHijriDirty] = useState(false)
 
-  const loadPreview = async () => {
+  const loadPreview = async (forceHijri = false) => {
     try {
       const res = await weatherApi.get()
       const data = res.data?.data
       if (!data) return
       setPreview(data)
       const h = data.hijri
-      if (h) {
+      if (h && (forceHijri || !hijriDirty)) {
         setHijriDay(h.day)
         setHijriMonth(h.month)
         setHijriYear(h.year)
@@ -81,7 +82,7 @@ export default function SettingsPage() {
           if (data) {
             setPreview(data)
             const h = data.hijri
-            if (h) {
+            if (h && !hijriDirty) {
               setHijriDay(h.day)
               setHijriMonth(h.month)
               setHijriYear(h.year)
@@ -112,15 +113,12 @@ export default function SettingsPage() {
       }
       delete payload.geminiApiKey
       delete payload.resetHijriAuto
-      if (!preview?.hijri) {
-        delete payload.hijriCorrectDay
-        delete payload.hijriCorrectMonth
-        delete payload.hijriCorrectYear
-      }
+      delete payload.hijriNudgeDays
       const res = await settingsApi.update(payload)
       setSettings(res.data.data)
+      setHijriDirty(false)
       await refresh()
-      await loadPreview()
+      await loadPreview(true)
       toast.success(t('settingsSaved'))
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -140,8 +138,9 @@ export default function SettingsPage() {
         hijriCorrectYear: hijriYear,
       })
       setSettings(res.data.data)
+      setHijriDirty(false)
       await refresh()
-      await loadPreview()
+      await loadPreview(true)
       toast.success(isUrdu ? 'اسلامی تاریخ درست کر دی گئی' : 'Islamic date correction saved')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -157,11 +156,30 @@ export default function SettingsPage() {
     try {
       const res = await settingsApi.update({ resetHijriAuto: true })
       setSettings(res.data.data)
+      setHijriDirty(false)
       await refresh()
-      await loadPreview()
+      await loadPreview(true)
       toast.success(isUrdu ? 'خودکار اسلامی تاریخ فعال' : 'Automatic daily Islamic date enabled')
     } catch {
       toast.error(t('settingsFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const nudgeHijri = async (days: number) => {
+    if (!settings) return
+    setSaving(true)
+    try {
+      const res = await settingsApi.update({ hijriNudgeDays: days })
+      setSettings(res.data.data)
+      setHijriDirty(false)
+      await refresh()
+      await loadPreview(true)
+      toast.success(isUrdu ? 'اسلامی تاریخ ایک دن منتقل ہو گئی' : 'Islamic date moved by one day')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || t('settingsFailed'))
     } finally {
       setSaving(false)
     }
@@ -338,7 +356,17 @@ export default function SettingsPage() {
             <h4 className={`font-semibold mb-1 ${isUrdu ? 'font-urdu' : ''}`}>{t('islamicDate')}</h4>
             <p className={`text-xs text-gray-500 mb-3 ${isUrdu ? 'font-urdu' : ''}`}>{t('islamicAutoHint')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Input label={t('islamicDay')} type="number" min={1} max={30} value={hijriDay} onChange={(e) => setHijriDay(parseInt(e.target.value || '1', 10))} />
+              <Input
+                label={t('islamicDay')}
+                type="number"
+                min={1}
+                max={30}
+                value={hijriDay}
+                onChange={(e) => {
+                  setHijriDirty(true)
+                  setHijriDay(parseInt(e.target.value || '1', 10))
+                }}
+              />
               <div>
                 <label className={`block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ${isUrdu ? 'font-urdu' : ''}`}>
                   {t('islamicMonth')}
@@ -346,16 +374,35 @@ export default function SettingsPage() {
                 <select
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm"
                   value={hijriMonth}
-                  onChange={(e) => setHijriMonth(parseInt(e.target.value, 10))}
+                  onChange={(e) => {
+                    setHijriDirty(true)
+                    setHijriMonth(parseInt(e.target.value, 10))
+                  }}
                 >
                   {HIJRI_MONTHS.map((m) => (
                     <option key={m.value} value={m.value}>{isUrdu ? m.ur : m.en}</option>
                   ))}
                 </select>
               </div>
-              <Input label={t('islamicYear')} type="number" min={1400} max={1600} value={hijriYear} onChange={(e) => setHijriYear(parseInt(e.target.value || '1447', 10))} />
+              <Input
+                label={t('islamicYear')}
+                type="number"
+                min={1400}
+                max={1600}
+                value={hijriYear}
+                onChange={(e) => {
+                  setHijriDirty(true)
+                  setHijriYear(parseInt(e.target.value || '1447', 10))
+                }}
+              />
             </div>
             <div className="flex flex-wrap gap-3 mt-4">
+              <Button type="button" variant="secondary" onClick={() => void nudgeHijri(-1)} loading={saving}>
+                −1 {isUrdu ? 'دن' : 'day'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => void nudgeHijri(1)} loading={saving}>
+                +1 {isUrdu ? 'دن' : 'day'}
+              </Button>
               <Button type="button" onClick={applyHijriCorrection} loading={saving}>
                 <MoonStar className="h-4 w-4" />
                 <span className={isUrdu ? 'font-urdu' : ''}>{t('applyIslamicDate')}</span>

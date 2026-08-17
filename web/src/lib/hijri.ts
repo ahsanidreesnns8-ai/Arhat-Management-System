@@ -59,8 +59,11 @@ export function gregorianParts(date: Date, timeZone: string) {
   return calendarParts(date, timeZone)
 }
 
+/** Pakistan civil/sighting calendar (not Saudi Umm al-Qura, which is often +1 day). */
+export const HIJRI_CALENDAR = 'islamic-civil'
+
 export function hijriParts(date: Date, timeZone: string) {
-  return calendarParts(date, timeZone, 'islamic-umalqura')
+  return calendarParts(date, timeZone, HIJRI_CALENDAR)
 }
 
 function readZoned(date: Date, timeZone: string) {
@@ -162,13 +165,18 @@ export function computeHijriAdjustment(
   ) {
     throw new Error('Invalid Islamic date. Use day 1–30, month 1–12, year 1300–1600.')
   }
-  for (let offset = -7; offset <= 7; offset += 1) {
+  for (let offset = -14; offset <= 14; offset += 1) {
     const current = hijriParts(addCalendarDays(at, offset, tz), tz)
     if (current.day === day && current.month === month && current.year === year) {
       return offset
     }
   }
   throw new Error(
-    'Islamic date correction is more than ±7 days from the calculated date. Check the values.',
+    'Islamic date correction is more than ±14 days from the calculated date. Check the values.',
   )
+}
+
+export function clampHijriAdjustment(days: number) {
+  const n = Math.round(Number(days) || 0)
+  return Math.max(-14, Math.min(14, n))
 }

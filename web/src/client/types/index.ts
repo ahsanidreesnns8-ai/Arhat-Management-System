@@ -74,6 +74,7 @@ export interface BusinessSettings {
   hijriCorrectMonth?: number
   hijriCorrectYear?: number
   resetHijriAuto?: boolean
+  hijriNudgeDays?: number
 }
 
 export interface HijriDateInfo {

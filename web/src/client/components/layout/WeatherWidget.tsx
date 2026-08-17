@@ -5,7 +5,7 @@ import { useBusiness } from '../../context/BusinessContext'
 import { useSync } from '../../context/SyncContext'
 import { weatherApi } from '../../services/api'
 import type { WeatherCalendar } from '../../types'
-import { hijriInfo } from '@/lib/hijri'
+import { hijriInfo, gregorianParts } from '@/lib/hijri'
 
 function weatherIcon(code: number) {
   if (code === 0) return Sun
@@ -43,6 +43,7 @@ async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: strin
   const json = await res.json()
   const code = Number(json?.current?.weather_code ?? 0)
   const hijri = hijriInfo(adjustment, tz)
+  const g = gregorianParts(new Date(), tz)
   return {
     locationLabel: label,
     latitude: lat,
@@ -54,7 +55,7 @@ async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: strin
     conditionUr: weatherLabel(code, true),
     humidity: Number(json?.current?.relative_humidity_2m ?? 0),
     windKmh: Math.round(Number(json?.current?.wind_speed_10m ?? 0)),
-    gregorianDate: new Date().toISOString().slice(0, 10),
+    gregorianDate: `${g.year}-${String(g.month).padStart(2, '0')}-${String(g.day).padStart(2, '0')}`,
     hijri,
     weatherAvailable: true,
   }

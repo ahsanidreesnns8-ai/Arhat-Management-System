@@ -27,6 +27,14 @@ async function main() {
   const roundTrip = hijriParts(addCalendarDays(new Date(), computed, tz), tz)
   assert(roundTrip.day === minusOne.day, 'shifted hijri day did not match target')
 
+  const umalqura = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
+    timeZone: tz,
+    day: 'numeric',
+  }).format(new Date())
+  const civilDay = String(today.day)
+  console.log('hijri calendar', { civil: today.formattedEn, umalquraDay: umalqura, civilDay })
+  assert(civilDay === String(today.day), 'civil day mismatch')
+
   await runWithWorkspace('demo', async () => {
     const before = await getSettings()
     const previous = before.hijriAdjustmentDays ?? 0
