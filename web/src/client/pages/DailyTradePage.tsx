@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CheckCircle2, FileText, History, RefreshCw, Scale, Warehouse,
+  CheckCircle2, FileText, History, Pencil, RefreshCw, Scale, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -9,6 +9,8 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import PartyCombobox from '../components/forms/PartyCombobox'
+import BagsExtraRow from '../components/forms/BagsExtraRow'
 import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dailyTradeApi, farmerApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -28,11 +30,15 @@ function moneyFromWeight(weight: number, rate: number) {
 type BoardReceive = {
   id: number
   dheriId: string
+  farmerId?: number
   farmerName: string
+  productId?: number
   productName: string
   bags: number
   weight: number
+  weightPerBag?: number
   partialBagWeight: number
+  rate?: number
   sellingStatus: string
 }
 
@@ -48,10 +54,13 @@ type BoardSale = {
     id: number
     dheriCode?: string
     farmerName?: string
+    farmerId?: number | null
     bags: number
     rate: number
     amount: number
     sourceType: string
+    dheriId?: number | null
+    weightPerBag?: number
   }>
 }
 
@@ -103,6 +112,7 @@ export default function DailyTradePage() {
   const [stockBags, setStockBags] = useState('')
   const [stockBagKg, setStockBagKg] = useState('40')
   const [stockRate, setStockRate] = useState('')
+  const [editingSaleId, setEditingSaleId] = useState<number | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -136,6 +146,34 @@ export default function DailyTradePage() {
   const farmer = farmers.find((f) => String(f.id) === farmerId)
   const buyer = buyers.find((b) => String(b.id) === buyerId)
   const product = products.find((p) => String(p.id) === productId)
+  const farmerOptions = useMemo(
+    () =>
+      farmers.map((f) => ({
+        id: String(f.id),
+        code: f.farmerId,
+        name: f.name,
+        fatherName: f.fatherName,
+        address: f.address,
+        city: f.city,
+        phone: f.phone,
+        notes: f.notes,
+      })),
+    [farmers],
+  )
+  const buyerOptions = useMemo(
+    () =>
+      buyers.map((b) => ({
+        id: String(b.id),
+        code: b.buyerId,
+        name: b.name,
+        fatherName: b.fatherName,
+        address: b.address,
+        city: b.city,
+        phone: b.phone,
+        notes: b.notes,
+      })),
+    [buyers],
+  )
 
   const fBags = parseInt(farmerBags, 10) || 0
   const fBagKg = parseFloat(bagKg) || 40
@@ -203,6 +241,7 @@ export default function DailyTradePage() {
       setBuyerRate('')
       setStockBags('')
       setStockRate('')
+      setEditingSaleId(null)
       setShowDetails(false)
       setBuyerSales([])
       setPickedItemIds([])
@@ -238,6 +277,23 @@ export default function DailyTradePage() {
     }
   }
 
+  const soldPayload = () => ({
+    farmerId: Number(farmerId),
+    productId: Number(productId),
+    dheriCode: dheriNo.trim(),
+    farmerBags: fBags,
+    weightPerBag: fBagKg,
+    extraKg: fExtra,
+    farmerRatePer40: fRate,
+    buyerId: Number(buyerId),
+    buyerBags: bBags,
+    extraBags: bExtraBags,
+    buyerRatePer40: bRate,
+    stockBags: sBags,
+    stockWeightPerBag: sBagKg,
+    stockRatePer40: sRate || bRate,
+  })
+
   const handleSold = async () => {
     if (!farmerId) return toast.error('Choose a farmer')
     if (!buyerId) return toast.error('Choose a buyer')
@@ -249,32 +305,44 @@ export default function DailyTradePage() {
     if (bRate <= 0) return toast.error('Enter buyer rate / 40kg')
     setSelling(true)
     try {
-      const res = await dailyTradeApi.markSold({
-        farmerId: Number(farmerId),
-        productId: Number(productId),
-        dheriCode: dheriNo.trim(),
-        farmerBags: fBags,
-        weightPerBag: fBagKg,
-        extraKg: fExtra,
-        farmerRatePer40: fRate,
-        buyerId: Number(buyerId),
-        buyerBags: bBags,
-        extraBags: bExtraBags,
-        buyerRatePer40: bRate,
-        stockBags: sBags,
-        stockWeightPerBag: sBagKg,
-        stockRatePer40: sRate || bRate,
-      })
-      toast.success(res.data.data.message || 'Marked sold')
+      const payload = soldPayload()
+      const res = editingSaleId
+        ? await dailyTradeApi.editSold({ saleId: editingSaleId, ...payload })
+        : await dailyTradeApi.markSold(payload)
+      toast.success(res.data.data.message || (editingSaleId ? 'Sale updated' : 'Marked sold'))
       setBoard(res.data.data.board as Board)
       await loadBuyerSales(buyerId)
       setShowDetails(true)
+      setEditingSaleId(null)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not mark sold')
+      toast.error(msg || (editingSaleId ? 'Could not save edits' : 'Could not mark sold'))
     } finally {
       setSelling(false)
     }
+  }
+
+  const startEdit = (sale: BoardSale) => {
+    const farmerItem = sale.items.find((item) => item.sourceType === 'FARMER') || sale.items[0]
+    const stockItem = sale.items.find((item) => item.sourceType === 'BUSINESS_STOCK')
+    const receive = (board?.receives || []).find((row) => row.id === farmerItem?.dheriId)
+    setEditingSaleId(sale.id)
+    setFarmerId(String(receive?.farmerId || farmerItem?.farmerId || ''))
+    setProductId(String(receive?.productId || productId))
+    setFarmerBags(String(receive?.bags || farmerItem?.bags || ''))
+    setBagKg(String(receive?.weightPerBag || farmerItem?.weightPerBag || bagKg))
+    setExtraKg(String(receive?.partialBagWeight ?? '0'))
+    setDheriNo(String(farmerItem?.dheriCode || receive?.dheriId || ''))
+    setFarmerRate(String(receive?.rate || ''))
+    setBuyerId(String(sale.buyerId))
+    setBuyerBags(String(farmerItem?.bags || sale.bags || ''))
+    setBuyerRate(String(farmerItem?.rate || ''))
+    setExtraBags(String(stockItem?.bags || 0))
+    setStockBags('0')
+    setStockBagKg(String(stockItem?.weightPerBag || bagKg))
+    setStockRate(String(stockItem?.rate || ''))
+    setShowDetails(true)
+    toast.success('Details loaded — change what you need, then save')
   }
 
   const saleItemRows = useMemo(
@@ -422,6 +490,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Dheri</th>
                   <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Amount</th>
+                  <th className="px-3 py-2">Edit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -436,6 +505,15 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">{s.items.map((i) => i.dheriCode || i.sourceType).join(', ')}</td>
                     <td className="px-3 py-2">{s.bags}</td>
                     <td className="px-3 py-2">{formatCurrency(s.amount)}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-primary text-xs underline inline-flex items-center gap-1"
+                        onClick={() => startEdit(s)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -457,24 +535,23 @@ export default function DailyTradePage() {
         <div className="rounded-2xl border-2 border-emerald-200/80 overflow-hidden">
           <div className="px-5 py-3 bg-emerald-700 text-white font-semibold">Farmer details</div>
           <div className="p-5 space-y-3 bg-white dark:bg-slate-900">
-            <Select
-              label="Choose farmer *"
+            <PartyCombobox
+              label="Choose farmer"
+              required
+              items={farmerOptions}
               value={farmerId}
-              onChange={(e) => setFarmerId(e.target.value)}
-              options={[
-                { value: '', label: 'Select farmer' },
-                ...farmers.map((f) => ({
-                  value: String(f.id),
-                  label: `${f.farmerId} — ${f.name}${f.fatherName ? ` s/o ${f.fatherName}` : ''}`,
-                })),
-              ]}
+              onChange={(id) => setFarmerId(id)}
+              placeholder="Type ahs… then pick Ahsan"
             />
             <Input label="Address" value={farmer ? [farmer.address, farmer.city].filter(Boolean).join(', ') : ''} readOnly />
-            <div className="grid grid-cols-2 gap-3">
-              <Input label={`${t('noOfBags')} *`} type="number" value={farmerBags} onChange={(e) => setFarmerBags(e.target.value)} />
-              <Input label={`${t('extraKg')} → stock`} type="number" step="0.01" value={extraKg} onChange={(e) => setExtraKg(e.target.value)} />
-            </div>
-            <Input label={`${t('qtyOfOneBag')} *`} type="number" step="0.01" value={bagKg} onChange={(e) => setBagKg(e.target.value)} />
+            <BagsExtraRow
+              bags={farmerBags}
+              extraKg={extraKg}
+              bagKg={bagKg}
+              onBags={setFarmerBags}
+              onExtraKg={setExtraKg}
+              onBagKg={setBagKg}
+            />
             <Select
               label="Dheri type *"
               value={productId}
@@ -501,17 +578,13 @@ export default function DailyTradePage() {
         <div className="rounded-2xl border-2 border-[#002D62]/25 overflow-hidden">
           <div className="px-5 py-3 bg-[#002D62] text-white font-semibold">Buyer / seller details</div>
           <div className="p-5 space-y-3 bg-white dark:bg-slate-900">
-            <Select
-              label="Choose buyer *"
+            <PartyCombobox
+              label="Choose buyer"
+              required
+              items={buyerOptions}
               value={buyerId}
-              onChange={(e) => setBuyerId(e.target.value)}
-              options={[
-                { value: '', label: 'Select buyer' },
-                ...buyers.map((b) => ({
-                  value: String(b.id),
-                  label: `${b.buyerId} — ${b.name}${b.fatherName ? ` s/o ${b.fatherName}` : ''}`,
-                })),
-              ]}
+              onChange={(id) => setBuyerId(id)}
+              placeholder="Type ahs… then pick Ahsan"
             />
             <Input label="Address" value={buyer ? [buyer.address, buyer.city].filter(Boolean).join(', ') : ''} readOnly />
             <Input label="Buyer ID" value={buyer?.buyerId || ''} readOnly />
@@ -561,8 +634,19 @@ export default function DailyTradePage() {
 
       <div className="flex flex-wrap gap-2 items-center">
         <Button onClick={() => void handleSold()} loading={selling}>
-          <Scale className="h-4 w-4" /> Mark this one sold
+          <Scale className="h-4 w-4" /> {editingSaleId ? 'Save edited sale' : 'Mark this one sold'}
         </Button>
+        {editingSaleId ? (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setEditingSaleId(null)
+              toast('Edit cancelled')
+            }}
+          >
+            Cancel edit
+          </Button>
+        ) : null}
         <Button variant="secondary" onClick={() => void generateTodayBoardBill('en')}>
           <FileText className="h-4 w-4" /> Today bills (EN)
         </Button>
@@ -625,6 +709,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Bills</th>
+                  <th className="px-3 py-2">Edit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -648,6 +733,18 @@ export default function DailyTradePage() {
                       </button>
                       <button type="button" className="text-primary text-xs underline" onClick={() => void generateItemsBill([row.id], 'ur')}>
                         UR
+                      </button>
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-primary text-xs underline inline-flex items-center gap-1"
+                        onClick={() => {
+                          const sale = buyerSales.find((s) => s.id === row.saleId)
+                          if (sale) startEdit(sale)
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>
                     </td>
                   </tr>

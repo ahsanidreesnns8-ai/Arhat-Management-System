@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
+import PartyCombobox from '../components/forms/PartyCombobox'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { buyerApi, farmerApi, paymentApi } from '../services/api'
@@ -210,20 +211,6 @@ export default function PaymentsPage() {
       setDeleting(false)
     }
   }
-
-  const partyOptions = newType === 'FARMER'
-    ? farmers
-      .filter((f) => (f.outstandingBalance || 0) > 0)
-      .map((f) => ({
-        value: String(f.id),
-        label: `${f.name} (${f.farmerId}) — due ${formatCurrency(f.outstandingBalance || 0)}`,
-      }))
-    : buyers
-      .filter((b) => (b.outstandingBalance || 0) > 0)
-      .map((b) => ({
-        value: String(b.id),
-        label: `${b.name} (${b.buyerId}) — due ${formatCurrency(b.outstandingBalance || 0)}`,
-      }))
 
   useVoicePageActions({
     openCreate: () => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) },
@@ -484,14 +471,25 @@ export default function PaymentsPage() {
               { value: 'FARMER', label: 'Pay farmer' },
             ]}
           />
-          <Select
+          <PartyCombobox
             label={newType === 'FARMER' ? 'Farmer (with outstanding)' : 'Buyer (with outstanding)'}
+            required
+            items={(newType === 'FARMER' ? farmers : buyers)
+              .filter((p) => (p.outstandingBalance || 0) > 0)
+              .map((p) => ({
+                id: String(p.id),
+                code: 'farmerId' in p ? p.farmerId : p.buyerId,
+                name: p.name,
+                fatherName: p.fatherName,
+                address: p.address,
+                city: p.city,
+                phone: p.phone,
+                notes: `due ${formatCurrency(p.outstandingBalance || 0)}`,
+              }))}
             value={newPartyId}
-            onChange={(e) => setNewPartyId(e.target.value)}
-            options={[
-              { value: '', label: partyOptions.length ? 'Select…' : 'No parties with outstanding balance' },
-              ...partyOptions,
-            ]}
+            onChange={(id) => setNewPartyId(id)}
+            placeholder="Type ahs… then pick Ahsan"
+            emptyLabel="No parties with outstanding balance"
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setNewOpen(false)}>Cancel</Button>

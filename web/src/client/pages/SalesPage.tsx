@@ -15,6 +15,7 @@ import { buyerApi, dheriApi, farmerApi, saleApi, settingsApi, stockApi } from '.
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Dheri, Farmer, Product, Sale, SaleItem, StockItem } from '../types'
+import PartyCombobox from '../components/forms/PartyCombobox'
 
 const emptyItem = (): SaleItem => ({
   productId: 0,
@@ -215,10 +216,22 @@ export default function SalesPage() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Sale" size="xl">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Select label="Buyer" value={buyerId} onChange={(e) => setBuyerId(e.target.value)} required>
-              <option value="">Select buyer</option>
-              {buyers.map((b) => <option key={b.id} value={b.id}>{b.buyerId} — {b.name}</option>)}
-            </Select>
+            <PartyCombobox
+              label="Buyer"
+              required
+              items={buyers.map((b) => ({
+                id: String(b.id),
+                code: b.buyerId,
+                name: b.name,
+                fatherName: b.fatherName,
+                address: b.address,
+                city: b.city,
+                phone: b.phone,
+              }))}
+              value={buyerId}
+              onChange={(id) => setBuyerId(id)}
+              placeholder="Type ahs… then pick Ahsan"
+            />
             <Input label="Sale date" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
             <Input label="Paid now" type="number" min="0" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
           </div>
@@ -253,10 +266,21 @@ export default function SalesPage() {
                   <Input label="Partial kg" type="number" value={String(item.partialBagWeight || 0)} onChange={(e) => updateItem(index, { partialBagWeight: parseFloat(e.target.value) || 0 })} />
                   {item.sourceType === 'FARMER' && (
                     <>
-                      <Select label="Farmer" value={String(item.farmerId || '')} onChange={(e) => updateItem(index, { farmerId: parseInt(e.target.value) || undefined })}>
-                        <option value="">Select farmer</option>
-                        {farmers.map((f) => <option key={f.id} value={f.id}>{f.farmerId} — {f.name}</option>)}
-                      </Select>
+                      <PartyCombobox
+                        label="Farmer"
+                        items={farmers.map((f) => ({
+                          id: String(f.id),
+                          code: f.farmerId,
+                          name: f.name,
+                          fatherName: f.fatherName,
+                          address: f.address,
+                          city: f.city,
+                          phone: f.phone,
+                        }))}
+                        value={String(item.farmerId || '')}
+                        onChange={(id) => updateItem(index, { farmerId: parseInt(id) || undefined })}
+                        placeholder="Type ahs… then pick Ahsan"
+                      />
                       <Select label="Dheri" value={String(item.dheriId || '')} onChange={(e) => {
                         const d = dheris.find((x) => x.id === parseInt(e.target.value))
                         updateItem(index, {

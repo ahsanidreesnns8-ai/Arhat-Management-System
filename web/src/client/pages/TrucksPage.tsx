@@ -5,10 +5,10 @@ import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+import PartyCombobox from '../components/forms/PartyCombobox'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { truckApi, farmerApi } from '../services/api'
@@ -128,8 +128,22 @@ export default function TrucksPage() {
           <DuplicateSuggestions matches={duplicates} entityLabel="truck" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input label="Registration Number *" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} />
-          <Select label="Farmer *" value={form.farmerId} onChange={(e) => setForm({ ...form, farmerId: e.target.value })}
-            options={[{ value: '', label: 'Select' }, ...farmers.map((f) => ({ value: f.id, label: f.name }))]} />
+          <PartyCombobox
+            label="Farmer"
+            required
+            items={farmers.map((f) => ({
+              id: String(f.id),
+              code: f.farmerId,
+              name: f.name,
+              fatherName: f.fatherName,
+              address: f.address,
+              city: f.city,
+              phone: f.phone,
+            }))}
+            value={form.farmerId}
+            onChange={(id) => setForm({ ...form, farmerId: id })}
+            placeholder="Type ahs… then pick Ahsan"
+          />
           <Input label="Driver Name" value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} />
           <Input label="Driver Phone" value={form.driverPhone} onChange={(e) => setForm({ ...form, driverPhone: e.target.value })} />
           <Input label="Capacity" type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />

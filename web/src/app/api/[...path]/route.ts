@@ -500,6 +500,13 @@ async function dispatch(
       )
       return result(data, data.message)
     }
+    if (path[1] === 'edit-sold' && method === 'POST') {
+      const data = await dailyTrade.updateDeskSold(
+        payload as dailyTrade.DeskSoldEditInput,
+        user?.id,
+      )
+      return result(data, data.message)
+    }
   }
 
   if (path[0] === 'calculator') {

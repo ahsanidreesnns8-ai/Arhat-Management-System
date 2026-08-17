@@ -7,6 +7,7 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import { useLanguage } from '../context/LanguageContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import BagsExtraRow from '../components/forms/BagsExtraRow'
 import { calculatorApi, dheriApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, PriceCalculationResult } from '../types'
@@ -133,11 +134,14 @@ export default function PriceCalculatorPage() {
                 })),
               ]}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <Input label={t('numberOfBags')} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-              <Input label={t('extraKg')} type="number" min="0" step="0.01" value={partialBagWeight} onChange={(e) => setPartialBagWeight(e.target.value)} />
-            </div>
-            <Input label={t('weightPerBag')} type="number" min="0" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
+            <BagsExtraRow
+              bags={numberOfBags}
+              extraKg={partialBagWeight}
+              bagKg={weightPerBag}
+              onBags={setNumberOfBags}
+              onExtraKg={setPartialBagWeight}
+              onBagKg={setWeightPerBag}
+            />
             <Input label="Rate / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
 
             <div className="flex gap-3 pt-2">

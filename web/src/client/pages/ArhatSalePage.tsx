@@ -8,9 +8,10 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import { arhatApi, buyerApi, calculatorApi, dheriApi, farmerApi, settingsApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
-import { useLanguage } from '../context/LanguageContext'
 import type { Buyer, Dheri, Farmer, PriceCalculationResult, Product } from '../types'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import PartyCombobox from '../components/forms/PartyCombobox'
+import BagsExtraRow from '../components/forms/BagsExtraRow'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -30,7 +31,6 @@ const emptyResult: PriceCalculationResult = {
 type Mode = 'FARMER_PAYABLE' | 'BUYER_SALE'
 
 export default function ArhatSalePage() {
-  const { t } = useLanguage()
   const [mode, setMode] = useState<Mode>('BUYER_SALE')
   const [farmers, setFarmers] = useState<Farmer[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -214,27 +214,60 @@ export default function ArhatSalePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
             {mode === 'BUYER_SALE' ? (
-              <Select
-                label="Buyer *"
+              <PartyCombobox
+                label="Buyer"
+                required
+                items={buyers.map((b) => ({
+                  id: String(b.id),
+                  code: b.buyerId,
+                  name: b.name,
+                  fatherName: b.fatherName,
+                  address: b.address,
+                  city: b.city,
+                  phone: b.phone,
+                }))}
                 value={buyerId}
-                onChange={(e) => setBuyerId(e.target.value)}
-                options={[{ value: '', label: 'Select buyer' }, ...buyers.map((b) => ({ value: b.id, label: `${b.buyerId} — ${b.name}` }))]}
+                onChange={(id) => setBuyerId(id)}
+                placeholder="Type ahs… then pick Ahsan"
               />
             ) : (
-              <Select
-                label="Farmer *"
+              <PartyCombobox
+                label="Farmer"
+                required
+                items={farmers.map((f) => ({
+                  id: String(f.id),
+                  code: f.farmerId,
+                  name: f.name,
+                  fatherName: f.fatherName,
+                  address: f.address,
+                  city: f.city,
+                  phone: f.phone,
+                }))}
                 value={farmerId}
-                onChange={(e) => setFarmerId(e.target.value)}
-                options={[{ value: '', label: 'Select farmer' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
+                onChange={(id) => setFarmerId(id)}
+                placeholder="Type ahs… then pick Ahsan"
               />
             )}
 
             {mode === 'BUYER_SALE' && (
-              <Select
+              <PartyCombobox
                 label="Farmer source"
+                items={[
+                  { id: '', code: '', name: 'Business stock' },
+                  ...farmers.map((f) => ({
+                    id: String(f.id),
+                    code: f.farmerId,
+                    name: f.name,
+                    fatherName: f.fatherName,
+                    address: f.address,
+                    city: f.city,
+                    phone: f.phone,
+                  })),
+                ]}
                 value={farmerId}
-                onChange={(e) => setFarmerId(e.target.value)}
-                options={[{ value: '', label: 'Business stock' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
+                onChange={(id) => setFarmerId(id)}
+                placeholder="Type ahs… or pick Business stock"
+                showDetails={Boolean(farmerId)}
               />
             )}
 
@@ -258,20 +291,17 @@ export default function ArhatSalePage() {
               options={[{ value: '', label: 'Select product' }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-              <Input
-                label={`${t('extraKg')} → Stock`}
-                type="number"
-                step="0.01"
-                value={partialBagWeight}
-                onChange={(e) => setPartialBagWeight(e.target.value)}
-              />
-            </div>
+            <BagsExtraRow
+              bags={numberOfBags}
+              extraKg={partialBagWeight}
+              bagKg={weightPerBag}
+              onBags={setNumberOfBags}
+              onExtraKg={setPartialBagWeight}
+              onBagKg={setWeightPerBag}
+            />
             <p className="-mt-2 text-xs text-slate-500">
               Extra KG sits beside bags. Enter 0 if none. Extra KG is priced at market rate, paid to farmer, and deposited into stock.
             </p>
-            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input label="Market Rate / 40kg (optional — winning buyer rate set when selling)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input

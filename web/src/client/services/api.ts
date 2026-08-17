@@ -324,6 +324,22 @@ export const dailyTradeApi = {
       }
       message: string
     }>>('/daily-trade/mark-sold', data),
+  editSold: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      sale: Sale
+      dheriId: number
+      dheriCode: string
+      board: any
+      totals: {
+        farmerGross: number
+        commission: number
+        farmerNet: number
+        buyerAmount: number
+        stockAmount: number
+        grandTotal: number
+      }
+      message: string
+    }>>('/daily-trade/edit-sold', data),
 }
 
 export const queueApi = {

@@ -10,6 +10,8 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import DuplicateSuggestions from '../components/forms/DuplicateSuggestions'
+import PartyCombobox from '../components/forms/PartyCombobox'
+import BagsExtraRow from '../components/forms/BagsExtraRow'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { dheriApi, farmerApi, settingsApi } from '../services/api'
@@ -152,13 +154,34 @@ export default function DheriesPage() {
         <div className="space-y-4">
           <DuplicateSuggestions matches={recentForFarmer} entityLabel="dheri" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select label="Farmer *" value={form.farmerId} onChange={(e) => setForm({ ...form, farmerId: e.target.value })}
-            options={[{ value: '', label: 'Select' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]} />
+          <PartyCombobox
+            label="Farmer"
+            required
+            items={farmers.map((f) => ({
+              id: String(f.id),
+              code: f.farmerId,
+              name: f.name,
+              fatherName: f.fatherName,
+              address: f.address,
+              city: f.city,
+              phone: f.phone,
+            }))}
+            value={form.farmerId}
+            onChange={(id) => setForm({ ...form, farmerId: id })}
+            placeholder="Type ahs… then pick Ahsan"
+          />
           <Select label="Product *" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...products.map((p) => ({ value: p.id, label: p.name }))]} />
-          <Input label={t('numberOfBags')} type="number" value={form.numberOfBags} onChange={(e) => setForm({ ...form, numberOfBags: e.target.value })} />
-          <Input label={t('extraKg')} type="number" value={form.partialBagWeight} onChange={(e) => setForm({ ...form, partialBagWeight: e.target.value })} />
-          <Input label={t('weightPerBag')} type="number" value={form.weightPerBag} onChange={(e) => setForm({ ...form, weightPerBag: e.target.value })} />
+          <div className="sm:col-span-2">
+          <BagsExtraRow
+            bags={form.numberOfBags}
+            extraKg={form.partialBagWeight}
+            bagKg={form.weightPerBag}
+            onBags={(numberOfBags) => setForm({ ...form, numberOfBags })}
+            onExtraKg={(partialBagWeight) => setForm({ ...form, partialBagWeight })}
+            onBagKg={(weightPerBag) => setForm({ ...form, weightPerBag })}
+          />
+          </div>
           <Input label="Market Rate (per Mann)" type="number" value={form.marketRate} onChange={(e) => setForm({ ...form, marketRate: e.target.value })} />
           <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>

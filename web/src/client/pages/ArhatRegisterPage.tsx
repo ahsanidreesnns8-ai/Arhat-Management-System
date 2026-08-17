@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { farmerApi, registerApi, billApi } from '../services/api'
@@ -14,6 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { isOwnerFinanceRole } from '../../lib/roles'
 import { Navigate } from 'react-router-dom'
 import type { Farmer, RegisterEntry, RegisterParty, ZakatSummary } from '../types'
+import PartyCombobox from '../components/forms/PartyCombobox'
 
 type Section = 'GIVING' | 'RECEIVING' | 'ZAKAT' | 'ADVANCE'
 
@@ -326,14 +326,19 @@ export default function ArhatRegisterPage() {
 
       <Modal open={giveOpen} onClose={() => setGiveOpen(false)} title={section === 'RECEIVING' ? 'Receive amount' : 'Give amount'}>
         <div className="space-y-3">
-          <Select
-            label="Name *"
+          <PartyCombobox
+            label="Name"
+            required
+            items={parties.map((p) => ({
+              id: String(p.id),
+              name: p.name,
+              address: p.address,
+              notes: p.notes,
+            }))}
             value={money.partyId}
-            onChange={(e) => setMoney({ ...money, partyId: e.target.value })}
-            options={[
-              { value: '', label: parties.length ? 'Select name' : 'Add a person first' },
-              ...parties.map((p) => ({ value: String(p.id), label: p.name })),
-            ]}
+            onChange={(id) => setMoney({ ...money, partyId: id })}
+            placeholder="Type ahs… then pick the name"
+            emptyLabel="Add a person first"
           />
           <Input
             label="Amount (PKR) *"
@@ -370,14 +375,21 @@ export default function ArhatRegisterPage() {
       <Modal open={advanceOpen} onClose={() => setAdvanceOpen(false)} title="Advance payment to farmer">
         <div className="space-y-3">
           <p className="text-sm text-slate-500">This amount prints on the farmer bill and reduces what is still payable.</p>
-          <Select
-            label="Farmer *"
+          <PartyCombobox
+            label="Farmer"
+            required
+            items={farmers.map((f) => ({
+              id: String(f.id),
+              code: f.farmerId,
+              name: f.name,
+              fatherName: f.fatherName,
+              address: f.address,
+              city: f.city,
+              phone: f.phone,
+            }))}
             value={advance.farmerId}
-            onChange={(e) => setAdvance({ ...advance, farmerId: e.target.value })}
-            options={[
-              { value: '', label: 'Select farmer' },
-              ...farmers.map((f) => ({ value: String(f.id), label: `${f.name} · ${f.farmerId}` })),
-            ]}
+            onChange={(id) => setAdvance({ ...advance, farmerId: id })}
+            placeholder="Type ahs… then pick Ahsan"
           />
           <Input
             label="Amount (PKR) *"

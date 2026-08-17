@@ -231,6 +231,7 @@ export async function consumeStockLotsToBags(input: {
       leftoverKg: totalAvailable.toNumber(),
       ratePer40Kg: round2(input.highestRateHint ?? 0).toNumber(),
       amount: 0,
+      bagWeightKg: bagWeight.toNumber(),
     }
   }
 
@@ -294,6 +295,90 @@ export async function consumeStockLotsToBags(input: {
     bagWeightKg: bagWeight.toNumber(),
     workspace: getWorkspace(),
   }
+}
+
+/** Put consumed Extra KG back onto lots (edit/reverse a stock-bag sale). */
+export async function restoreStockKg(input: {
+  productId: number
+  kg: number | string
+  ratePer40Kg?: number | string
+  bagWeightKg?: number | string
+  saleId?: number
+  notes?: string | null
+  createdById?: bigint
+}) {
+  const kg = round2(input.kg)
+  if (kg.lte(0)) return { restoredKg: 0 }
+  const productId = BigInt(input.productId)
+  const rate = round2(input.ratePer40Kg ?? 0)
+  const bagWeight = round2(input.bagWeightKg ?? 40)
+
+  await prisma.$transaction(async (tx) => {
+    const lots = await tx.stockLot.findMany({
+      where: { productId },
+      orderBy: [{ intakeDate: 'desc' }, { id: 'desc' }],
+    })
+    let leftover = kg
+    for (const lot of lots) {
+      if (leftover.lte(0)) break
+      const remaining = d(lot.remainingKg.toString())
+      const original = d(lot.originalKg.toString())
+      const room = original.sub(remaining)
+      if (room.lte(0)) continue
+      const add = leftover.lt(room) ? leftover : room
+      await tx.stockLot.update({
+        where: { id: lot.id },
+        data: { remainingKg: remaining.add(add).toFixed(2) },
+      })
+      leftover = leftover.sub(add)
+    }
+    if (leftover.gt(0)) {
+      await tx.stockLot.create({
+        data: {
+          productId,
+          remainingKg: leftover.toFixed(2),
+          originalKg: leftover.toFixed(2),
+          ratePer40Kg: rate.toFixed(2),
+          bagWeightKg: bagWeight.toFixed(2),
+          amountValue: amountFromWeight(leftover, rate).toFixed(2),
+          intakeDate: new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'),
+          notes: input.notes || 'Restored Extra KG from edited sale',
+        },
+      })
+    }
+
+    const settings = await tx.businessSettings.findFirst()
+    const stock = await tx.stock.upsert({
+      where: { productId },
+      update: {},
+      create: { productId, quantity: 0 },
+    })
+    const previous = d(stock.quantity.toString())
+    const next = previous.add(kg)
+    await tx.stock.update({
+      where: { id: stock.id },
+      data: {
+        quantity: next.toFixed(2),
+        lowStockAlert: next.lt(d(settings?.lowStockThreshold?.toString() ?? 100)),
+      },
+    })
+    await tx.stockTransaction.create({
+      data: {
+        productId,
+        transactionType: 'INCOMING',
+        quantity: kg.toFixed(2),
+        previousQuantity: previous.toFixed(2),
+        newQuantity: next.toFixed(2),
+        referenceType: 'SALE_EDIT_RESTORE',
+        referenceId: input.saleId != null ? BigInt(input.saleId) : null,
+        ratePer40Kg: rate.toFixed(2),
+        amountValue: amountFromWeight(kg, rate).toFixed(2),
+        notes: input.notes || 'Restored Extra KG from edited Daily Trade sale',
+        createdById: input.createdById,
+      },
+    })
+  })
+  return { restoredKg: kg.toNumber() }
 }
 
 export function priceForKg(kg: number, ratePer40: number) {

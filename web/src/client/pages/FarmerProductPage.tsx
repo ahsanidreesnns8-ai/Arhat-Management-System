@@ -6,6 +6,8 @@ import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
+import PartyCombobox from '../components/forms/PartyCombobox'
+import BagsExtraRow from '../components/forms/BagsExtraRow'
 import { useLanguage } from '../context/LanguageContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
@@ -241,11 +243,21 @@ export default function FarmerProductPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <Select
-              label="Farmer *"
+            <PartyCombobox
+              label="Farmer"
+              required
+              items={farmers.map((f) => ({
+                id: String(f.id),
+                code: f.farmerId,
+                name: f.name,
+                fatherName: f.fatherName,
+                address: f.address,
+                city: f.city,
+                phone: f.phone,
+              }))}
               value={farmerId}
-              onChange={(e) => setFarmerId(e.target.value)}
-              options={[{ value: '', label: 'Select farmer' }, ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` }))]}
+              onChange={(id) => setFarmerId(id)}
+              placeholder="Type ahs… then pick Ahsan"
             />
             <Select
               label="Product *"
@@ -259,20 +271,17 @@ export default function FarmerProductPage() {
               onChange={(e) => setDheriCode(e.target.value)}
               placeholder="e.g. 1, 2, 3…"
             />
-            <div className="grid grid-cols-2 gap-3">
-              <Input label={`${t('numberOfBags')} *`} type="number" min="0" value={numberOfBags} onChange={(e) => setNumberOfBags(e.target.value)} />
-              <Input
-                label={`${t('extraKg')} → Stock`}
-                type="number"
-                step="0.01"
-                value={partialBagWeight}
-                onChange={(e) => setPartialBagWeight(e.target.value)}
-              />
-            </div>
+            <BagsExtraRow
+              bags={numberOfBags}
+              extraKg={partialBagWeight}
+              bagKg={weightPerBag}
+              onBags={setNumberOfBags}
+              onExtraKg={setPartialBagWeight}
+              onBagKg={setWeightPerBag}
+            />
             <p className="-mt-2 text-xs text-slate-500">
               Extra KG sits beside bags. 0 if none. Priced at today’s rate and saved to stock with farmer details.
             </p>
-            <Input label={t('weightPerBag')} type="number" step="0.01" value={weightPerBag} onChange={(e) => setWeightPerBag(e.target.value)} />
             <Input label="Market Rate / 40kg (optional — set at auction sell)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />

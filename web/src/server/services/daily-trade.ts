@@ -267,6 +267,8 @@ export async function getDailyBoard(
         farmerName: item.farmer?.name,
         dheriId: item.dheriId == null ? null : Number(item.dheriId),
         dheriCode: item.dheri?.dheriId,
+        farmerId: item.farmerId == null ? null : Number(item.farmerId),
+        weightPerBag: item.weightPerBag.toNumber(),
         dayBatchId: item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId),
         batchNumber: item.dheri?.dayBatch?.batchNumber ?? null,
       })),
@@ -773,6 +775,319 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
       grandTotal: buyerAmount + stockAmount,
     },
     message: `Sold dheri ${dheriCode} — buyer ${sale.invoiceNumber}`,
+  }
+}
+
+export type DeskSoldEditInput = DeskSoldInput & { saleId: number }
+
+/**
+ * Re-edit a Daily Trade sold row: autofill source of truth is the sale + dheri.
+ * Recalculates farmer payable, buyer amount, Extra KG stock, and outstanding.
+ */
+export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) {
+  const saleId = Number(input.saleId)
+  if (!saleId) throw new Error('Sale is required to edit')
+  if (input.farmerId == null) throw new Error('Choose a farmer')
+  if (input.buyerId == null) throw new Error('Choose a buyer')
+  if (input.productId == null) throw new Error('Choose dheri type')
+  const dheriCode = String(input.dheriCode || '').trim()
+  if (!dheriCode) throw new Error('Enter the dheri number you assigned at entrance')
+  const farmerBags = Number(input.farmerBags) || 0
+  const buyerBags = Number(input.buyerBags) || 0
+  if (farmerBags <= 0) throw new Error('Farmer bags must be greater than zero')
+  if (buyerBags <= 0) throw new Error('Buyer bags must be greater than zero')
+  const farmerRate = Number(input.farmerRatePer40) || 0
+  const buyerRate = Number(input.buyerRatePer40) || 0
+  if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
+  if (buyerRate <= 0) throw new Error('Enter buyer rate per 40kg')
+  const bagKg = Number(input.weightPerBag) || 40
+  const extraKg = Number(input.extraKg) || 0
+  const extraBags = Math.max(0, Number(input.extraBags) || 0)
+  const stockBags = Math.max(0, Number(input.stockBags) || 0)
+  const stockBagKg = Number(input.stockWeightPerBag) || bagKg
+  const stockRate = Number(input.stockRatePer40) || buyerRate
+  const stockToSell = extraBags + stockBags
+
+  const sale = await prisma.sale.findFirst({
+    where: { id: BigInt(saleId), deleted: false },
+    include: { items: true, buyer: true },
+  })
+  if (!sale) throw new Error('Sale not found')
+
+  const farmerItem = sale.items.find((item) => item.sourceType === 'FARMER')
+  if (!farmerItem?.dheriId) throw new Error('This sale has no farmer dheri to edit')
+  const dheri = await prisma.dheri.findFirst({
+    where: { id: farmerItem.dheriId, deleted: false },
+  })
+  if (!dheri) throw new Error('Dheri not found')
+
+  const clash = await prisma.dheri.findFirst({
+    where: { dheriId: dheriCode, deleted: false, NOT: { id: dheri.id } },
+  })
+  if (clash) throw new Error(`Dheri ${dheriCode} is already used`)
+
+  const extraDiffPreview = round2(extraKg).sub(d(dheri.partialBagWeight.toString()))
+  if (extraDiffPreview.lt(0)) {
+    const lot = await prisma.stockLot.findFirst({ where: { dheriId: dheri.id } })
+    if (lot && d(lot.remainingKg.toString()).lt(extraDiffPreview.abs())) {
+      throw new Error(
+        'Cannot reduce Extra KG below what was already sold from stock. Restore stock bags first.',
+      )
+    }
+  }
+
+  const { saveCalculation, calculatePrice } = await import('@/server/services/calculator')
+  const { restoreStockKg, consumeStockLotsToBags, intakeExtraKgToStock } = await import(
+    '@/server/services/stock-lots'
+  )
+  const { amountFromWeight, totalWeight } = await import('@/server/money')
+
+  const oldFarmerId = Number(dheri.farmerId)
+  const oldBuyerId = Number(sale.buyerId)
+  const oldPayable = d(dheri.farmerReceivable.toString())
+  const oldUnpaid = d(sale.totalAmount.toString()).sub(d(sale.paidAmount.toString()))
+  const oldExtra = d(dheri.partialBagWeight.toString())
+  const stockItems = sale.items.filter((item) => item.sourceType === 'BUSINESS_STOCK')
+  const oldStockKg = stockItems.reduce((sum, item) => sum + item.totalWeight.toNumber(), 0)
+  const oldStockProductId = stockItems[0] ? Number(stockItems[0].productId) : Number(dheri.productId)
+
+  if (oldStockKg > 0) {
+    await restoreStockKg({
+      productId: oldStockProductId,
+      kg: oldStockKg,
+      ratePer40Kg: stockItems[0]?.rate.toNumber() || stockRate,
+      bagWeightKg: stockItems[0]?.weightPerBag.toNumber() || stockBagKg,
+      saleId,
+      notes: `Edit restore for ${sale.invoiceNumber}`,
+      createdById: userId,
+    })
+  }
+
+  const calculation = await calculatePrice({
+    numberOfBags: farmerBags,
+    weightPerBag: bagKg,
+    partialBagWeight: extraKg,
+    marketRate: farmerRate,
+  })
+
+  await prisma.$transaction(async (tx) => {
+    if (oldUnpaid.gt(0)) {
+      await tx.buyer.update({
+        where: { id: sale.buyerId },
+        data: { outstandingBalance: { decrement: oldUnpaid.toFixed(2) } },
+      })
+    }
+    if (oldPayable.gt(0) && dheri.payablePosted) {
+      await tx.farmer.update({
+        where: { id: dheri.farmerId },
+        data: { outstandingBalance: { decrement: oldPayable.toFixed(2) } },
+      })
+    }
+  })
+
+  await prisma.dheri.update({
+    where: { id: dheri.id },
+    data: {
+      farmerId: BigInt(input.farmerId),
+      productId: BigInt(input.productId),
+      dheriId: dheriCode,
+    },
+  })
+  await saveCalculation(dheri.id, {
+    numberOfBags: farmerBags,
+    weightPerBag: bagKg,
+    partialBagWeight: extraKg,
+    marketRate: farmerRate,
+  })
+
+  const extraDiff = round2(extraKg).sub(oldExtra)
+  const extraLot = await prisma.stockLot.findFirst({
+    where: { dheriId: dheri.id },
+    orderBy: { id: 'asc' },
+  })
+  if (extraDiff.gt(0)) {
+    if (extraLot) {
+      await prisma.stockLot.update({
+        where: { id: extraLot.id },
+        data: {
+          remainingKg: d(extraLot.remainingKg.toString()).add(extraDiff).toFixed(2),
+          originalKg: d(extraLot.originalKg.toString()).add(extraDiff).toFixed(2),
+          ratePer40Kg: d(farmerRate).toFixed(2),
+        },
+      })
+      const stock = await prisma.stock.upsert({
+        where: { productId: BigInt(input.productId) },
+        update: {},
+        create: { productId: BigInt(input.productId), quantity: 0 },
+      })
+      await prisma.stock.update({
+        where: { id: stock.id },
+        data: { quantity: d(stock.quantity.toString()).add(extraDiff).toFixed(2) },
+      })
+    } else {
+      await intakeExtraKgToStock({
+        productId: input.productId,
+        farmerId: input.farmerId,
+        dheriId: Number(dheri.id),
+        extraKg: extraDiff.toNumber(),
+        ratePer40Kg: farmerRate,
+        bagWeightKg: bagKg,
+        createdById: userId,
+      })
+    }
+  } else if (extraDiff.lt(0)) {
+    const reduce = extraDiff.abs()
+    if (extraLot) {
+      const remaining = d(extraLot.remainingKg.toString())
+      if (remaining.lt(reduce)) {
+        throw new Error(
+          'Cannot reduce Extra KG below what was already sold from stock. Restore stock bags first.',
+        )
+      }
+      await prisma.stockLot.update({
+        where: { id: extraLot.id },
+        data: {
+          remainingKg: remaining.sub(reduce).toFixed(2),
+          originalKg: d(extraLot.originalKg.toString()).sub(reduce).toFixed(2),
+        },
+      })
+      const stock = await prisma.stock.findFirst({
+        where: { productId: extraLot.productId },
+      })
+      if (stock) {
+        await prisma.stock.update({
+          where: { id: stock.id },
+          data: { quantity: d(stock.quantity.toString()).sub(reduce).toFixed(2) },
+        })
+      }
+    }
+  }
+
+  const newPayable = round2(calculation.farmerFinalBalance)
+  if (newPayable.gt(0)) {
+    await prisma.farmer.update({
+      where: { id: BigInt(input.farmerId) },
+      data: {
+        outstandingBalance: { increment: newPayable.toFixed(2) },
+      },
+    })
+    await prisma.dheri.update({
+      where: { id: dheri.id },
+      data: { payablePosted: true, sellingStatus: 'SOLD' },
+    })
+  } else {
+    await prisma.dheri.update({
+      where: { id: dheri.id },
+      data: { sellingStatus: 'SOLD' },
+    })
+  }
+
+  let formed = { bagsFromStock: 0, kgUsed: 0, amount: 0, ratePer40Kg: stockRate, bagWeightKg: stockBagKg }
+  if (stockToSell > 0) {
+    formed = await consumeStockLotsToBags({
+      productId: input.productId,
+      bagWeightKg: stockBagKg,
+      highestRateHint: stockRate,
+      createdById: userId,
+      saleId,
+      maxBags: stockToSell,
+    })
+    if (formed.bagsFromStock < stockToSell) {
+      throw new Error(
+        `Not enough Extra KG stock to sell ${stockToSell} extra/stock bags (can form ${formed.bagsFromStock})`,
+      )
+    }
+  }
+
+  const farmerWeight = totalWeight(buyerBags, bagKg, 0)
+  const farmerAmount = amountFromWeight(farmerWeight, buyerRate)
+  const stockWeight = totalWeight(formed.bagsFromStock, formed.bagWeightKg || stockBagKg, 0)
+  const stockAmount = amountFromWeight(stockWeight, formed.ratePer40Kg)
+  const totalBags = buyerBags + formed.bagsFromStock
+  const totalW = farmerWeight.add(stockWeight)
+  const totalA = round2(farmerAmount.add(stockAmount))
+  const paid = d(sale.paidAmount.toString())
+  if (paid.gt(totalA)) throw new Error('Paid amount is higher than the new total. Adjust payments first.')
+  const unpaid = totalA.sub(paid)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.saleItem.deleteMany({ where: { saleId: sale.id } })
+    await tx.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: BigInt(input.productId),
+        sourceType: 'FARMER',
+        farmerId: BigInt(input.farmerId),
+        dheriId: dheri.id,
+        numberOfBags: buyerBags,
+        weightPerBag: String(bagKg),
+        partialBagWeight: '0',
+        totalWeight: farmerWeight.toFixed(2),
+        rate: String(buyerRate),
+        amount: farmerAmount.toFixed(2),
+      },
+    })
+    if (formed.bagsFromStock > 0) {
+      await tx.saleItem.create({
+        data: {
+          saleId: sale.id,
+          productId: BigInt(input.productId),
+          sourceType: 'BUSINESS_STOCK',
+          numberOfBags: formed.bagsFromStock,
+          weightPerBag: String(formed.bagWeightKg || stockBagKg),
+          partialBagWeight: '0',
+          totalWeight: stockWeight.toFixed(2),
+          rate: String(formed.ratePer40Kg),
+          amount: stockAmount.toFixed(2),
+        },
+      })
+    }
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        buyerId: BigInt(input.buyerId),
+        totalBags,
+        totalWeight: totalW.toFixed(2),
+        totalAmount: totalA.toFixed(2),
+        paymentStatus: paid.lte(0) ? 'PENDING' : paid.gte(totalA) ? 'PAID' : 'PARTIAL',
+        notes: input.notes || sale.notes,
+      },
+    })
+    if (unpaid.gt(0)) {
+      await tx.buyer.update({
+        where: { id: BigInt(input.buyerId) },
+        data: { outstandingBalance: { increment: unpaid.toFixed(2) } },
+      })
+    }
+    await tx.auditLog.create({
+      data: {
+        userId,
+        action: 'UPDATE',
+        entityType: 'Sale',
+        entityId: sale.id,
+        oldValue: { farmerId: oldFarmerId, buyerId: oldBuyerId, invoice: sale.invoiceNumber },
+        newValue: { farmerId: input.farmerId, buyerId: input.buyerId, bags: farmerBags },
+      },
+    })
+  })
+
+  const { getSale } = await import('@/server/services/sales')
+  const updated = await getSale(sale.id)
+  const board = await getDailyBoard()
+  return {
+    sale: updated,
+    dheriId: Number(dheri.id),
+    dheriCode,
+    board,
+    totals: {
+      farmerGross: calculation.totalAmount,
+      commission: calculation.commission,
+      farmerNet: calculation.farmerFinalBalance,
+      buyerAmount: farmerAmount.toNumber(),
+      stockAmount: stockAmount.toNumber(),
+      grandTotal: totalA.toNumber(),
+    },
+    message: `Updated dheri ${dheriCode} — ${updated.invoiceNumber}`,
   }
 }
 
