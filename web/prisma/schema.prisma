@@ -582,6 +582,7 @@ model WheatKhataParty {
   createdAt DateTime            @default(now()) @map("created_at")
   updatedAt DateTime            @updatedAt @map("updated_at")
   products  WheatKhataProduct[]
+  payments  WheatKhataPayment[]
 
   @@index([workspace, kind])
   @@index([workspace, name])
@@ -590,18 +591,35 @@ model WheatKhataParty {
 
 /// Wheat bags received from or given to a Wheat Khata party
 model WheatKhataProduct {
-  id          BigInt          @id @default(autoincrement())
-  workspace   String          @default("live") @db.VarChar(20)
-  partyId     BigInt          @map("party_id")
-  bags        Int
-  bagWeightKg Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
-  ratePerBag  Decimal         @map("rate_per_bag") @db.Decimal(12, 2)
-  totalPrice  Decimal         @map("total_price") @db.Decimal(15, 2)
-  notes       String?
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  party       WheatKhataParty @relation(fields: [partyId], references: [id])
+  id             BigInt          @id @default(autoincrement())
+  workspace      String          @default("live") @db.VarChar(20)
+  partyId        BigInt          @map("party_id")
+  bags           Int
+  bagWeightKg    Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
+  ratePerBag     Decimal         @map("rate_per_bag") @db.Decimal(12, 2)
+  bagPricePerBag Decimal         @default(0.00) @map("bag_price_per_bag") @db.Decimal(12, 2)
+  labourPerBag   Decimal         @default(0.00) @map("labour_per_bag") @db.Decimal(12, 2)
+  totalPrice     Decimal         @map("total_price") @db.Decimal(15, 2)
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  party          WheatKhataParty @relation(fields: [partyId], references: [id])
 
   @@index([workspace, partyId, createdAt])
   @@map("wheat_khata_products")
+}
+
+/// Cash given to a receiving party, or cash received from a selling party
+model WheatKhataPayment {
+  id        BigInt          @id @default(autoincrement())
+  workspace String          @default("live") @db.VarChar(20)
+  partyId   BigInt          @map("party_id")
+  amount    Decimal         @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  party     WheatKhataParty @relation(fields: [partyId], references: [id])
+
+  @@index([workspace, partyId, createdAt])
+  @@map("wheat_khata_payments")
 }

@@ -670,6 +670,9 @@ async function dispatch(
     if (path[1] === 'products' && method === 'POST') {
       return result(await wheatKhata.addProduct(payload), 'Product saved', 201)
     }
+    if (path[1] === 'payments' && method === 'POST') {
+      return result(await wheatKhata.addPayment(payload), 'Amount saved', 201)
+    }
     if (path[1] === 'preview' && method === 'POST') {
       return result(wheatKhata.previewProduct(payload))
     }

@@ -4,7 +4,7 @@ import type {
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
-  WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct,
+  WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
 } from '../types'
 
 const api = axios.create({
@@ -237,13 +237,36 @@ export const wheatKhataApi = {
   addParty: (data: { kind: 'RECEIVING' | 'GIVING'; name: string; address?: string; notes?: string }) =>
     api.post<ApiResponse<WheatKhataParty>>('/wheat-khata/parties', data),
   getParty: (id: number) => api.get<ApiResponse<WheatKhataParty>>(`/wheat-khata/parties/${id}`),
-  previewProduct: (data: { bags: number; ratePerBag: number; bagWeightKg?: number }) =>
-    api.post<ApiResponse<{ bags: number; bagWeightKg: number; ratePerBag: number; totalPrice: number; totalWeightKg: number }>>(
-      '/wheat-khata/preview',
-      data,
-    ),
-  addProduct: (data: { partyId: number; bags: number; ratePerBag: number; bagWeightKg?: number; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataProduct>>('/wheat-khata/products', data),
+  previewProduct: (data: {
+    bags: number
+    ratePerBag: number
+    bagWeightKg?: number
+    bagPricePerBag?: number
+    labourPerBag?: number
+  }) =>
+    api.post<ApiResponse<{
+      bags: number
+      bagWeightKg: number
+      ratePerBag: number
+      bagPricePerBag: number
+      labourPerBag: number
+      wheatAmount: number
+      bagAmount: number
+      labourAmount: number
+      totalPrice: number
+      totalWeightKg: number
+    }>>('/wheat-khata/preview', data),
+  addProduct: (data: {
+    partyId: number
+    bags: number
+    ratePerBag: number
+    bagWeightKg?: number
+    bagPricePerBag?: number
+    labourPerBag?: number
+    notes?: string
+  }) => api.post<ApiResponse<WheatKhataProduct>>('/wheat-khata/products', data),
+  addPayment: (data: { partyId: number; amount: number; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataPayment>>('/wheat-khata/payments', data),
 }
 
 export const truckApi = {
