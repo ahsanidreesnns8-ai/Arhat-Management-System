@@ -50,7 +50,7 @@ const sections: Array<{
     to: '/wheat-khata',
     icon: Wheat,
     title: 'Wheat Khata',
-    description: 'Cash in, receive wheat from parties, and sell wheat to parties',
+    description: 'Give product to companies and receive money; receive product from parties and give money',
   },
   {
     to: '/farmers',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Banknote, HandCoins, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
+import { Banknote, Building2, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -13,21 +13,20 @@ import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import type { WheatKhataBook, WheatKhataParty } from '../types'
 
-type Section = 'MONEY' | 'RECEIVING' | 'GIVING'
-type PartyKind = 'RECEIVING' | 'GIVING'
+type Section = 'MONEY' | 'PARTY' | 'COMPANY'
 
 const emptyBook: WheatKhataBook = {
   totals: {
     moneyIn: 0,
-    receivingAmount: 0,
-    givingAmount: 0,
+    receivingFromCompany: 0,
+    givingToParty: 0,
     cashGiven: 0,
     cashReceived: 0,
     totalAmount: 0,
   },
   money: [],
-  receivingParties: [],
-  givingParties: [],
+  parties: [],
+  companies: [],
 }
 
 const emptyProductForm = {
@@ -115,14 +114,14 @@ export default function WheatKhataPage() {
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
 
-  const parties = section === 'GIVING' ? book.givingParties : book.receivingParties
+  const entities = section === 'COMPANY' ? book.companies : book.parties
   const selectedProductParty = useMemo(
-    () => parties.find((p) => String(p.id) === productForm.partyId) || null,
-    [parties, productForm.partyId],
+    () => entities.find((p) => String(p.id) === productForm.partyId) || null,
+    [entities, productForm.partyId],
   )
   const selectedPaymentParty = useMemo(
-    () => parties.find((p) => String(p.id) === paymentForm.partyId) || null,
-    [parties, paymentForm.partyId],
+    () => entities.find((p) => String(p.id) === paymentForm.partyId) || null,
+    [entities, paymentForm.partyId],
   )
   const livePreview = productPreview(
     productForm.bags,
@@ -138,20 +137,20 @@ export default function WheatKhataPage() {
     setMoneyOpen(true)
   }
 
-  const openParty = (kind: PartyKind) => {
+  const openEntity = (kind: Section) => {
     setSection(kind)
     setPartyForm({ name: '', address: '', notes: '' })
     setPartyOpen(true)
   }
 
-  const openProduct = (kind: PartyKind, partyId = '') => {
+  const openProduct = (kind: Section, partyId = '') => {
     setSection(kind)
     setProductForm({ ...emptyProductForm, partyId })
     setCalculated(null)
     setProductOpen(true)
   }
 
-  const openPayment = (kind: PartyKind, partyId = '') => {
+  const openPayment = (kind: Section, partyId = '') => {
     setSection(kind)
     setPaymentForm({ partyId, amount: '', notes: '' })
     setPaymentOpen(true)
@@ -160,8 +159,8 @@ export default function WheatKhataPage() {
   useVoicePageActions({
     openCreate: () => {
       if (section === 'MONEY') openMoney()
-      else if (section === 'RECEIVING') openParty('RECEIVING')
-      else openParty('GIVING')
+      else if (section === 'COMPANY') openEntity('COMPANY')
+      else openEntity('PARTY')
     },
     refresh: () => { void load() },
     save: () => {
@@ -204,10 +203,10 @@ export default function WheatKhataPage() {
 
   const saveParty = async () => {
     if (!partyForm.name.trim()) {
-      toast.error('Party name is required')
+      toast.error(section === 'COMPANY' ? 'Company name is required' : 'Party name is required')
       return
     }
-    const kind: PartyKind = section === 'GIVING' ? 'GIVING' : 'RECEIVING'
+    const kind = section === 'COMPANY' ? 'COMPANY' : 'PARTY'
     setSaving(true)
     try {
       await wheatKhataApi.addParty({
@@ -216,7 +215,7 @@ export default function WheatKhataPage() {
         address: partyForm.address.trim() || undefined,
         notes: partyForm.notes.trim() || undefined,
       })
-      toast.success(kind === 'RECEIVING' ? 'Receiving party saved' : 'Selling party saved')
+      toast.success(kind === 'COMPANY' ? 'Company saved' : 'Party saved')
       setPartyForm({ name: '', address: '', notes: '' })
       setPartyOpen(false)
       void load(true)
@@ -247,7 +246,7 @@ export default function WheatKhataPage() {
 
   const saveProduct = async () => {
     if (!productForm.partyId) {
-      toast.error('Choose a party name first')
+      toast.error(section === 'COMPANY' ? 'Choose a company name first' : 'Choose a party name first')
       return
     }
     const preview = productPreview(
@@ -273,9 +272,9 @@ export default function WheatKhataPage() {
         notes: productForm.notes.trim() || undefined,
       })
       toast.success(
-        section === 'GIVING'
-          ? 'Product given — wheat, bag price, and labour added to giving amount'
-          : 'Product received — wheat, bag price, and labour added to receiving amount',
+        section === 'COMPANY'
+          ? 'Product given to company — wheat, bag price, and labour added to receiving amount from company'
+          : 'Product received from party — wheat, bag price, and labour added to giving amount to party',
       )
       setProductForm(emptyProductForm)
       setCalculated(null)
@@ -290,7 +289,7 @@ export default function WheatKhataPage() {
 
   const savePayment = async () => {
     if (!paymentForm.partyId) {
-      toast.error('Choose a party name first')
+      toast.error(section === 'COMPANY' ? 'Choose a company name first' : 'Choose a party name first')
       return
     }
     const amount = Number(paymentForm.amount)
@@ -306,9 +305,9 @@ export default function WheatKhataPage() {
         notes: paymentForm.notes.trim() || undefined,
       })
       toast.success(
-        section === 'GIVING'
-          ? 'Amount received — added to total money'
-          : 'Amount given — deducted from total money',
+        section === 'COMPANY'
+          ? 'Amount received from company — added to total money'
+          : 'Amount given to party — deducted from total money',
       )
       setPaymentForm({ partyId: '', amount: '', notes: '' })
       setPaymentOpen(false)
@@ -321,14 +320,14 @@ export default function WheatKhataPage() {
   }
 
   const { totals } = book
-  const partyKind: PartyKind = section === 'GIVING' ? 'GIVING' : 'RECEIVING'
+  const isCompany = section === 'COMPANY'
   const preview = calculated || livePreview
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Wheat Khata"
-        description="Receive wheat and give cash to receiving parties. Give wheat and receive cash from selling parties."
+        description="Give product to a company and receive money from it. Receive product from a party and give money to it."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -336,26 +335,26 @@ export default function WheatKhataPage() {
           <p className="text-xs uppercase tracking-wide text-slate-500">Total amount</p>
           <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(totals.totalAmount)}</p>
           <p className="text-[11px] text-slate-500 mt-1">
-            Add money {formatCurrency(totals.moneyIn)} + received {formatCurrency(totals.cashReceived)} − given {formatCurrency(totals.cashGiven)}
+            Add money {formatCurrency(totals.moneyIn)} + from companies {formatCurrency(totals.cashReceived)} − to parties {formatCurrency(totals.cashGiven)}
           </p>
         </div>
         <div className="card-3d p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount</p>
-          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.receivingAmount)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">Wheat + bag price + labour from receiving parties</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount from company</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingFromCompany)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Product given to companies (wheat + bag + labour) plus money received from them</p>
         </div>
         <div className="card-3d p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Giving amount</p>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.givingAmount)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">Wheat + bag price + labour to selling parties</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Giving amount to party</p>
+          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingToParty)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Product received from parties (wheat + bag + labour) plus money given to them</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {([
-          { id: 'MONEY' as const, label: 'Add Money', icon: Banknote },
-          { id: 'RECEIVING' as const, label: 'Add Receiving Party', icon: Truck },
-          { id: 'GIVING' as const, label: 'Add Selling Party', icon: HandCoins },
+          { id: 'MONEY' as const, label: 'Add Money', icon: Banknote, hint: 'Cash added to this khata' },
+          { id: 'PARTY' as const, label: 'Add Party', icon: Truck, hint: 'Receive product, then give money' },
+          { id: 'COMPANY' as const, label: 'Add Company', icon: Building2, hint: 'Give product, then receive money' },
         ]).map((item) => (
           <button
             key={item.id}
@@ -367,11 +366,7 @@ export default function WheatKhataPage() {
           >
             <item.icon className="h-5 w-5 text-primary mb-2" />
             <p className="font-semibold">{item.label}</p>
-            <p className="text-[11px] text-slate-500 mt-1">
-              {item.id === 'MONEY' && 'Cash added to this khata'}
-              {item.id === 'RECEIVING' && 'Receive wheat, then give amount'}
-              {item.id === 'GIVING' && 'Give wheat, then receive amount'}
-            </p>
+            <p className="text-[11px] text-slate-500 mt-1">{item.hint}</p>
           </button>
         ))}
       </div>
@@ -422,43 +417,41 @@ export default function WheatKhataPage() {
         </div>
       )}
 
-      {(section === 'RECEIVING' || section === 'GIVING') && (
+      {(section === 'PARTY' || section === 'COMPANY') && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => openParty(partyKind)}>
+            <Button onClick={() => openEntity(section)}>
               <Plus className="h-4 w-4" />
-              {section === 'RECEIVING' ? 'Add Receiving Party' : 'Add Selling Party'}
+              {isCompany ? 'Add Company' : 'Add Party'}
             </Button>
-            <Button variant="secondary" onClick={() => openProduct(partyKind)}>
+            <Button variant="secondary" onClick={() => openProduct(section)}>
               <PackagePlus className="h-4 w-4" />
-              {section === 'RECEIVING' ? 'Receive Product' : 'Give Product'}
+              {isCompany ? 'Give Product' : 'Receive Product'}
             </Button>
-            <Button variant="secondary" onClick={() => openPayment(partyKind)}>
+            <Button variant="secondary" onClick={() => openPayment(section)}>
               <Wallet className="h-4 w-4" />
-              {section === 'RECEIVING' ? 'Give Amount' : 'Receive Amount'}
+              {isCompany ? 'Receive Amount' : 'Give Amount'}
             </Button>
           </div>
           <div className="px-1">
-            <h3 className="text-sm font-semibold">
-              {section === 'RECEIVING' ? 'Receiving parties' : 'Selling parties'}
-            </h3>
+            <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
             <p className="text-[11px] text-slate-500">
-              {section === 'RECEIVING'
-                ? 'You receive wheat here, not money. Give Amount pays the party and deducts from total money. Tap a party for full details.'
-                : 'You give wheat here, not money. Receive Amount collects cash and adds to total money. Tap a party for full details.'}
+              {isCompany
+                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money.'
+                : 'Owner receives wheat from the party and gives money to it. Give Amount deducts from total money.'}
             </p>
           </div>
           {loading ? (
             <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
-          ) : !parties.length ? (
+          ) : !entities.length ? (
             <p className="card-3d p-5 text-sm text-slate-500">
-              {section === 'RECEIVING'
-                ? 'Add a receiving party first, then receive product or give amount.'
-                : 'Add a selling party first, then give product or receive amount.'}
+              {isCompany
+                ? 'Add a company first, then give product or receive amount.'
+                : 'Add a party first, then receive product or give amount.'}
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {parties.map((p) => (
+              {entities.map((p) => (
                 <div key={p.id} className="card-3d p-4 space-y-3">
                   <button type="button" onClick={() => setDetailParty(p)} className="w-full text-left">
                     <p className="font-semibold truncate">{p.name}</p>
@@ -473,11 +466,11 @@ export default function WheatKhataPage() {
                         <div className="font-semibold">{formatCurrency(p.productTotal)}</div>
                       </div>
                       <div className={`rounded-lg px-2 py-1.5 ${
-                        section === 'RECEIVING'
-                          ? 'bg-rose-50 dark:bg-rose-500/10'
-                          : 'bg-emerald-50 dark:bg-emerald-500/10'
+                        isCompany
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10'
+                          : 'bg-rose-50 dark:bg-rose-500/10'
                       }`}>
-                        <div className="text-slate-500">{section === 'RECEIVING' ? 'Given' : 'Received'}</div>
+                        <div className="text-slate-500">{isCompany ? 'Received' : 'Given'}</div>
                         <div className="font-semibold">{formatCurrency(p.cashTotal)}</div>
                       </div>
                       <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2 py-1.5">
@@ -487,11 +480,11 @@ export default function WheatKhataPage() {
                     </div>
                   </button>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Button size="sm" onClick={() => openProduct(partyKind, String(p.id))}>
-                      {section === 'RECEIVING' ? 'Receive Product' : 'Give Product'}
+                    <Button size="sm" onClick={() => openProduct(section, String(p.id))}>
+                      {isCompany ? 'Give Product' : 'Receive Product'}
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => openPayment(partyKind, String(p.id))}>
-                      {section === 'RECEIVING' ? 'Give Amount' : 'Receive Amount'}
+                    <Button size="sm" variant="secondary" onClick={() => openPayment(section, String(p.id))}>
+                      {isCompany ? 'Receive Amount' : 'Give Amount'}
                     </Button>
                     <button
                       type="button"
@@ -533,19 +526,19 @@ export default function WheatKhataPage() {
       <Modal
         open={partyOpen}
         onClose={() => setPartyOpen(false)}
-        title={partyKind === 'RECEIVING' ? 'Add Receiving Party' : 'Add Selling Party'}
+        title={isCompany ? 'Add Company' : 'Add Party'}
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            {partyKind === 'RECEIVING'
-              ? 'Saved as a receiving party — owner receives wheat product from them, then gives amount.'
-              : 'Saved as a selling party — owner gives wheat product, then receives amount from them.'}
+            {isCompany
+              ? 'Company: owner gives wheat to them and receives money from them.'
+              : 'Party: owner receives wheat from them and gives money to them.'}
           </p>
           <Input
             label="Name *"
             value={partyForm.name}
             onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })}
-            placeholder="Type the party name"
+            placeholder={isCompany ? 'Type the company name' : 'Type the party name'}
           />
           <Input
             label="Address (optional)"
@@ -567,7 +560,7 @@ export default function WheatKhataPage() {
       <Modal
         open={productOpen}
         onClose={() => { setProductOpen(false); setCalculated(null) }}
-        title={partyKind === 'RECEIVING' ? 'Receive Product' : 'Give Product'}
+        title={isCompany ? 'Give Product to Company' : 'Receive Product from Party'}
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
@@ -576,7 +569,7 @@ export default function WheatKhataPage() {
           <PartyCombobox
             label="Name"
             required
-            items={parties.map((p) => ({
+            items={entities.map((p) => ({
               id: String(p.id),
               name: p.name,
               address: p.address,
@@ -585,7 +578,7 @@ export default function WheatKhataPage() {
             value={productForm.partyId}
             onChange={(id) => setProductForm({ ...productForm, partyId: id })}
             placeholder="Type ahs… then pick the name"
-            emptyLabel={partyKind === 'RECEIVING' ? 'Add a receiving party first' : 'Add a selling party first'}
+            emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedProductParty && (
             <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
@@ -643,16 +636,16 @@ export default function WheatKhataPage() {
                 Total: {formatCurrency(preview.totalPrice)} · {formatNumber(preview.totalWeightKg)} kg
               </div>
               <div className="text-[11px] text-slate-600 dark:text-slate-300">
-                {partyKind === 'RECEIVING'
-                  ? 'Adds to receiving amount. Use Give Amount to pay cash.'
-                  : 'Adds to giving amount. Use Receive Amount to collect cash.'}
+                {isCompany
+                  ? 'Adds to receiving amount from company. Use Receive Amount to collect cash.'
+                  : 'Adds to giving amount to party. Use Give Amount to pay cash.'}
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => { setProductOpen(false); setCalculated(null) }}>Cancel</Button>
             <Button variant="secondary" onClick={calculateProduct}>Calculate</Button>
-            <Button onClick={() => void saveProduct()} loading={saving} disabled={!parties.length}>Save</Button>
+            <Button onClick={() => void saveProduct()} loading={saving} disabled={!entities.length}>Save</Button>
           </div>
         </div>
       </Modal>
@@ -660,27 +653,27 @@ export default function WheatKhataPage() {
       <Modal
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
-        title={partyKind === 'RECEIVING' ? 'Give Amount' : 'Receive Amount'}
+        title={isCompany ? 'Receive Amount from Company' : 'Give Amount to Party'}
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            {partyKind === 'RECEIVING'
-              ? 'You received product from this party, not money. Give Amount pays them and deducts from total money.'
-              : 'You gave product to this party, not money. Receive Amount collects cash and adds to total money.'}
+            {isCompany
+              ? 'Owner gave product to this company. Receive Amount collects money from the company and adds to total money.'
+              : 'Owner received product from this party. Give Amount pays the party and deducts from total money.'}
           </p>
           <PartyCombobox
             label="Name"
             required
-            items={parties.map((p) => ({
+            items={entities.map((p) => ({
               id: String(p.id),
               name: p.name,
               address: p.address,
-              notes: `Product ${formatCurrency(p.productTotal)} · ${partyKind === 'RECEIVING' ? 'Given' : 'Received'} ${formatCurrency(p.cashTotal)}`,
+              notes: `Product ${formatCurrency(p.productTotal)} · ${isCompany ? 'Received' : 'Given'} ${formatCurrency(p.cashTotal)}`,
             }))}
             value={paymentForm.partyId}
             onChange={(id) => setPaymentForm({ ...paymentForm, partyId: id })}
             placeholder="Type ahs… then pick the name"
-            emptyLabel={partyKind === 'RECEIVING' ? 'Add a receiving party first' : 'Add a selling party first'}
+            emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedPaymentParty && (
             <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
@@ -688,7 +681,7 @@ export default function WheatKhataPage() {
               <div>{selectedPaymentParty.address || 'No address'}</div>
               <div>
                 Product {formatCurrency(selectedPaymentParty.productTotal)} ·
-                {' '}{partyKind === 'RECEIVING' ? 'Given' : 'Received'} {formatCurrency(selectedPaymentParty.cashTotal)} ·
+                {' '}{isCompany ? 'Received' : 'Given'} {formatCurrency(selectedPaymentParty.cashTotal)} ·
                 {' '}Balance {formatCurrency(Math.abs(selectedPaymentParty.remaining))}
               </div>
             </div>
@@ -707,7 +700,7 @@ export default function WheatKhataPage() {
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setPaymentOpen(false)}>Cancel</Button>
-            <Button onClick={() => void savePayment()} loading={saving} disabled={!parties.length}>Save</Button>
+            <Button onClick={() => void savePayment()} loading={saving} disabled={!entities.length}>Save</Button>
           </div>
         </div>
       </Modal>
@@ -715,7 +708,7 @@ export default function WheatKhataPage() {
       <Modal
         open={!!detailParty}
         onClose={() => setDetailParty(null)}
-        title={detailParty ? detailParty.name : 'Party details'}
+        title={detailParty ? detailParty.name : 'Details'}
         size="lg"
       >
         {detailParty && (
@@ -817,14 +810,14 @@ export default function WheatKhataPage() {
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setDetailParty(null)}>Close</Button>
               <Button variant="secondary" onClick={() => {
-                const kind = detailParty.kind === 'GIVING' ? 'GIVING' : 'RECEIVING'
+                const kind = detailParty.kind === 'GIVING' ? 'COMPANY' : 'PARTY'
                 setDetailParty(null)
                 openPayment(kind, String(detailParty.id))
               }}>
                 {detailParty.kind === 'GIVING' ? 'Receive Amount' : 'Give Amount'}
               </Button>
               <Button onClick={() => {
-                const kind = detailParty.kind === 'GIVING' ? 'GIVING' : 'RECEIVING'
+                const kind = detailParty.kind === 'GIVING' ? 'COMPANY' : 'PARTY'
                 setDetailParty(null)
                 openProduct(kind, String(detailParty.id))
               }}>

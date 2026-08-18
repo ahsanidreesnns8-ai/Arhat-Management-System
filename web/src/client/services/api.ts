@@ -234,7 +234,7 @@ export const wheatKhataApi = {
   book: () => api.get<ApiResponse<WheatKhataBook>>('/wheat-khata'),
   addMoney: (data: { amount: number; notes?: string }) =>
     api.post<ApiResponse<WheatKhataMoney>>('/wheat-khata/money', data),
-  addParty: (data: { kind: 'RECEIVING' | 'GIVING'; name: string; address?: string; notes?: string }) =>
+  addParty: (data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }) =>
     api.post<ApiResponse<WheatKhataParty>>('/wheat-khata/parties', data),
   getParty: (id: number) => api.get<ApiResponse<WheatKhataParty>>(`/wheat-khata/parties/${id}`),
   previewProduct: (data: {
