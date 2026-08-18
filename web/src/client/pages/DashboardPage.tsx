@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus, Wheat,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus, Wheat, Coins,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -194,6 +194,11 @@ export default function DashboardPage() {
         <Link to="/wheat-khata" className="contents">
           <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
             <Wheat className="h-4 w-4" /> Wheat Khata
+          </Button>
+        </Link>
+        <Link to="/arhat-amount" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Coins className="h-4 w-4" /> Arhat Amount
           </Button>
         </Link>
         {showFinance && (

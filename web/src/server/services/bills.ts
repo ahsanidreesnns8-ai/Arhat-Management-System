@@ -4,6 +4,7 @@ import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger } from '@/server/services/register'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
+import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
 
 function escape(value: unknown) {
   return String(value ?? '')
@@ -1085,4 +1086,82 @@ export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en') {
       ? 'Wheat Khata · All company bills'
       : 'Wheat Khata · All party bills'
   return documentFromSlips(title, urdu, slips)
+}
+
+function arhatLineRows(
+  history: Array<{ date: string; day: string; time: string; kind: string; reason: string; amount: number; book?: string }>,
+  urdu: boolean,
+) {
+  const kindLabel: Record<string, string> = {
+    ADD: urdu ? 'جمع' : 'Added',
+    RECEIVING: urdu ? 'وصول' : 'Received',
+    GIVING: urdu ? 'دی گئی' : 'Given',
+  }
+  const bookLabel: Record<string, string> = {
+    ARHAT: urdu ? 'آرھٹ' : 'Arhat',
+    WHEAT_KHATA: urdu ? 'گندم' : 'Wheat',
+  }
+  if (!history.length) {
+    return [[urdu ? 'کوئی اندراج نہیں' : 'No entries yet', '', '', '0']]
+  }
+  return history.map((row) => [
+    `${row.day} ${row.date} ${row.time}`,
+    `${row.book ? `${bookLabel[row.book] || row.book} · ` : ''}${kindLabel[row.kind] || row.kind}`,
+    row.reason,
+    money(row.amount),
+  ])
+}
+
+export async function arhatAmountBillHtml(lang = 'en') {
+  const book = await getArhatAmountBook()
+  const urdu = lang === 'ur'
+  const title = urdu ? 'آرھٹ رقم' : 'Arhat Amount'
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(title)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'کل رقم' : 'Total'}</span><div class="value">PKR ${money(book.totals.totalAmount)}</div></div>
+      <div><span class="label">${urdu ? 'جمع' : 'Added'}</span><div class="value">PKR ${money(book.totals.added)}</div></div>
+      <div><span class="label">${urdu ? 'وصول' : 'Receiving'}</span><div class="value">PKR ${money(book.totals.receiving)}</div></div>
+      <div><span class="label">${urdu ? 'دی گئی' : 'Giving'}</span><div class="value">PKR ${money(book.totals.giving)}</div></div>
+      <div><span class="label">${urdu ? 'زکوٰۃ' : 'Zakat'}</span><div class="value">PKR ${money(book.totals.zakat)}</div></div>
+      <div><span class="label">${urdu ? 'کمیشن' : 'Commission'}</span><div class="value">PKR ${money(book.totals.commission)}</div></div>
+    </div>
+  </div>`
+  const body =
+    table(
+      urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
+      arhatLineRows(book.history, urdu),
+    )
+  return page(title, partyHtml, body, urdu)
+}
+
+export async function arhatAmountMergeBillHtml(lang = 'en') {
+  const report = await getMergeReport()
+  const urdu = lang === 'ur'
+  const title = urdu ? 'تمام رقم — آرھٹ + گندم کھاتہ' : 'Merge all amount · Arhat + Wheat Khata'
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(title)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'آرھٹ رقم' : 'Arhat Amount'}</span><div class="value">PKR ${money(report.arhat.totalAmount)}</div></div>
+      <div><span class="label">${urdu ? 'گندم کھاتہ' : 'Wheat Khata'}</span><div class="value">PKR ${money(report.wheatKhata.totalAmount)}</div></div>
+      <div style="grid-column:1/-1"><span class="label">${urdu ? 'کل رقم' : 'Total amount'}</span><div class="value">PKR ${money(report.combined.totalAmount)}</div></div>
+    </div>
+  </div>`
+  const summary = table(
+    urdu ? ['تفصیل', 'آرھٹ', 'گندم کھاتہ', 'کل'] : ['Particulars', 'Arhat Amount', 'Wheat Khata', 'Total'],
+    [
+      [urdu ? 'جمع رقم' : 'Added amount', money(report.arhat.added), money(report.wheatKhata.added), money(report.combined.added)],
+      [urdu ? 'وصول رقم' : 'Receiving amount', money(report.arhat.receiving), money(report.wheatKhata.receiving), money(report.combined.receiving)],
+      [urdu ? 'دی گئی رقم' : 'Giving amount', money(report.arhat.giving), money(report.wheatKhata.giving), money(report.combined.giving)],
+      [urdu ? 'کمیشن' : 'Commission', money(report.arhat.commission), money(report.wheatKhata.commission), money(report.combined.commission)],
+      [urdu ? 'زکوٰۃ' : 'Zakat', money(report.arhat.zakat), money(report.wheatKhata.zakat), money(report.combined.zakat)],
+    ],
+    [urdu ? 'کل رقم' : 'Total amount', money(report.arhat.totalAmount), money(report.wheatKhata.totalAmount), money(report.combined.totalAmount)],
+  )
+  const history = `<h3 class="section-title ${urdu ? 'urdu' : ''}">${urdu ? 'مکمل ہسٹری' : 'Complete history'}</h3>
+    ${table(
+      urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
+      arhatLineRows(report.history, urdu),
+    )}`
+  return page(title, partyHtml, summary + history, urdu)
 }

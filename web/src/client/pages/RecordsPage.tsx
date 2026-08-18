@@ -18,6 +18,7 @@ import {
   Wallet,
   Warehouse,
   Wheat,
+  Coins,
 } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
@@ -51,6 +52,12 @@ const sections: Array<{
     icon: Wheat,
     title: 'Wheat Khata',
     description: 'Give product to companies and receive money; receive product from parties and give money',
+  },
+  {
+    to: '/arhat-amount',
+    icon: Coins,
+    title: 'Arhat Amount',
+    description: 'Shop cash book except Wheat Khata. Merge both books for a combined bill.',
   },
   {
     to: '/farmers',

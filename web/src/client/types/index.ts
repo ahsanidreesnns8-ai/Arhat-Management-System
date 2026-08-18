@@ -541,6 +541,50 @@ export interface WheatKhataBook {
   companies: WheatKhataParty[]
 }
 
+export interface ArhatAmountLine {
+  id: string
+  book: 'ARHAT' | 'WHEAT_KHATA' | string
+  source: string
+  kind: 'ADD' | 'RECEIVING' | 'GIVING' | string
+  amount: number
+  reason: string
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface ArhatAmountTotals {
+  added: number
+  receiving: number
+  giving: number
+  zakat: number
+  commission: number
+  totalAmount: number
+}
+
+export interface ArhatAmountBook {
+  totals: ArhatAmountTotals
+  manual: Array<{
+    id: number
+    kind: string
+    amount: number
+    notes?: string | null
+    createdAt: string
+    day: string
+    date: string
+    time: string
+  }>
+  history: ArhatAmountLine[]
+}
+
+export interface ArhatAmountMergeReport {
+  arhat: ArhatAmountTotals
+  wheatKhata: ArhatAmountTotals
+  combined: ArhatAmountTotals
+  history: ArhatAmountLine[]
+}
+
 export interface ZakatSummary {
   allTime: number
   last12Months: number
