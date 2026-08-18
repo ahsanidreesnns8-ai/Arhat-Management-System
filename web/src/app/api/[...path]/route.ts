@@ -706,6 +706,12 @@ async function dispatch(
 
   if (path[0] === 'bills' && method === 'GET') {
     const lang = url.searchParams.get('lang') ?? 'en'
+    if (path[1] === 'wheat-khata' && path[2] === 'all' && path.length === 3) {
+      return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang))
+    }
+    if (path[1] === 'wheat-khata' && path.length === 3) {
+      return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang))
+    }
     if (path[1] === 'register' && path[2] === 'party' && path.length === 4) {
       return html(await bills.registerPartyBill(numericId(path[3]), lang))
     }

@@ -2,6 +2,7 @@ import { prisma } from '@/server/db'
 import { copyrightText, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { getPartyLedger } from '@/server/services/register'
+import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
 
 function escape(value: unknown) {
   return String(value ?? '')
@@ -58,235 +59,220 @@ function formatBillDates(adjustmentDays = 0, timeZone = 'Asia/Karachi') {
   return { dayEn, dayUr, dateEn, dateUr, timeEn, timeUr, hijriEn: hijri.formattedEn, hijriUr: hijri.formattedUr }
 }
 
-async function page(title: string, partyHtml: string, body: string, urdu: boolean) {
+type BillSlip = {
+  title: string
+  partyHtml: string
+  body: string
+}
+
+function slipCss() {
+  return `@page{size:3.5in 6.5in;margin:0.14in}
+:root{--navy:#002D62;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
+*{box-sizing:border-box}
+html,body{margin:0;background:#e8edf3}
+body{
+  padding:12px;
+  color:var(--ink);
+  font-family:"Source Sans 3",system-ui,sans-serif;
+  font-size:8.5px;
+  line-height:1.35;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+.urdu{font-family:"Noto Nastaliq Urdu","Source Sans 3",serif}
+.slip{
+  width:3.5in;
+  min-height:6.5in;
+  margin:0 auto 14px;
+  padding:0.14in;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 1px 8px rgba(15,23,42,.12);
+  page-break-after:always;
+  break-after:page;
+}
+.slip:last-child{page-break-after:auto;break-after:auto;margin-bottom:0}
+.slip-head{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding-bottom:6px;
+  border-bottom:1.5px solid var(--gold);
+  margin-bottom:7px;
+}
+.rtc-mark{width:42px;height:42px;flex:0 0 42px;margin:0}
+.rtc-mark svg{width:42px;height:42px;display:block}
+.slip-meta{flex:1;min-width:0}
+.company{
+  margin:0;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:13px;
+  font-weight:700;
+  color:var(--navy);
+  line-height:1.15;
+  letter-spacing:.02em;
+}
+.bill-title{
+  margin:2px 0 0;
+  font-size:9px;
+  font-weight:600;
+  color:#334155;
+}
+.dates{
+  display:flex;
+  flex-wrap:wrap;
+  gap:2px 8px;
+  font-size:7.5px;
+  color:var(--muted);
+  margin:4px 0 2px;
+}
+.party-card{border:none;padding:0;background:none;margin:3px 0 0}
+.party-card h3{
+  margin:0 0 2px;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:12px;
+  color:var(--navy);
+  font-weight:700;
+  line-height:1.2;
+}
+.party-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}
+.party-grid .label{
+  display:block;
+  font-size:7px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:var(--muted);
+  font-weight:600;
+}
+.party-grid .value{font-size:8.5px;font-weight:600;color:var(--ink);margin-top:1px;word-break:break-word}
+.slip-body{flex:1}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:7.5px;table-layout:fixed}
+th,td{border:1px solid #cbd5e1;padding:3px 4px;text-align:left;vertical-align:top;word-break:break-word}
+th{background:var(--navy);color:#fff;font-weight:600;font-size:7px;letter-spacing:.02em}
+.totals{font-weight:700;background:#f1f5f9}
+.note{margin-top:8px;padding:6px 8px;background:var(--soft);border:1px solid var(--line);font-size:8px;line-height:1.4}
+.note strong{color:var(--navy)}
+.summary{margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.summary > div{border:1px solid var(--line);border-radius:4px;padding:6px 7px;background:#fff}
+.summary .label{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.summary .value{font-size:10px;font-weight:700;margin-top:3px;color:var(--navy);font-variant-numeric:tabular-nums}
+.section-title{
+  margin:10px 0 0;
+  color:var(--navy);
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:11px;
+  font-weight:700;
+}
+.payment-box{margin-top:8px;border:1px solid var(--gold);overflow:hidden;background:#fff}
+.payment-box .head{
+  background:var(--navy);
+  color:#fff;
+  padding:5px 8px;
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:11px;
+  font-weight:700;
+}
+.payment-box .body{padding:6px 8px}
+.payment-totals{display:grid;grid-template-columns:1fr;gap:5px;margin-top:6px}
+.payment-totals > div{border:1px solid var(--line);border-radius:4px;padding:6px;background:var(--soft)}
+.payment-totals .label{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.payment-totals .value{font-size:10px;font-weight:700;margin-top:2px;color:var(--navy)}
+.paid-note{margin-top:3px;font-size:7.5px;font-weight:500;color:#334155;line-height:1.35}
+.bill-block{page-break-inside:avoid;margin-bottom:8px}
+.slip-foot{margin-top:auto;padding-top:10px}
+.sign-row{display:flex;justify-content:flex-end;margin-bottom:8px}
+.sign-line{
+  min-width:1.35in;
+  border-top:1px solid #334155;
+  padding-top:2px;
+  text-align:center;
+  font-size:7.5px;
+  color:var(--muted);
+}
+.rule{border:none;border-top:1px solid #1e293b;margin:0 0 5px}
+.copyright{
+  margin:0;
+  padding:0;
+  border:none;
+  text-align:center;
+  font-size:6.5px;
+  color:var(--muted);
+  letter-spacing:.01em;
+  line-height:1.35;
+}
+@media print{
+  html,body{background:#fff;padding:0}
+  .slip{box-shadow:none;margin:0;width:auto;min-height:calc(6.5in - 0.28in)}
+  a{color:inherit;text-decoration:none}
+}`
+}
+
+function slipHtml(
+  company: string,
+  dates: ReturnType<typeof formatBillDates>,
+  copy: string,
+  urdu: boolean,
+  slip: BillSlip,
+) {
+  return `<article class="slip">
+  <header class="slip-head">
+    ${rtcMarkHtml()}
+    <div class="slip-meta">
+      <h1 class="company">${escape(company)}</h1>
+      ${slip.title ? `<div class="bill-title ${urdu ? 'urdu' : ''}">${escape(slip.title)}</div>` : ''}
+      <div class="dates">
+        <span><strong>${urdu ? 'دن' : 'Day'}</strong> ${escape(urdu ? dates.dayUr : dates.dayEn)}</span>
+        <span><strong>${urdu ? 'تاریخ' : 'Date'}</strong> ${escape(urdu ? dates.dateUr : dates.dateEn)}</span>
+        <span><strong>${urdu ? 'وقت' : 'Time'}</strong> ${escape(urdu ? dates.timeUr : dates.timeEn)}</span>
+        <span><strong>Hijri</strong> ${escape(urdu ? dates.hijriUr : dates.hijriEn)}</span>
+      </div>
+      ${slip.partyHtml}
+    </div>
+  </header>
+  <div class="slip-body">${slip.body}</div>
+  <footer class="slip-foot">
+    <div class="sign-row"><span class="sign-line">${urdu ? 'دستخط' : 'Signature'}</span></div>
+    <hr class="rule" />
+    <div class="copyright ${urdu ? 'urdu' : ''}">${escape(copy)}</div>
+  </footer>
+</article>`
+}
+
+async function documentFromSlips(docTitle: string, urdu: boolean, slips: BillSlip[]) {
   const settings = await prisma.businessSettings.findFirst()
   const dates = formatBillDates(
     settings?.hijriAdjustmentDays ?? 0,
     settings?.weatherTimezone || 'Asia/Karachi',
   )
   const company = settings?.companyName ?? 'Rehmani Trading Company'
-  const rtcMark = rtcMarkHtml()
   const copy = copyrightText(company, urdu)
+  const title = docTitle || company
   return `<!doctype html>
 <html lang="${urdu ? 'ur' : 'en'}" dir="${urdu ? 'rtl' : 'ltr'}">
 <head>
 <meta charset="utf-8">
-<title>${escape(title || company)}</title>
+<title>${escape(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 <style>
-:root{--navy:#002D62;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  padding:28px;
-  color:var(--ink);
-  background:#fff;
-  font-family:"Source Sans 3",system-ui,sans-serif;
-  font-size:13.5px;
-  line-height:1.45;
-  -webkit-print-color-adjust:exact;
-  print-color-adjust:exact;
-}
-.urdu{font-family:"Noto Nastaliq Urdu","Source Sans 3",serif}
-.sheet{max-width:980px;margin:auto}
-.brand{
-  text-align:center;
-  color:var(--navy);
-  border-bottom:2px solid var(--gold);
-  padding-bottom:14px;
-  margin-bottom:18px;
-}
-.rtc-mark{
-  width:76px;
-  height:76px;
-  margin:0 auto 10px;
-}
-.brand h1{
-  margin:0;
-  font-family:"Cormorant Garamond",Georgia,serif;
-  font-size:32px;
-  font-weight:700;
-  letter-spacing:.03em;
-}
-.brand h2{
-  margin:8px 0 0;
-  font-family:"Source Sans 3",sans-serif;
-  font-size:15px;
-  font-weight:600;
-  color:#334155;
-  letter-spacing:.02em;
-}
-.dates{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  flex-wrap:wrap;
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:12px;
-}
-.party-card{
-  border:1px solid var(--line);
-  border-radius:12px;
-  padding:14px 16px;
-  background:linear-gradient(180deg,#fff 0%,var(--soft) 100%);
-  margin-bottom:14px;
-}
-.party-card h3{
-  margin:0 0 10px;
-  font-family:"Cormorant Garamond",Georgia,serif;
-  font-size:22px;
-  color:var(--navy);
-  font-weight:700;
-}
-.party-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:8px 16px;
-}
-.party-grid .label{
-  display:block;
-  font-size:10px;
-  text-transform:uppercase;
-  letter-spacing:.06em;
-  color:var(--muted);
-  font-weight:600;
-}
-.party-grid .value{
-  font-size:13.5px;
-  font-weight:600;
-  color:var(--ink);
-  margin-top:2px;
-}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top}
-th{
-  background:var(--navy);
-  color:#fff;
-  font-weight:600;
-  font-size:11.5px;
-  letter-spacing:.02em;
-}
-.totals{font-weight:700;background:#f1f5f9}
-.note{
-  margin-top:14px;
-  padding:12px 14px;
-  background:var(--soft);
-  border:1px solid var(--line);
-  border-radius:10px;
-  font-size:13px;
-  line-height:1.55;
-}
-.note strong{color:var(--navy)}
-.summary{
-  margin-top:14px;
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
-  gap:10px;
-}
-.summary > div{
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:12px;
-  background:#fff;
-}
-.summary .label{
-  font-size:10px;
-  color:var(--muted);
-  text-transform:uppercase;
-  letter-spacing:.05em;
-  font-weight:600;
-}
-.summary .value{
-  font-size:16px;
-  font-weight:700;
-  margin-top:6px;
-  color:var(--navy);
-  font-variant-numeric:tabular-nums;
-}
-.section-title{
-  margin:22px 0 0;
-  color:var(--navy);
-  font-family:"Cormorant Garamond",Georgia,serif;
-  font-size:20px;
-  font-weight:700;
-}
-.payment-box{
-  margin-top:18px;
-  border:1.5px solid var(--gold);
-  border-radius:12px;
-  overflow:hidden;
-  background:#fff;
-}
-.payment-box .head{
-  background:linear-gradient(90deg,var(--navy),#0a3a75);
-  color:#fff;
-  padding:10px 14px;
-  font-family:"Cormorant Garamond",Georgia,serif;
-  font-size:18px;
-  font-weight:700;
-}
-.payment-box .body{padding:12px 14px}
-.payment-totals{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-top:12px;
-}
-.payment-totals > div{
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:10px;
-  background:var(--soft);
-}
-.payment-totals .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
-.payment-totals .value{font-size:15px;font-weight:700;margin-top:4px;color:var(--navy)}
-.paid-note{
-  margin-top:6px;
-  font-size:12px;
-  font-weight:500;
-  color:#334155;
-  line-height:1.45;
-}
-.bill-block{page-break-inside:avoid;margin-bottom:48px;padding-bottom:24px;border-bottom:1px dashed #94a3b8}
-.bill-block:last-child{border-bottom:none;margin-bottom:0}
-.copyright{
-  margin-top:28px;
-  padding-top:12px;
-  border-top:1.5px solid var(--gold);
-  text-align:center;
-  font-size:11px;
-  color:var(--muted);
-  letter-spacing:.01em;
-}
-@media print{
-  body{padding:12px}
-  .bill-block{page-break-after:always;border-bottom:none}
-  a{color:inherit;text-decoration:none}
-}
+${slipCss()}
 </style>
 </head>
 <body>
-<div class="sheet">
-  <div class="brand">
-    ${rtcMark}
-    <h1>${escape(company)}</h1>
-    ${title ? `<h2 class="${urdu ? 'urdu' : ''}">${escape(title)}</h2>` : ''}
-  </div>
-  <div class="dates">
-    <span><strong>${urdu ? 'دن' : 'Day'}</strong> ${escape(urdu ? dates.dayUr : dates.dayEn)}</span>
-    <span><strong>${urdu ? 'تاریخ' : 'Date'}</strong> ${escape(urdu ? dates.dateUr : dates.dateEn)}</span>
-    <span><strong>${urdu ? 'وقت' : 'Time'}</strong> ${escape(urdu ? dates.timeUr : dates.timeEn)}</span>
-    <span><strong>Hijri</strong> ${escape(urdu ? dates.hijriUr : dates.hijriEn)}</span>
-  </div>
-  ${partyHtml}
-  ${body}
-  <div class="copyright ${urdu ? 'urdu' : ''}">${escape(copy)}</div>
-</div>
+${slips.map((slip) => slipHtml(company, dates, copy, urdu, slip)).join('\n')}
 </body>
 </html>`
+}
+
+async function page(title: string, partyHtml: string, body: string | string[], urdu: boolean) {
+  const bodies = Array.isArray(body) ? body : [body]
+  return documentFromSlips(
+    title,
+    urdu,
+    bodies.map((item) => ({ title, partyHtml, body: item })),
+  )
 }
 
 /** Work sack wording: Urdu uses بوری, never تھیلی. */
@@ -697,14 +683,12 @@ export async function buyerBillSelected(
         : urdu
           ? 'خریدار بل / منتخب قطاریں'
           : 'Buyer Bill / Selected Lines'
-    return `<div class="bill-block">
-      <h3 class="section-title" style="margin-top:0">${escape(title)}</h3>
+    return `<h3 class="section-title" style="margin-top:0">${escape(title)}</h3>
       ${table(
         w.buyerCols,
         rows,
         [w.totals, '', String(bags), '', money(weight), '', money(amount)],
-      )}
-    </div>`
+      )}`
   })
 
   return page(
@@ -719,7 +703,7 @@ export async function buyerBillSelected(
       address: buyer.address,
       urdu,
     }),
-    sheets.join('\n'),
+    sheets,
     urdu,
   )
 }
@@ -922,4 +906,187 @@ async function renderRegisterLedgerBill(
     ],
   )
   return page(title, partyHtml, body, urdu)
+}
+
+type WheatKhataBillParty = Awaited<ReturnType<typeof getParty>>
+
+function wheatKhataKind(value: unknown): 'RECEIVING' | 'GIVING' {
+  const kind = String(value ?? '').trim().toUpperCase()
+  if (kind === 'PARTY' || kind === 'RECEIVING') return 'RECEIVING'
+  if (kind === 'COMPANY' || kind === 'GIVING') return 'GIVING'
+  throw new Error('Choose party or company')
+}
+
+function wheatProductDetail(
+  row: {
+    bags: number
+    trucks?: number | null
+    ratePerBag: number
+    bagPricePerBag: number
+    labourPerBag: number
+  },
+  isCompany: boolean,
+  urdu: boolean,
+) {
+  const trucks = row.trucks ?? 0
+  const extra = Math.max(0, row.bags - trucks * BAGS_PER_TRUCK)
+  let qty = urdu ? `${row.bags} بوریاں` : `${row.bags} bags`
+  if (isCompany && trucks > 0) {
+    const truckWord = urdu
+      ? `${trucks} ٹرک`
+      : `${trucks} truck${trucks === 1 ? '' : 's'}`
+    qty =
+      extra > 0
+        ? urdu
+          ? `${truckWord} + ${extra} بوریاں (${row.bags})`
+          : `${truckWord} + ${extra} bags (${row.bags})`
+        : urdu
+          ? `${truckWord} (${row.bags} بوریاں)`
+          : `${truckWord} (${row.bags} bags)`
+  }
+  const extras: string[] = []
+  if (row.bagPricePerBag) extras.push(`${urdu ? 'بوری' : 'bag'} ${money(row.bagPricePerBag)}`)
+  if (row.labourPerBag) extras.push(`${urdu ? 'مزدوری' : 'labour'} ${money(row.labourPerBag)}`)
+  return `${qty} × ${money(row.ratePerBag)}${extras.length ? ` + ${extras.join(' + ')}` : ''}`
+}
+
+function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSlip {
+  const isCompany = party.kind === 'GIVING'
+  const title = urdu
+    ? isCompany
+      ? 'گندم کھاتہ · کمپنی'
+      : 'گندم کھاتہ · پارٹی'
+    : isCompany
+      ? 'Wheat Khata · Company'
+      : 'Wheat Khata · Party'
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(party.name)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'قسم' : 'Type'}</span><div class="value">${
+        isCompany
+          ? urdu
+            ? 'کمپنی'
+            : 'Company'
+          : urdu
+            ? 'پارٹی'
+            : 'Party'
+      }</div></div>
+      <div><span class="label">${urdu ? 'بوریاں' : 'Bags'}</span><div class="value">${party.totalBags}</div></div>
+      ${
+        party.address
+          ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(party.address)}</div></div>`
+          : ''
+      }
+    </div>
+  </div>`
+
+  const products = [...(party.products || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const payments = [...(party.payments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+
+  const productRows = products.length
+    ? products.map((row) => [
+        `${row.date} ${row.time}`,
+        wheatProductDetail(row, isCompany, urdu),
+        money(row.totalWeightKg),
+        money(row.totalPrice),
+      ])
+    : [[urdu ? 'کوئی مال نہیں' : 'No product yet', '', '0', '0']]
+
+  const productTable = table(
+    urdu ? ['تاریخ', 'تفصیل', 'کلو', 'رقم'] : ['Date', 'Particulars', 'Kg', 'Amount'],
+    productRows,
+    [
+      urdu ? 'کل مال' : 'Product total',
+      `${party.totalBags} ${urdu ? 'بوریاں' : 'bags'}`,
+      money(party.totalWeightKg),
+      money(party.productTotal),
+    ],
+  )
+
+  const cashLabel = isCompany
+    ? urdu
+      ? 'وصول'
+      : 'Received'
+    : urdu
+      ? 'دی گئی'
+      : 'Given'
+  const paymentRows = payments.length
+    ? payments.map((row) => [
+        `${row.date} ${row.time}`,
+        cashLabel,
+        money(row.amount),
+        row.notes || '—',
+      ])
+    : [[urdu ? 'کوئی رقم نہیں' : 'No cash yet', '', '0', '—']]
+
+  const paymentTable = `<h3 class="section-title ${urdu ? 'urdu' : ''}">${
+    isCompany
+      ? urdu
+        ? 'وصول رقم'
+        : 'Cash received'
+      : urdu
+        ? 'دی گئی رقم'
+        : 'Cash given'
+  }</h3>
+    ${table(
+      urdu ? ['تاریخ', 'قسم', 'رقم', 'نوٹ'] : ['Date', 'Type', 'Amount', 'Note'],
+      paymentRows,
+      [urdu ? 'کل رقم' : 'Cash total', '', money(party.cashTotal), ''],
+    )}`
+
+  const net = party.remaining
+  const netLabel =
+    net > 0
+      ? isCompany
+        ? urdu
+          ? 'کمپنی پر باقی'
+          : 'Due from company'
+        : urdu
+          ? 'پارٹی کو باقی'
+          : 'Due to party'
+      : net < 0
+        ? isCompany
+          ? urdu
+            ? 'زیادہ وصول'
+            : 'Received extra'
+          : urdu
+            ? 'زیادہ دی'
+            : 'Given extra'
+        : urdu
+          ? 'حساب برابر'
+          : 'Settled'
+
+  const summary = `<div class="summary">
+    <div><div class="label">${urdu ? 'کل مال' : 'Product'}</div><div class="value">PKR ${money(party.productTotal)}</div></div>
+    <div><div class="label">${cashLabel}</div><div class="value">PKR ${money(party.cashTotal)}</div></div>
+    <div style="grid-column:1/-1"><div class="label">${urdu ? 'بقایا' : 'Balance'}</div><div class="value">PKR ${money(Math.abs(net))} · ${escape(netLabel)}</div></div>
+  </div>`
+
+  return { title, partyHtml, body: productTable + paymentTable + summary }
+}
+
+export async function wheatKhataBillHtml(id: number | bigint, lang = 'en') {
+  const party = await getParty(id)
+  const urdu = lang === 'ur'
+  const slip = wheatKhataSlipParts(party, urdu)
+  return documentFromSlips(slip.title, urdu, [slip])
+}
+
+export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en') {
+  const kind = wheatKhataKind(kindValue)
+  const urdu = lang === 'ur'
+  const book = await getBook()
+  const list = kind === 'GIVING' ? book.companies : book.parties
+  if (!list.length) {
+    throw new Error(kind === 'GIVING' ? 'No company bills yet' : 'No party bills yet')
+  }
+  const slips = list.map((party) => wheatKhataSlipParts(party, urdu))
+  const title = urdu
+    ? kind === 'GIVING'
+      ? 'گندم کھاتہ · تمام کمپنی بل'
+      : 'گندم کھاتہ · تمام پارٹی بل'
+    : kind === 'GIVING'
+      ? 'Wheat Khata · All company bills'
+      : 'Wheat Khata · All party bills'
+  return documentFromSlips(title, urdu, slips)
 }
