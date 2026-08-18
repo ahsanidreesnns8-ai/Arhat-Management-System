@@ -113,7 +113,8 @@ export function addCalendarDays(date: Date, days: number, timeZone: string) {
 }
 
 export function urduDigits(value: number | string) {
-  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
+  const map = Array.from('۰۱۲۳۴۵۶۷۸۹')
+  return String(value).replace(/\d/g, (digit) => map[Number(digit)] ?? digit)
 }
 
 export function formatHijri(parts: CalendarParts, lang: 'en' | 'ur' = 'en') {

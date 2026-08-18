@@ -17,7 +17,7 @@ Cursor is **not** an environment variable and is **not** part of runtime.
 ## Vercel project settings (one-time)
 
 1. Import this GitHub repository at [vercel.com/new](https://vercel.com/new).
-2. **Root Directory:** `web`
+2. **Root Directory:** `web` (Settings → Build and Deployment). If this is empty, `npm install` fails with ENOENT.
 3. **Production Branch:** `main` (so the site does not depend on Cloud Agent branches).
 4. Add `DATABASE_URL`.
 5. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
