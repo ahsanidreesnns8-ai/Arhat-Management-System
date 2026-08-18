@@ -26,10 +26,9 @@ function karachiParts(date: Date) {
 
 function parseKind(value: unknown): WheatKhataPartyKind {
   const kind = String(value ?? '').trim().toUpperCase()
-  if (!PARTY_KINDS.includes(kind as WheatKhataPartyKind)) {
-    throw new Error('Choose receiving or selling party')
-  }
-  return kind as WheatKhataPartyKind
+  if (kind === 'PARTY' || kind === 'RECEIVING') return 'RECEIVING'
+  if (kind === 'COMPANY' || kind === 'GIVING') return 'GIVING'
+  throw new Error('Choose party or company')
 }
 
 function parseAmount(value: unknown, label = 'Amount') {
@@ -281,26 +280,30 @@ export async function getBook() {
   ])
 
   const money = moneyRows.map(moneyDto)
-  const receivingParties = receivingRows.map((row) => partyDto(row))
-  const givingParties = givingRows.map((row) => partyDto(row))
+  const parties = receivingRows.map((row) => partyDto(row))
+  const companies = givingRows.map((row) => partyDto(row))
   const moneyIn = money.reduce((sum, row) => sum + row.amount, 0)
-  const receivingAmount = receivingParties.reduce((sum, row) => sum + row.productTotal, 0)
-  const givingAmount = givingParties.reduce((sum, row) => sum + row.productTotal, 0)
-  const cashGiven = receivingParties.reduce((sum, row) => sum + row.cashTotal, 0)
-  const cashReceived = givingParties.reduce((sum, row) => sum + row.cashTotal, 0)
+  const givingToParty =
+    parties.reduce((sum, row) => sum + row.productTotal, 0) +
+    parties.reduce((sum, row) => sum + row.cashTotal, 0)
+  const receivingFromCompany =
+    companies.reduce((sum, row) => sum + row.productTotal, 0) +
+    companies.reduce((sum, row) => sum + row.cashTotal, 0)
+  const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0)
+  const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0)
 
   return {
     totals: {
       moneyIn,
-      receivingAmount,
-      givingAmount,
+      receivingFromCompany,
+      givingToParty,
       cashGiven,
       cashReceived,
       totalAmount: moneyIn + cashReceived - cashGiven,
     },
     money,
-    receivingParties,
-    givingParties,
+    parties,
+    companies,
   }
 }
 
@@ -323,7 +326,7 @@ export async function createParty(input: {
 }) {
   const kind = parseKind(input.kind)
   const name = String(input.name ?? '').trim()
-  if (!name) throw new Error('Party name is required')
+  if (!name) throw new Error(kind === 'GIVING' ? 'Company name is required' : 'Party name is required')
   const address = parseOptionalText(input.address)
   const notes = parseOptionalText(input.notes)
 

@@ -145,7 +145,7 @@ export async function search(query: string) {
       id: `wheat-${item.id}`,
       type: 'WHEAT_KHATA',
       title: item.name,
-      subtitle: item.kind === 'GIVING' ? 'Wheat Khata selling party' : 'Wheat Khata receiving party',
+      subtitle: item.kind === 'GIVING' ? 'Wheat Khata company' : 'Wheat Khata party',
       link: '/wheat-khata',
     })),
   ]

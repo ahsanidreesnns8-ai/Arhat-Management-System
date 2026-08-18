@@ -525,15 +525,15 @@ export interface WheatKhataParty {
 export interface WheatKhataBook {
   totals: {
     moneyIn: number
-    receivingAmount: number
-    givingAmount: number
+    receivingFromCompany: number
+    givingToParty: number
     cashGiven: number
     cashReceived: number
     totalAmount: number
   }
   money: WheatKhataMoney[]
-  receivingParties: WheatKhataParty[]
-  givingParties: WheatKhataParty[]
+  parties: WheatKhataParty[]
+  companies: WheatKhataParty[]
 }
 
 export interface ZakatSummary {
