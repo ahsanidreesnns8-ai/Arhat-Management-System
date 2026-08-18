@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { formatMann, farmerBill, registerPartyBill } from '../src/server/services/bills'
+import { formatMann, splitMann, farmerBill, registerPartyBill } from '../src/server/services/bills'
 import { createFarmer } from '../src/server/services/farmers'
 import {
   createParty,
@@ -27,6 +27,10 @@ function assert(cond: unknown, message: string): asserts cond {
 async function main() {
   assert(formatMann(400, 5) === '10.05', `mann format expected 10.05 got ${formatMann(400, 5)}`)
   assert(formatMann(5600, 34) === '140.34', `mann format expected 140.34 got ${formatMann(5600, 34)}`)
+  const split405 = splitMann(405)
+  assert(split405.man.toFixed(0) === '10' && split405.extraKg.toFixed(0) === '5', '405 kg should be 10 man and 5 kg')
+  const split434 = splitMann(434)
+  assert(split434.man.toFixed(0) === '10' && split434.extraKg.toFixed(0) === '34', '434 kg should be 10 man and 34 kg')
 
   await runWithWorkspace('demo', async () => {
     const ids = {
