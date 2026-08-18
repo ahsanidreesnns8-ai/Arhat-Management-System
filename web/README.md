@@ -7,7 +7,8 @@
    - `JWT_SECRET` = any long random string
 4. Deploy → copy your permanent `https://….vercel.app` URL.
 
-Login: `owner` / `owner123` · `staff` / `staff123` (only these two accounts)
+Login: `owner` / `owner123` · `staff` / `staff123`  
+The owner can add more users in **Owner Panel** (name, username, password). Those people can then sign in with that username and password.
 
 ---
 
@@ -37,9 +38,25 @@ npm run dev
 App: http://localhost:3000  
 API: http://localhost:3000/api  
 
-Allowed logins only:
+Default logins:
 - `owner` / `owner123`
 - `staff` / `staff123`
+- Additional users created in Owner Panel
+
+## AI Assistant (Gemini)
+
+Business questions (stock, sales, farmers, queue) work without a key.
+
+For world / general questions:
+
+1. Open [Google AI Studio](https://aistudio.google.com/apikey) and sign in.
+2. Click **Create API key** and copy it.
+3. Either:
+   - Paste it in the app: **Settings → AI Assistant (Gemini) → Save All Settings**, or
+   - Set `GEMINI_API_KEY` in `.env` (local) or Vercel → Project → Settings → Environment Variables, then redeploy.
+4. Open the AI Assistant from the bottom dock and ask a general question (e.g. “What is wheat?”).
+
+If both are set, the Vercel / `.env` key is used first.
 
 ## Deploy to Vercel (get a `*.vercel.app` link)
 

@@ -1,4 +1,6 @@
-import { ArrowLeft, Menu, X, Sun, Moon, Monitor, LogOut, User, Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, Menu, X, Sun, Moon, Monitor, LogOut, User, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
@@ -42,6 +44,14 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
   }
 
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refreshSystem = () => {
+    if (refreshing) return
+    setRefreshing(true)
+    toast.success(t('systemRefreshed'))
+    window.location.reload()
+  }
 
   return (
     <header className="app-navbar sticky top-0 z-30 safe-top">
@@ -78,6 +88,17 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          <motion.button
+            type="button"
+            onClick={refreshSystem}
+            className="nav-icon-btn text-[#002D62] dark:text-[#E8C87A]"
+            title={t('refreshSystem')}
+            whileTap={{ scale: 0.94 }}
+            aria-label={t('refreshSystem')}
+          >
+            <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+          </motion.button>
+
           <motion.button
             type="button"
             onClick={toggleAmountsHidden}

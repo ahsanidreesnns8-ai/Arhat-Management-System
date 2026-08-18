@@ -10,8 +10,6 @@ const products = [
   ['BAR-001', 'Barley'],
 ] as const
 
-const ALLOWED_USERNAMES = ['owner', 'staff'] as const
-
 async function ensureSettings(workspace: 'live' | 'demo', companyName: string) {
   const existing = await prisma.businessSettings.findFirst({ where: { workspace } })
   if (existing) return existing
@@ -101,20 +99,6 @@ async function upsertLoginUser(input: {
   })
 }
 
-async function disableOtherLogins() {
-  await prisma.user.updateMany({
-    where: {
-      username: { notIn: [...ALLOWED_USERNAMES] },
-    },
-    data: {
-      active: false,
-      deleted: true,
-      failedLoginAttempts: 0,
-      lockedUntil: null,
-    },
-  })
-}
-
 async function main() {
   await ensureSettings('live', 'Rehmani Trading Company')
   await ensureSettings('demo', 'Rehmani Trading Company')
@@ -123,7 +107,6 @@ async function main() {
   await ensureSync(1, 'live')
   await ensureSync(2, 'demo')
 
-  // Only two logins are permitted on this system.
   await upsertLoginUser({
     username: 'owner',
     email: 'owner@rehmanitrading.com',
@@ -141,8 +124,6 @@ async function main() {
     role: 'OPERATOR',
     workspace: 'live',
   })
-
-  await disableOtherLogins()
 }
 
 main()

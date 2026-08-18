@@ -8,6 +8,7 @@ import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
+import FarmerDetailFields from '../components/forms/FarmerDetailFields'
 import { useLanguage } from '../context/LanguageContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
@@ -259,6 +260,7 @@ export default function FarmerProductPage() {
               onChange={(id) => setFarmerId(id)}
               placeholder="Type ahs… then pick Ahsan"
             />
+            <FarmerDetailFields farmer={farmers.find((f) => String(f.id) === farmerId)} />
             <Select
               label="Product *"
               value={productId}

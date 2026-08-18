@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Building2, Percent, Languages, CloudSun, MoonStar } from 'lucide-react'
+import { Save, Building2, Percent, Languages, CloudSun, MoonStar, Bot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -51,6 +51,7 @@ export default function SettingsPage() {
   const [hijriMonth, setHijriMonth] = useState(1)
   const [hijriYear, setHijriYear] = useState(1447)
   const [hijriDirty, setHijriDirty] = useState(false)
+  const [geminiDraft, setGeminiDraft] = useState('')
 
   const loadPreview = async (forceHijri = false) => {
     try {
@@ -111,11 +112,14 @@ export default function SettingsPage() {
         hijriCorrectMonth: hijriMonth,
         hijriCorrectYear: hijriYear,
       }
-      delete payload.geminiApiKey
       delete payload.resetHijriAuto
       delete payload.hijriNudgeDays
+      delete payload.geminiApiKeyConfigured
+      if (geminiDraft.trim()) payload.geminiApiKey = geminiDraft.trim()
+      else delete payload.geminiApiKey
       const res = await settingsApi.update(payload)
       setSettings(res.data.data)
+      setGeminiDraft('')
       setHijriDirty(false)
       await refresh()
       await loadPreview(true)
@@ -303,6 +307,48 @@ export default function SettingsPage() {
               {t('urdu')}
             </button>
           </div>
+        </div>
+
+        <div className="card-3d p-6 lg:col-span-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Bot className="h-5 w-5 text-primary" />
+            <h3 className={`text-lg font-semibold ${isUrdu ? 'font-urdu' : ''}`}>{t('geminiSettings')}</h3>
+          </div>
+          <p className={`text-sm text-gray-500 mb-3 ${isUrdu ? 'font-urdu' : ''}`}>{t('geminiHint')}</p>
+          <ol className={`text-sm text-slate-600 dark:text-slate-300 space-y-1.5 mb-4 list-decimal pl-5 ${isUrdu ? 'font-urdu' : ''}`}>
+            <li>
+              Open{' '}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline"
+              >
+                Google AI Studio
+              </a>{' '}
+              and sign in with Google.
+            </li>
+            <li>Click <strong>Create API key</strong> and copy the key (starts with AIza).</li>
+            <li>Paste it below and tap <strong>Save All Settings</strong>.</li>
+            <li>
+              Optional on Vercel: Project → Settings → Environment Variables → add{' '}
+              <code className="text-primary">GEMINI_API_KEY</code> (this overrides the key saved here).
+            </li>
+          </ol>
+          {settings.geminiApiKeyConfigured && (
+            <p className={`text-xs text-emerald-700 dark:text-emerald-300 mb-2 ${isUrdu ? 'font-urdu' : ''}`}>
+              {t('geminiConfigured')}
+            </p>
+          )}
+          <Input
+            label={t('geminiKey')}
+            type="password"
+            autoComplete="off"
+            placeholder={settings.geminiApiKeyConfigured ? '••••••••' : 'AIza…'}
+            value={geminiDraft}
+            onChange={(e) => setGeminiDraft(e.target.value)}
+          />
+          <p className={`text-xs text-gray-500 mt-2 ${isUrdu ? 'font-urdu' : ''}`}>{t('geminiHowTo')}</p>
         </div>
 
         <div className="card-3d p-6 lg:col-span-2">

@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import { useAuth } from '../context/AuthContext'
 import { auditApi, backupApi, userApi } from '../services/api'
@@ -18,7 +17,7 @@ export default function OwnerPage() {
   const [logs, setLogs] = useState<Array<{ action: string; entityType: string; createdAt: string }>>([])
   const [staffUsage, setStaffUsage] = useState<StaffUsageSummary | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ username: '', email: '', fullName: '', password: '', role: 'OPERATOR' })
+  const [form, setForm] = useState({ username: '', fullName: '', password: '' })
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -30,16 +29,21 @@ export default function OwnerPage() {
   useEffect(() => { load() }, [])
 
   const createUser = async () => {
-    if (!form.username || !form.email || !form.password || !form.fullName) {
-      toast.error('Fill all required fields')
+    if (!form.username.trim() || !form.password.trim() || !form.fullName.trim()) {
+      toast.error('Fill name, username, and password')
       return
     }
     setSaving(true)
     try {
-      await userApi.create(form)
-      toast.success('User created')
+      await userApi.create({
+        fullName: form.fullName.trim(),
+        username: form.username.trim(),
+        password: form.password,
+        role: 'OPERATOR',
+      })
+      toast.success('User saved — they can log in now')
       setModalOpen(false)
-      setForm({ username: '', email: '', fullName: '', password: '', role: 'OPERATOR' })
+      setForm({ username: '', fullName: '', password: '' })
       load()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -133,7 +137,7 @@ export default function OwnerPage() {
         description="Users, staff access time, backups, audit"
         action={
           <Button size="sm" onClick={() => setModalOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Add
+            <Plus className="h-3.5 w-3.5" /> Add user
           </Button>
         }
       />
@@ -263,27 +267,17 @@ export default function OwnerPage() {
         </ul>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create user">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add user">
         <div className="space-y-2.5">
-          <Input label="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-          <Input label="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-          <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <Input label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          <Select
-            label="Role"
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            options={[
-              { value: 'OWNER', label: 'Owner' },
-              { value: 'ADMIN', label: 'Admin' },
-              { value: 'SUPERVISOR', label: 'Supervisor' },
-              { value: 'OPERATOR', label: 'Operator' },
-              { value: 'VIEWER', label: 'Viewer' },
-            ]}
-          />
+          <p className="text-[12px] text-slate-500">
+            Save a name, username, and password. That person can then sign in on the login page with those details.
+          </p>
+          <Input label="Name *" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+          <Input label="Username *" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" />
+          <Input label="Password *" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button onClick={createUser} loading={saving}>Create</Button>
+            <Button onClick={createUser} loading={saving}>Save</Button>
           </div>
         </div>
       </Modal>

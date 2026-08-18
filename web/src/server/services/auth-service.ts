@@ -7,7 +7,7 @@ import {
   verifyToken,
 } from '@/server/auth'
 import {
-  isAllowedLoginUsername,
+  isSharedShopLogin,
   normalizeLoginUsername,
 } from '@/server/allowed-logins'
 import { WORKSPACE_DEMO, runWithWorkspace } from '@/server/workspace'
@@ -30,18 +30,13 @@ export async function login(
     throw new Error('Username and password are required')
   }
 
-  // Hard allowlist: only owner / staff may authenticate.
-  if (!isAllowedLoginUsername(normalized)) {
-    throw new Error('Invalid username or password')
-  }
-
   const user = await prisma.user.findFirst({
     where: { username: normalized, deleted: false },
   })
 
   // owner / staff are shared shop logins. Never lock the whole account
   // because one person mistyped the password — everyone else still needs in.
-  const sharedShopLogin = isAllowedLoginUsername(normalized)
+  const sharedShopLogin = isSharedShopLogin(normalized)
 
   if (
     !sharedShopLogin &&

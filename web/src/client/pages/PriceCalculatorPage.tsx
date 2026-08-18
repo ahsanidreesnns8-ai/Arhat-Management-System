@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Calculator, RotateCcw, Save } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { Calculator, RotateCcw } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
-import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
 import { useLanguage } from '../context/LanguageContext'
-import { useVoicePageActions } from '../context/VoiceControlContext'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
-import { calculatorApi, dheriApi } from '../services/api'
+import { calculatorApi } from '../services/api'
 import { formatCurrency, formatNumber } from '../utils/format'
-import type { Dheri, PriceCalculationResult } from '../types'
+import type { PriceCalculationResult } from '../types'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -29,18 +26,11 @@ const emptyResult: PriceCalculationResult = {
 
 export default function PriceCalculatorPage() {
   const { t } = useLanguage()
-  const [dheris, setDheris] = useState<Dheri[]>([])
-  const [selectedDheriId, setSelectedDheriId] = useState<string>('')
   const [numberOfBags, setNumberOfBags] = useState('0')
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
   const [pricePerMann, setPricePerMann] = useState('0')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    dheriApi.getAll().then((res) => setDheris(res.data?.data ?? [])).catch(() => setDheris([]))
-  }, [])
 
   const payload = useMemo(() => ({
     numberOfBags: parseInt(numberOfBags) || 0,
@@ -63,19 +53,7 @@ export default function PriceCalculatorPage() {
     return () => clearTimeout(timer)
   }, [runCalculation])
 
-  const handleDheriSelect = (id: string) => {
-    setSelectedDheriId(id)
-    const dheri = dheris.find((d) => d.id === parseInt(id))
-    if (dheri) {
-      setNumberOfBags(String(dheri.numberOfBags))
-      setWeightPerBag(String(dheri.weightPerBag))
-      setPartialBagWeight(String(dheri.partialBagWeight || 0))
-      setPricePerMann(String(dheri.marketRate))
-    }
-  }
-
   const handleReset = () => {
-    setSelectedDheriId('')
     setNumberOfBags('0')
     setWeightPerBag('40')
     setPartialBagWeight('0')
@@ -83,57 +61,31 @@ export default function PriceCalculatorPage() {
     setResult(emptyResult)
   }
 
-  const handleSave = async () => {
-    if (!selectedDheriId) {
-      toast.error('Select a dheri to save')
-      return
-    }
-    setSaving(true)
-    try {
-      await calculatorApi.saveToDheri(parseInt(selectedDheriId), payload)
-      toast.success('Saved to dheri')
-    } catch {
-      toast.error('Failed to save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const resultRows = [
     { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: 'orange' as const },
+    { label: `Commission (${result.commissionPercentage || 4}%)`, value: formatCurrency(result.commission), accent: 'orange' as const },
     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
 
-  useVoicePageActions({
-    save: () => { void handleSave() },
-  })
-
   return (
     <div className="space-y-6">
-      <PageHeader title="Price Calculator" description="Calculate product amount and farmer payable" />
+      <PageHeader
+        title={t('calculator')}
+        description="Scratch pad only — numbers stay here. Nothing is saved to stock, Daily Trade, or records."
+      />
 
       <div className="card p-6 lg:p-8">
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-2">
           <Calculator className="h-6 w-6 text-primary" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Calculator</h2>
         </div>
+        <p className="text-sm text-slate-500 mb-6">
+          Enter bags, extra KG, and rate to see weight, amount, and commission. Use Daily Trade or Farmer Product when you want to record a real lot.
+        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-5">
-            <Select
-              label="Dheri"
-              value={selectedDheriId}
-              onChange={(e) => handleDheriSelect(e.target.value)}
-              options={[
-                { value: '', label: 'Select or enter manually' },
-                ...dheris.map((d) => ({
-                  value: d.id,
-                  label: `${d.dheriId} — ${d.farmerName} (${d.productName})`,
-                })),
-              ]}
-            />
             <BagsExtraRow
               bags={numberOfBags}
               extraKg={partialBagWeight}
@@ -152,10 +104,6 @@ export default function PriceCalculatorPage() {
               <Button onClick={runCalculation}>
                 <Calculator className="h-4 w-4" />
                 Calculate
-              </Button>
-              <Button onClick={handleSave} loading={saving}>
-                <Save className="h-4 w-4" />
-                Save to Dheri
               </Button>
             </div>
           </div>

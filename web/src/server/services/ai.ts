@@ -14,8 +14,17 @@ function contains(message: string, ...values: string[]) {
   return values.some((value) => message.includes(value.toLowerCase()))
 }
 
+async function resolveGeminiKey() {
+  const fromEnv = process.env.GEMINI_API_KEY?.trim()
+  if (fromEnv) return fromEnv
+  const row = await prisma.businessSettings.findFirst({
+    select: { geminiApiKey: true },
+  })
+  return row?.geminiApiKey?.trim() || null
+}
+
 async function generalAnswer(input: AiChatInput) {
-  const key = process.env.GEMINI_API_KEY
+  const key = await resolveGeminiKey()
   if (!key) return null
   try {
     const history = (input.history ?? []).slice(-8).map((item) => ({
@@ -136,8 +145,8 @@ export async function chat(input: AiChatInput) {
     ? response(general, 'world_ai')
     : response(
         urdu
-          ? 'عام سوالات کے لیے GEMINI_API_KEY ترتیب دیں۔ کاروباری ڈیٹا کے بارے میں ابھی پوچھ سکتے ہیں۔'
-          : 'Configure GEMINI_API_KEY for general questions. Business-data questions are available now.',
+          ? 'عام سوالات کے لیے Settings میں Gemini API کلید لگائیں، یا Vercel پر GEMINI_API_KEY سیٹ کریں۔ کاروباری ڈیٹا کے بارے میں ابھی پوچھ سکتے ہیں۔'
+          : 'Add a Gemini API key in Settings (or GEMINI_API_KEY on Vercel) for general questions. Business-data questions work now.',
         'system',
       )
 }

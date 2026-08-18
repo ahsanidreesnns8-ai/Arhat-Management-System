@@ -12,6 +12,7 @@ import type { Buyer, Dheri, Farmer, PriceCalculationResult, Product } from '../t
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
+import FarmerDetailFields from '../components/forms/FarmerDetailFields'
 
 const emptyResult: PriceCalculationResult = {
   totalWeight: 0,
@@ -247,6 +248,9 @@ export default function ArhatSalePage() {
                 onChange={(id) => setFarmerId(id)}
                 placeholder="Type ahs… then pick Ahsan"
               />
+            )}
+            {mode !== 'BUYER_SALE' && (
+              <FarmerDetailFields farmer={farmers.find((f) => String(f.id) === farmerId)} />
             )}
 
             {mode === 'BUYER_SALE' && (

@@ -1,13 +1,18 @@
-/** Only these two accounts may authenticate. */
-export const ALLOWED_LOGIN_USERNAMES = ['owner', 'staff'] as const
+/** Shared shop terminals (many people, same login) skip account lockout. */
+export const SHARED_SHOP_USERNAMES = ['owner', 'staff'] as const
 
-export type AllowedLoginUsername = (typeof ALLOWED_LOGIN_USERNAMES)[number]
+export type SharedShopUsername = (typeof SHARED_SHOP_USERNAMES)[number]
 
 export function normalizeLoginUsername(username: string) {
   return username.trim().toLowerCase()
 }
 
-export function isAllowedLoginUsername(username: string): username is AllowedLoginUsername {
+export function isSharedShopLogin(username: string): username is SharedShopUsername {
   const normalized = normalizeLoginUsername(username)
-  return (ALLOWED_LOGIN_USERNAMES as readonly string[]).includes(normalized)
+  return (SHARED_SHOP_USERNAMES as readonly string[]).includes(normalized)
+}
+
+/** @deprecated use isSharedShopLogin — kept so system accounts cannot be deleted */
+export function isAllowedLoginUsername(username: string): username is SharedShopUsername {
+  return isSharedShopLogin(username)
 }

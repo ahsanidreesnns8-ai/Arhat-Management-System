@@ -79,9 +79,13 @@ docker compose up -d --build
 
 Dashboard · Farmers · Buyers · Trucks · Dheris · Stock · Price Calculator · Farmer Product · Daily Trade · Queue · Sales · Payments · Records · Reports · Settings · Owner Panel · AI Assistant · Global Search · Bilingual bills
 
-## AI keys (server env only)
+## AI keys
+
+Business questions work without a key. For general / world questions, set `GEMINI_API_KEY` in `web/.env` or Vercel, **or** paste the key in **Settings → AI Assistant (Gemini)**.
+
+Get a free key: https://aistudio.google.com/apikey
 
 ```bash
 GEMINI_API_KEY=...
-GROQ_API_KEY=...   # optional
+GROQ_API_KEY=...   # optional, unused by the current assistant
 ```

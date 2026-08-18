@@ -26,6 +26,7 @@ export type SettingsInput = Partial<{
   hijriCorrectYear: number
   hijriNudgeDays: number
   resetHijriAuto: boolean
+  geminiApiKey: string | null
 }>
 
 export function settingsDto(row: BusinessSettings) {
@@ -43,7 +44,7 @@ export function settingsDto(row: BusinessSettings) {
     lowStockThreshold: row.lowStockThreshold.toNumber(),
     backupReminderDays: row.backupReminderDays,
     paymentReminderDays: row.paymentReminderDays,
-    geminiApiKeyConfigured: false,
+    geminiApiKeyConfigured: Boolean(row.geminiApiKey?.trim()),
     weatherLatitude: row.weatherLatitude.toNumber(),
     weatherLongitude: row.weatherLongitude.toNumber(),
     weatherLocationLabel: row.weatherLocationLabel,
@@ -77,6 +78,14 @@ export async function updateSettings(input: SettingsInput) {
   }
   if (input.weatherTimezone?.trim()) {
     data.weatherTimezone = input.weatherTimezone.trim()
+  }
+  if (input.geminiApiKey !== undefined) {
+    const key = input.geminiApiKey
+    if (key === null || key === 'CLEAR') {
+      data.geminiApiKey = null
+    } else if (key.trim()) {
+      data.geminiApiKey = key.trim().slice(0, 255)
+    }
   }
   if (input.backupReminderDays != null) {
     data.backupReminderDays = input.backupReminderDays

@@ -11,6 +11,7 @@ import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
+import FarmerDetailFields from '../components/forms/FarmerDetailFields'
 import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dailyTradeApi, farmerApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -543,7 +544,7 @@ export default function DailyTradePage() {
               onChange={(id) => setFarmerId(id)}
               placeholder="Type ahs… then pick Ahsan"
             />
-            <Input label="Address" value={farmer ? [farmer.address, farmer.city].filter(Boolean).join(', ') : ''} readOnly />
+            <FarmerDetailFields farmer={farmer} />
             <BagsExtraRow
               bags={farmerBags}
               extraKg={extraKg}

@@ -2,7 +2,7 @@ import type { User, UserRole } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { hashPassword } from '@/server/auth'
 import {
-  isAllowedLoginUsername,
+  isSharedShopLogin,
   normalizeLoginUsername,
 } from '@/server/allowed-logins'
 
@@ -31,18 +31,24 @@ export function userDto(user: User) {
 }
 
 function parseRole(value?: string): UserRole {
-  const role = String(value ?? '').toUpperCase()
+  const role = String(value ?? 'OPERATOR').toUpperCase()
   if (!['OWNER', 'ADMIN', 'SUPERVISOR', 'OPERATOR', 'VIEWER'].includes(role)) {
     throw new Error('Invalid user role')
   }
   return role as UserRole
 }
 
-function validate(input: UserInput) {
-  if (!input.username?.trim()) throw new Error('Username is required')
-  if (!input.email?.trim()) throw new Error('Email is required')
-  if (!input.fullName?.trim()) throw new Error('Full name is required')
-  return parseRole(input.role)
+function parseUsername(raw?: string) {
+  const username = normalizeLoginUsername(raw || '')
+  if (!username) throw new Error('Username is required')
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
+    throw new Error('Username must be 3–32 letters, numbers, dots, or dashes')
+  }
+  return username
+}
+
+function localEmail(username: string) {
+  return `${username}@local.rehmani`
 }
 
 export async function listUsers() {
@@ -62,55 +68,70 @@ export async function getUser(id: number | bigint) {
 }
 
 export async function createUser(input: UserInput) {
-  const role = validate(input)
-  const username = normalizeLoginUsername(input.username!)
-  if (!isAllowedLoginUsername(username)) {
-    throw new Error('Only owner and staff logins are allowed on this system')
-  }
+  const username = parseUsername(input.username)
+  if (!input.fullName?.trim()) throw new Error('Name is required')
   if (!input.password?.trim()) throw new Error('Password is required')
-  const duplicate = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { username },
-        { email: input.email!.trim() },
-      ],
-    },
+  if (input.password.trim().length < 4) throw new Error('Password must be at least 4 characters')
+  const role = parseRole(input.role || 'OPERATOR')
+  const email = (input.email?.trim() || localEmail(username)).toLowerCase()
+
+  const existing = await prisma.user.findFirst({
+    where: { username },
   })
-  if (duplicate?.username === username) {
+  if (existing && !existing.deleted) {
     throw new Error('Username already exists')
   }
-  if (duplicate) throw new Error('Email already exists')
-  const row = await prisma.user.create({
-    data: {
-      username,
-      email: input.email!.trim(),
-      password: await hashPassword(input.password),
-      fullName: input.fullName!.trim(),
-      role,
-      workspace: 'live',
-      active: input.active ?? true,
+
+  const emailTaken = await prisma.user.findFirst({
+    where: {
+      email,
+      ...(existing ? { id: { not: existing.id } } : {}),
     },
   })
+  if (emailTaken && !emailTaken.deleted) {
+    throw new Error('Email already exists')
+  }
+
+  const password = await hashPassword(input.password)
+  const data = {
+    username,
+    email,
+    password,
+    fullName: input.fullName.trim(),
+    role,
+    workspace: 'live' as const,
+    active: input.active ?? true,
+    deleted: false,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+  }
+
+  if (existing?.deleted) {
+    const row = await prisma.user.update({
+      where: { id: existing.id },
+      data,
+    })
+    return userDto(row)
+  }
+
+  const row = await prisma.user.create({ data })
   return userDto(row)
 }
 
 export async function updateUser(id: number | bigint, input: UserInput) {
-  const role = validate(input)
-  const username = normalizeLoginUsername(input.username!)
-  if (!isAllowedLoginUsername(username)) {
-    throw new Error('Only owner and staff logins are allowed on this system')
-  }
+  const username = parseUsername(input.username)
+  if (!input.fullName?.trim()) throw new Error('Name is required')
+  const role = parseRole(input.role)
   const existing = await prisma.user.findFirst({
     where: { id: BigInt(id), deleted: false },
   })
   if (!existing) throw new Error('User not found')
+  const email = (input.email?.trim() || existing.email).toLowerCase()
   const duplicate = await prisma.user.findFirst({
     where: {
       id: { not: existing.id },
-      OR: [
-        { username },
-        { email: input.email!.trim() },
-      ],
+      deleted: false,
+      OR: [{ username }, { email }],
     },
   })
   if (duplicate?.username === username) {
@@ -121,8 +142,8 @@ export async function updateUser(id: number | bigint, input: UserInput) {
     where: { id: existing.id },
     data: {
       username,
-      email: input.email!.trim(),
-      fullName: input.fullName!.trim(),
+      email,
+      fullName: input.fullName.trim(),
       role,
       ...(input.active != null && { active: input.active }),
       ...(input.password?.trim() && {
@@ -140,7 +161,7 @@ export async function setUserActive(id: number | bigint, active: boolean) {
 
 export async function deleteUser(id: number | bigint) {
   const existing = await getUser(id)
-  if (isAllowedLoginUsername(existing.username)) {
+  if (isSharedShopLogin(existing.username)) {
     throw new Error('System accounts cannot be deleted')
   }
   await prisma.user.update({
