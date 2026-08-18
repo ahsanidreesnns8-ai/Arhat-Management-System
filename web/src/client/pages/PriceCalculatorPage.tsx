@@ -93,6 +93,7 @@ export default function PriceCalculatorPage() {
               onBags={setNumberOfBags}
               onExtraKg={setPartialBagWeight}
               onBagKg={setWeightPerBag}
+              extraKgLabel="Extra KG"
             />
             <Input label="Rate / 40kg (PKR)" type="number" min="0" step="0.01" value={pricePerMann} onChange={(e) => setPricePerMann(e.target.value)} />
 

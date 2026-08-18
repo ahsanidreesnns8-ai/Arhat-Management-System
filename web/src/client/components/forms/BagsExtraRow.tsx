@@ -9,6 +9,7 @@ type BagsExtraRowProps = {
   onExtraKg: (value: string) => void
   onBagKg?: (value: string) => void
   showBagKg?: boolean
+  extraKgLabel?: string
 }
 
 /** Bags and Extra KG sit on the same row — Extra KG immediately beside bags. */
@@ -20,6 +21,7 @@ export default function BagsExtraRow({
   onExtraKg,
   onBagKg,
   showBagKg = true,
+  extraKgLabel,
 }: BagsExtraRowProps) {
   const { t } = useLanguage()
   return (
@@ -32,7 +34,7 @@ export default function BagsExtraRow({
         onChange={(e) => onBags(e.target.value)}
       />
       <Input
-        label={`${t('extraKg')} → stock`}
+        label={extraKgLabel ?? `${t('extraKg')} → stock`}
         type="number"
         step="0.01"
         min="0"
