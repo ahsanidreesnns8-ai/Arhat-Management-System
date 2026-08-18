@@ -24,13 +24,21 @@ export function ensureShopLogins() {
   return ensureOnce
 }
 
+async function passwordMatches(plain: string, encoded: string | null | undefined) {
+  if (!encoded) return false
+  try {
+    return await verifyPassword(plain, encoded)
+  } catch {
+    return false
+  }
+}
+
 async function repairShopLogins() {
   for (const login of DEFAULT_SHOP_LOGINS) {
     const existing = await prisma.user.findUnique({
       where: { username: login.username },
     })
-    const passwordOk =
-      !!existing && (await verifyPassword(login.password, existing.password))
+    const passwordOk = !!existing && (await passwordMatches(login.password, existing.password))
     const healthy =
       !!existing &&
       passwordOk &&
