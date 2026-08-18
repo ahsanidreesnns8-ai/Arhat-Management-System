@@ -1,6 +1,7 @@
 import { prisma } from '@/server/db'
 import { copyrightText, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
+import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger } from '@/server/services/register'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
 
@@ -287,10 +288,11 @@ function bagWord(urdu: boolean) {
       ? [
           'پروڈکٹ',
           'بوریاں',
-          'ایک بوری مقدار',
           'اضافی کلو',
+          'ایک بوری مقدار',
           'کل وزن',
-          'کل من',
+          'من',
+          'کلو',
           'ریٹ/40کلو',
           'مجموعی',
           'کمیشن',
@@ -299,10 +301,11 @@ function bagWord(urdu: boolean) {
       : [
           'Product',
           'Bags',
+          'Extra kg',
           'Qty of one bag',
-          'Extra KG',
           'Total kg',
-          'Total man',
+          'Man',
+          'Kg',
           'Rate/40kg',
           'Gross',
           'Commission',
@@ -323,11 +326,34 @@ function qtyLabel(value: number) {
   return String(Number(value.toFixed(2)))
 }
 
+/** Exact weight text — no rounding. Amounts still use money(). */
+function weightLabel(value: DecimalInput) {
+  const x = d(value)
+  if (!x.isFinite()) return '0'
+  if (x.isInteger()) return x.toFixed(0)
+  const places = x.decimalPlaces()
+  return x.toFixed(places ?? 0)
+}
+
+/**
+ * Whole man (before decimal) and leftover kg (fraction of a man × 40).
+ * Weight is not rounded.
+ */
+export function splitMann(totalKg: DecimalInput) {
+  const kg = d(totalKg)
+  const man = kg.div(40).floor()
+  const extraKg = kg.minus(man.mul(40))
+  return { man, extraKg }
+}
+
 /** 140.34 means 140 man and 34 extra kg (decimal is extra kg, not a fraction of a man). */
 export function formatMann(bagsKg: number, extraKg: number) {
-  const whole = Math.round(bagsKg / 40)
-  const extra = Math.max(0, Math.round(extraKg))
-  return `${whole}.${String(extra).padStart(2, '0')}`
+  const split = splitMann(d(bagsKg).add(extraKg))
+  const extra = split.extraKg
+  const extraDigits = extra.isInteger()
+    ? extra.toFixed(0).padStart(2, '0')
+    : extra.toFixed(extra.decimalPlaces() ?? 0)
+  return `${split.man.toFixed(0)}.${extraDigits}`
 }
 
 function table(headers: string[], rows: string[][], footer?: string[]) {
@@ -357,8 +383,9 @@ function partyDetailsCard(opts: {
 }
 
 /**
- * Farmer bill includes bags + Extra KG (stock) in payable.
- * Extra KG is priced at the dheri market rate and shown as its own columns.
+ * Farmer bill lists bags plus leftover kg (less than one bag), and splits man into
+ * whole man and leftover kg. Extra KG stock is not printed. Weights are exact;
+ * only amounts are rounded.
  */
 export async function farmerBill(id: number | bigint, lang = 'en') {
   const farmer = await prisma.farmer.findFirst({
@@ -372,10 +399,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       payments: {
         orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
       },
-      stockLots: {
-        include: { product: true, dheri: true },
-        orderBy: { intakeDate: 'desc' },
-      },
     },
   })
   if (!farmer) throw new Error('Farmer not found')
@@ -383,17 +406,19 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const urdu = lang === 'ur'
   const w = bagWord(urdu)
   const lines = farmer.dheris.map((item) => {
-    const bagQty = item.weightPerBag.toNumber()
-    const bagsWeight = item.numberOfBags * bagQty
-    const extraKg = item.partialBagWeight.toNumber()
+    const bagQty = d(item.weightPerBag.toString())
+    const extraKg = d(item.partialBagWeight.toString())
+    const bagsWeight = d(item.numberOfBags).mul(bagQty)
+    const totalKg = bagsWeight.add(extraKg)
+    const mann = splitMann(totalKg)
     return {
       product: item.product.name,
       bags: item.numberOfBags,
       bagQty,
-      bagsWeight,
       extraKg,
-      totalWeight: item.totalWeight.toNumber(),
-      mann: formatMann(bagsWeight, extraKg),
+      totalKg,
+      man: mann.man,
+      manKg: mann.extraKg,
       rate: item.marketRate.toNumber(),
       gross: item.totalPrice.toNumber(),
       commission: item.commissionAmount.toNumber(),
@@ -404,10 +429,11 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const rows = lines.map((item) => [
     item.product,
     String(item.bags),
-    qtyLabel(item.bagQty),
-    qtyLabel(item.extraKg),
-    money(item.totalWeight),
-    item.mann,
+    weightLabel(item.extraKg),
+    weightLabel(item.bagQty),
+    weightLabel(item.totalKg),
+    weightLabel(item.man),
+    weightLabel(item.manKg),
     money(item.rate),
     money(item.gross),
     money(item.commission),
@@ -415,9 +441,9 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   ])
 
   const bags = sum(lines.map((x) => x.bags))
-  const bagsWeight = sum(lines.map((x) => x.bagsWeight))
-  const extraKg = sum(lines.map((x) => x.extraKg))
-  const weight = sum(lines.map((x) => x.totalWeight))
+  const extraKg = lines.reduce((s, x) => s.add(x.extraKg), d(0))
+  const totalKg = lines.reduce((s, x) => s.add(x.totalKg), d(0))
+  const footerMann = splitMann(totalKg)
   const gross = sum(lines.map((x) => x.gross))
   const commission = sum(lines.map((x) => x.commission))
   const payable = sum(lines.map((x) => x.payable))
@@ -425,35 +451,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const paidNotes = farmer.payments
     .map((p) => String(p.notes ?? '').trim())
     .filter(Boolean)
-
-  // Extra KG stock has no dheri column — batches are tracked by date/product only.
-  const stockRows = farmer.stockLots.map((lot) => [
-    lot.intakeDate.toISOString().slice(0, 10),
-    lot.product.name,
-    money(lot.originalKg),
-    money(lot.remainingKg),
-    money(lot.ratePer40Kg),
-  ])
-  const stockOriginal = sum(farmer.stockLots.map((x) => x.originalKg.toNumber()))
-  const stockRemaining = sum(farmer.stockLots.map((x) => x.remainingKg.toNumber()))
-
-  const stockSection =
-    farmer.stockLots.length > 0
-      ? `<h3 class="section-title ${urdu ? 'urdu' : ''}">${urdu ? 'اضافی کلو اسٹاک ریکارڈ (اس کسان سے)' : 'Extra KG stock record (from this farmer)'}</h3>
-      ${table(
-        urdu
-          ? ['تاریخ', 'پروڈکٹ', 'اصل کلو', 'باقی کلو', 'ریٹ/40کلو']
-          : ['Date', 'Product', 'Original kg', 'Remaining kg', 'Rate/40kg'],
-        stockRows,
-        [
-          urdu ? 'کل' : 'Totals',
-          '',
-          money(stockOriginal),
-          money(stockRemaining),
-          '',
-        ],
-      )}`
-      : ''
 
   const recentPayments = farmer.payments.slice(0, 12)
   const paymentRows = recentPayments.map((p) => [
@@ -515,18 +512,17 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       [
         w.totals,
         String(bags),
+        weightLabel(extraKg),
         '',
-        qtyLabel(extraKg),
-        money(weight),
-        formatMann(bagsWeight, extraKg),
+        weightLabel(totalKg),
+        weightLabel(footerMann.man),
+        weightLabel(footerMann.extraKg),
         '',
         money(gross),
         money(commission),
         money(payable),
       ],
-    ) +
-      stockSection +
-      paymentBox,
+    ) + paymentBox,
     urdu,
   )
 }
