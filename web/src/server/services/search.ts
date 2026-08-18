@@ -11,6 +11,7 @@ const PAGE_SHORTCUTS = [
   { id: 'farmer-product', title: 'Farmer Product', titleUr: 'کسان پروڈکٹ', keywords: ['farmer product', 'کسان پروڈکٹ'], link: '/farmer-product' },
   { id: 'daily-trade', title: 'Daily Trade', titleUr: 'روزانہ تجارت', keywords: ['daily trade', 'stock', 'extra kg', 'آرھٹ', 'روزانہ'], link: '/daily-trade' },
   { id: 'wheat-khata', title: 'Wheat Khata', titleUr: 'گندم کھاتہ', keywords: ['wheat khata', 'wheat', 'khata', 'گندم', 'کھاتہ'], link: '/wheat-khata' },
+  { id: 'arhat-amount', title: 'Arhat Amount', titleUr: 'آرھٹ رقم', keywords: ['arhat amount', 'merge', 'آرھٹ رقم'], link: '/arhat-amount' },
   { id: 'queue', title: 'Queue', titleUr: 'قطار', keywords: ['queue', 'قطار'], link: '/queue' },
   { id: 'sales', title: 'Sales', titleUr: 'فروخت', keywords: ['sales', 'invoice', 'فروخت', 'انوائس'], link: '/sales' },
   { id: 'payments', title: 'Payments', titleUr: 'ادائیگیاں', keywords: ['payments', 'ادائیگی'], link: '/payments' },

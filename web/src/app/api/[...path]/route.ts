@@ -32,6 +32,7 @@ import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
 import * as register from '@/server/services/register'
 import * as wheatKhata from '@/server/services/wheat-khata'
+import * as arhatAmount from '@/server/services/arhat-amount'
 import { isOwnerFinanceRole } from '@/lib/roles'
 
 type RouteContext = {
@@ -654,6 +655,18 @@ async function dispatch(
     }
   }
 
+  if (path[0] === 'arhat-amount') {
+    if (path.length === 1 && method === 'GET') {
+      return result(await arhatAmount.getBook())
+    }
+    if (path[1] === 'merge' && method === 'GET') {
+      return result(await arhatAmount.getMergeReport())
+    }
+    if (path[1] === 'entries' && method === 'POST') {
+      return result(await arhatAmount.addEntry(payload), 'Amount saved', 201)
+    }
+  }
+
   if (path[0] === 'wheat-khata') {
     if (path.length === 1 && method === 'GET') {
       return result(await wheatKhata.getBook())
@@ -706,6 +719,12 @@ async function dispatch(
 
   if (path[0] === 'bills' && method === 'GET') {
     const lang = url.searchParams.get('lang') ?? 'en'
+    if (path[1] === 'arhat-amount' && path[2] === 'merge' && path.length === 3) {
+      return html(await bills.arhatAmountMergeBillHtml(lang))
+    }
+    if (path[1] === 'arhat-amount' && path.length === 2) {
+      return html(await bills.arhatAmountBillHtml(lang))
+    }
     if (path[1] === 'wheat-khata' && path[2] === 'all' && path.length === 3) {
       return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang))
     }

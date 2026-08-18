@@ -624,3 +624,17 @@ model WheatKhataPayment {
   @@index([workspace, partyId, createdAt])
   @@map("wheat_khata_payments")
 }
+
+/// Manual cash added, received, or given in Arhat Amount (auto farmer/buyer/register stay in their tables)
+model ArhatAmountEntry {
+  id        BigInt   @id @default(autoincrement())
+  workspace String   @default("live") @db.VarChar(20)
+  kind      String   @db.VarChar(20)
+  amount    Decimal  @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspace, kind, createdAt])
+  @@map("arhat_amount_entries")
+}

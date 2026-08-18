@@ -5,6 +5,7 @@ import type {
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
+  ArhatAmountBook, ArhatAmountMergeReport,
 } from '../types'
 
 const api = axios.create({
@@ -220,6 +221,8 @@ export const billApi = {
     billRequest(`/bills/wheat-khata/${id}`, lang),
   wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en') =>
     billRequest('/bills/wheat-khata/all', lang, { kind }),
+  arhatAmount: (lang: 'en' | 'ur' = 'en') => billRequest('/bills/arhat-amount', lang),
+  arhatAmountMerge: (lang: 'en' | 'ur' = 'en') => billRequest('/bills/arhat-amount/merge', lang),
 }
 
 export const registerApi = {
@@ -232,6 +235,13 @@ export const registerApi = {
   addEntry: (data: Record<string, unknown>) =>
     api.post<ApiResponse<RegisterEntry>>('/register/entries', data),
   zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
+}
+
+export const arhatAmountApi = {
+  book: () => api.get<ApiResponse<ArhatAmountBook>>('/arhat-amount'),
+  merge: () => api.get<ApiResponse<ArhatAmountMergeReport>>('/arhat-amount/merge'),
+  addEntry: (data: { kind: 'ADD' | 'RECEIVING' | 'GIVING'; amount: number; notes?: string }) =>
+    api.post('/arhat-amount/entries', data),
 }
 
 export const wheatKhataApi = {
