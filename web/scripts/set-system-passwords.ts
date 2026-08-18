@@ -1,6 +1,7 @@
 /**
- * Set unique owner/staff passwords without committing them.
- * Usage: cd web && OWNER_PASSWORD='...' STAFF_PASSWORD='...' npx tsx scripts/set-system-passwords.ts
+ * Reset owner/staff to the shop passwords (or env overrides).
+ * Usage: cd web && npx tsx scripts/set-system-passwords.ts
+ * Optional: OWNER_PASSWORD='...' STAFF_PASSWORD='...'
  */
 import { config } from 'dotenv'
 config({ path: '.env' })
@@ -8,6 +9,7 @@ config({ path: '.env' })
 import { prisma } from '../src/server/db'
 import { hashPassword } from '../src/server/auth'
 import { assertStrongPassword } from '../src/server/password-policy'
+import { DEFAULT_SHOP_LOGINS } from '../src/server/shop-login-defaults'
 import { endAllSessionsForUser } from '../src/server/services/login-sessions'
 
 async function setPassword(username: string, password: string) {
@@ -29,13 +31,11 @@ async function setPassword(username: string, password: string) {
 }
 
 async function main() {
-  const owner = process.env.OWNER_PASSWORD?.trim()
-  const staff = process.env.STAFF_PASSWORD?.trim()
-  if (!owner || !staff) {
-    throw new Error('OWNER_PASSWORD and STAFF_PASSWORD are required')
+  for (const login of DEFAULT_SHOP_LOGINS) {
+    const envKey = login.username === 'owner' ? 'OWNER_PASSWORD' : 'STAFF_PASSWORD'
+    const password = process.env[envKey]?.trim() || login.password
+    await setPassword(login.username, password)
   }
-  await setPassword('owner', owner)
-  await setPassword('staff', staff)
 }
 
 main()

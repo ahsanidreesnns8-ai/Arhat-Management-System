@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [formError, setFormError] = useState('')
   const [userFocused, setUserFocused] = useState(false)
   const [passFocused, setPassFocused] = useState(false)
   const { login } = useAuth()
@@ -50,9 +51,12 @@ export default function LoginPage() {
     const user = username.trim()
     const pass = password
     if (!user || !pass) {
-      toast.error(isUrdu ? 'صارف نام اور پاس ورڈ درکار ہیں' : 'Username and password are required')
+      const message = isUrdu ? 'صارف نام اور پاس ورڈ درکار ہیں' : 'Username and password are required'
+      setFormError(message)
+      toast.error(message)
       return
     }
+    setFormError('')
     setLoading(true)
     try {
       await login(user, pass)
@@ -63,7 +67,9 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const axiosMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       const plainMsg = err instanceof Error ? err.message : undefined
-      toast.error(axiosMsg || plainMsg || (isUrdu ? 'لاگ اِن ناکام' : 'Login failed'))
+      const message = axiosMsg || plainMsg || (isUrdu ? 'لاگ اِن ناکام' : 'Login failed')
+      setFormError(message)
+      toast.error(message)
       setLoading(false)
       setSuccess(false)
     }
@@ -185,12 +191,28 @@ export default function LoginPage() {
               initial={{ opacity: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
             >
+              {formError ? (
+                <div
+                  role="alert"
+                  className={`flex items-center gap-2 rounded-xl border border-red-400/40 bg-red-500/15 px-3.5 py-2.5 text-sm text-red-100 ${
+                    isUrdu ? 'font-urdu' : ''
+                  }`}
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
+                    ×
+                  </span>
+                  <span>{formError}</span>
+                </div>
+              ) : null}
               <div className={`login-field ${userFocused || username ? 'is-active' : ''}`}>
                 <input
                   id="login-username"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value)
+                    if (formError) setFormError('')
+                  }}
                   onFocus={() => setUserFocused(true)}
                   onBlur={() => setUserFocused(false)}
                   autoComplete="username"
@@ -207,7 +229,10 @@ export default function LoginPage() {
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (formError) setFormError('')
+                  }}
                   onFocus={() => setPassFocused(true)}
                   onBlur={() => setPassFocused(false)}
                   autoComplete="current-password"

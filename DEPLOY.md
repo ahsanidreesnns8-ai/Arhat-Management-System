@@ -16,6 +16,13 @@
 4. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
 5. Use the generated URL, e.g. `https://arhat-management-system.vercel.app`.
 
+Shop logins (always restored on deploy):
+
+| Username | Password |
+|----------|----------|
+| `owner` | `owner123` |
+| `staff` | `staff123` |
+
 Local instructions: [`web/README.md`](web/README.md)
 
 ---

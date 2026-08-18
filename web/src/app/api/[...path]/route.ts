@@ -6,6 +6,7 @@ import { bumpRevision, getPulse } from '@/server/sync'
 import { runWithWorkspace } from '@/server/workspace'
 import * as authService from '@/server/services/auth-service'
 import * as loginSessions from '@/server/services/login-sessions'
+import { ensureShopLogins } from '@/server/shop-logins'
 import * as farmers from '@/server/services/farmers'
 import * as buyers from '@/server/services/buyers'
 import * as trucks from '@/server/services/trucks'
@@ -104,6 +105,11 @@ async function dispatch(
       : {}
 
   if (path[0] === 'health' && method === 'GET') {
+    try {
+      await ensureShopLogins()
+    } catch {
+      // Keep health green; login will retry the repair.
+    }
     return result({
       status: 'UP',
       application: 'Rehmani Trading Company ERP',

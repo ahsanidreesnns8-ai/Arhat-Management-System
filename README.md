@@ -17,7 +17,7 @@ The production app lives in **`web/`** — **Next.js + TypeScript** (UI + API), 
 
 Details: [`web/README.md`](web/README.md)
 
-**Default login:** `owner` / `admin123`
+**Default login:** `owner` / `owner123` · `staff` / `staff123`
 
 ---
 

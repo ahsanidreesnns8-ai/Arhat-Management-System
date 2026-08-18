@@ -16,6 +16,7 @@ import {
   startLoginSession,
   touchLoginSession,
 } from '@/server/services/login-sessions'
+import { ensureShopLogins } from '@/server/shop-logins'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -29,6 +30,8 @@ export async function login(
   if (!normalized || !password) {
     throw new Error('Username and password are required')
   }
+
+  await ensureShopLogins()
 
   const user = await prisma.user.findFirst({
     where: { username: normalized, deleted: false },
