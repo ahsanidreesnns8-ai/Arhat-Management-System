@@ -15,6 +15,8 @@ import type { WheatKhataBook, WheatKhataParty } from '../types'
 
 type Section = 'MONEY' | 'PARTY' | 'COMPANY'
 
+const BAGS_PER_TRUCK = 600
+
 const emptyBook: WheatKhataBook = {
   totals: {
     moneyIn: 0,
@@ -23,6 +25,10 @@ const emptyBook: WheatKhataBook = {
     cashGiven: 0,
     cashReceived: 0,
     totalAmount: 0,
+    bagsReceived: 0,
+    bagsGiven: 0,
+    bagsInStock: 0,
+    bagsPerTruck: BAGS_PER_TRUCK,
   },
   money: [],
   parties: [],
@@ -32,6 +38,7 @@ const emptyBook: WheatKhataBook = {
 const emptyProductForm = {
   partyId: '',
   bags: '',
+  trucks: '',
   ratePerBag: '',
   bagWeightKg: '40',
   bagPricePerBag: '',
@@ -49,17 +56,34 @@ function moneyOrZero(value: string) {
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
+function countOrZero(value: string) {
+  if (!value.trim()) return 0
+  const n = Number(value)
+  return Number.isInteger(n) && n >= 0 ? n : 0
+}
+
+function bagsLabel(bags: number, perTruck = BAGS_PER_TRUCK) {
+  const trucks = Math.floor(bags / perTruck)
+  const extra = bags % perTruck
+  if (trucks > 0 && extra > 0) return `${formatNumber(bags, 0)} bags · ${trucks} truck${trucks === 1 ? '' : 's'} + ${extra}`
+  if (trucks > 0) return `${formatNumber(bags, 0)} bags · ${trucks} truck${trucks === 1 ? '' : 's'}`
+  return `${formatNumber(bags, 0)} bags`
+}
+
 function productPreview(
   bags: string,
   ratePerBag: string,
   bagWeightKg = '40',
   bagPricePerBag = '',
   labourPerBag = '',
+  trucks = '',
 ) {
-  const bagsN = Number(bags)
+  const extraBags = countOrZero(bags)
+  const trucksN = countOrZero(trucks)
+  const bagsN = trucksN * BAGS_PER_TRUCK + extraBags
   const rateN = Number(ratePerBag)
   const kgN = Number(bagWeightKg || 40)
-  if (!Number.isInteger(bagsN) || bagsN <= 0 || !Number.isFinite(rateN) || rateN <= 0) {
+  if (bagsN <= 0 || !Number.isFinite(rateN) || rateN <= 0) {
     return null
   }
   const bagPrice = moneyOrZero(bagPricePerBag)
@@ -70,6 +94,8 @@ function productPreview(
   const weight = Number.isFinite(kgN) && kgN > 0 ? bagsN * kgN : bagsN * 40
   return {
     bags: bagsN,
+    trucks: trucksN,
+    extraBags,
     ratePerBag: rateN,
     bagPricePerBag: bagPrice,
     labourPerBag: labour,
@@ -129,6 +155,7 @@ export default function WheatKhataPage() {
     productForm.bagWeightKg,
     productForm.bagPricePerBag,
     productForm.labourPerBag,
+    productForm.trucks,
   )
 
   const openMoney = () => {
@@ -233,14 +260,15 @@ export default function WheatKhataPage() {
       productForm.bagWeightKg,
       productForm.bagPricePerBag,
       productForm.labourPerBag,
+      productForm.trucks,
     )
     if (!preview) {
-      toast.error('Enter bags and rate of one bag first')
+      toast.error(section === 'COMPANY' ? 'Enter trucks or bags, and rate of one bag' : 'Enter bags and rate of one bag first')
       return
     }
     setCalculated(preview)
     toast.success(
-      `Wheat ${formatCurrency(preview.wheatAmount)} + bags ${formatCurrency(preview.bagAmount)} + labour ${formatCurrency(preview.labourAmount)} = ${formatCurrency(preview.totalPrice)}`,
+      `${preview.trucks ? `${preview.trucks} truck${preview.trucks === 1 ? '' : 's'} = ${preview.bags} bags. ` : ''}${preview.bags} bags · wheat ${formatCurrency(preview.wheatAmount)} + bags ${formatCurrency(preview.bagAmount)} + labour ${formatCurrency(preview.labourAmount)} = ${formatCurrency(preview.totalPrice)}`,
     )
   }
 
@@ -255,16 +283,18 @@ export default function WheatKhataPage() {
       productForm.bagWeightKg,
       productForm.bagPricePerBag,
       productForm.labourPerBag,
+      productForm.trucks,
     )
     if (!preview) {
-      toast.error('Enter bags and rate of one bag')
+      toast.error(section === 'COMPANY' ? 'Enter trucks or bags, and rate of one bag' : 'Enter bags and rate of one bag')
       return
     }
     setSaving(true)
     try {
       await wheatKhataApi.addProduct({
         partyId: Number(productForm.partyId),
-        bags: preview.bags,
+        bags: preview.extraBags,
+        trucks: preview.trucks || undefined,
         ratePerBag: preview.ratePerBag,
         bagWeightKg: Number(productForm.bagWeightKg || 40),
         bagPricePerBag: preview.bagPricePerBag,
@@ -273,8 +303,8 @@ export default function WheatKhataPage() {
       })
       toast.success(
         section === 'COMPANY'
-          ? 'Product given to company — wheat, bag price, and labour added to receiving amount from company'
-          : 'Product received from party — wheat, bag price, and labour added to giving amount to party',
+          ? `${preview.bags} bags deducted from stock and given to company`
+          : `${preview.bags} bags added to total bags received from parties`,
       )
       setProductForm(emptyProductForm)
       setCalculated(null)
@@ -347,6 +377,24 @@ export default function WheatKhataPage() {
           <p className="text-xs uppercase tracking-wide text-slate-500">Giving amount to party</p>
           <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingToParty)}</p>
           <p className="text-[11px] text-slate-500 mt-1">Product received from parties (wheat + bag + labour) plus money given to them</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Total bags received from parties</p>
+          <p className="text-2xl font-bold text-primary mt-1">{formatNumber(totals.bagsReceived, 0)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">{bagsLabel(totals.bagsReceived, totals.bagsPerTruck)} · adds when you receive from any party</p>
+        </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Bags sold to companies</p>
+          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatNumber(totals.bagsGiven, 0)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">{bagsLabel(totals.bagsGiven, totals.bagsPerTruck)} · 1 truck = {totals.bagsPerTruck} bags</p>
+        </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Bags in stock</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatNumber(totals.bagsInStock, 0)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">{bagsLabel(totals.bagsInStock, totals.bagsPerTruck)} · selling to a company deducts from here</p>
         </div>
       </div>
 
@@ -564,7 +612,10 @@ export default function WheatKhataPage() {
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            Type a few letters of the name (for example ahs) to autofill name and address. Total = (rate + bag price + labour) × bags.
+            Type a few letters of the name (for example ahs) to autofill name and address.
+            {isCompany
+              ? ' Enter trucks (1 truck = 600 bags) and/or extra bags. Those bags are deducted from stock.'
+              : ' Enter bags received. They add to the total bags from all parties.'}
           </p>
           <PartyCombobox
             label="Name"
@@ -586,10 +637,25 @@ export default function WheatKhataPage() {
               <div>{selectedProductParty.address || 'No address'}</div>
             </div>
           )}
+          {isCompany && (
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 text-[12px]">
+              Bags in stock: {bagsLabel(totals.bagsInStock, totals.bagsPerTruck)}. Selling deducts from this total. 1 truck = {totals.bagsPerTruck} bags.
+            </div>
+          )}
+          {isCompany && (
+            <Input
+              label={`Trucks (1 truck = ${BAGS_PER_TRUCK} bags)`}
+              type="number"
+              min="0"
+              step="1"
+              value={productForm.trucks}
+              onChange={(e) => { setProductForm({ ...productForm, trucks: e.target.value }); setCalculated(null) }}
+            />
+          )}
           <Input
-            label="Bags *"
+            label={isCompany ? 'Extra bags (besides trucks)' : 'Bags *'}
             type="number"
-            min="1"
+            min="0"
             step="1"
             value={productForm.bags}
             onChange={(e) => { setProductForm({ ...productForm, bags: e.target.value }); setCalculated(null) }}
@@ -629,6 +695,7 @@ export default function WheatKhataPage() {
           />
           {preview && (
             <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm space-y-0.5">
+              <div className="font-medium">{preview.bags} bags{preview.trucks ? ` (${preview.trucks} truck${preview.trucks === 1 ? '' : 's'}${preview.extraBags ? ` + ${preview.extraBags} bags` : ''})` : ''}</div>
               <div>Wheat: {preview.bags} × {formatCurrency(preview.ratePerBag)} = {formatCurrency(preview.wheatAmount)}</div>
               <div>Bag price: {preview.bags} × {formatCurrency(preview.bagPricePerBag)} = {formatCurrency(preview.bagAmount)}</div>
               <div>Labour: {preview.bags} × {formatCurrency(preview.labourPerBag)} = {formatCurrency(preview.labourAmount)}</div>
@@ -637,8 +704,8 @@ export default function WheatKhataPage() {
               </div>
               <div className="text-[11px] text-slate-600 dark:text-slate-300">
                 {isCompany
-                  ? 'Adds to receiving amount from company. Use Receive Amount to collect cash.'
-                  : 'Adds to giving amount to party. Use Give Amount to pay cash.'}
+                  ? 'Deducts these bags from stock and adds the amount to receiving from company.'
+                  : 'Adds these bags to total bags received from all parties.'}
               </div>
             </div>
           )}
@@ -761,7 +828,10 @@ export default function WheatKhataPage() {
                       {detailParty.products.map((row) => (
                         <tr key={row.id} className="border-b border-slate-100 dark:border-white/10">
                           <td className="px-3 py-2">{row.date} · {row.time}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(row.bags, 0)}</td>
+                          <td className="px-3 py-2 text-right">
+                            {formatNumber(row.bags, 0)}
+                            {row.trucks ? ` · ${row.trucks} truck${row.trucks === 1 ? '' : 's'}` : ''}
+                          </td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.ratePerBag)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.bagAmount)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.labourAmount)}</td>
