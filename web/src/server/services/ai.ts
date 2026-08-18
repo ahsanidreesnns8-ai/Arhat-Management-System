@@ -14,6 +14,8 @@ function contains(message: string, ...values: string[]) {
   return values.some((value) => message.includes(value.toLowerCase()))
 }
 
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest'] as const
+
 async function resolveGeminiKey() {
   const fromEnv = process.env.GEMINI_API_KEY?.trim()
   if (fromEnv) return fromEnv
@@ -23,37 +25,45 @@ async function resolveGeminiKey() {
   return row?.geminiApiKey?.trim() || null
 }
 
+async function callGemini(key: string, model: string, input: AiChatInput) {
+  const history = (input.history ?? []).slice(-8).map((item) => ({
+    role: item.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: item.content }],
+  }))
+  const result = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: input.message }] },
+        ],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    },
+  )
+  if (!result.ok) return null
+  const body = (await result.json()) as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> }
+    }>
+  }
+  return body.candidates?.[0]?.content?.parts?.[0]?.text ?? null
+}
+
 async function generalAnswer(input: AiChatInput) {
   const key = await resolveGeminiKey()
-  if (!key) return null
+  if (!key) return { text: null as string | null, configured: false }
   try {
-    const history = (input.history ?? []).slice(-8).map((item) => ({
-      role: item.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: item.content }],
-    }))
-    const result = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            ...history,
-            { role: 'user', parts: [{ text: input.message }] },
-          ],
-        }),
-        signal: AbortSignal.timeout(10_000),
-      },
-    )
-    if (!result.ok) return null
-    const body = (await result.json()) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> }
-      }>
+    for (const model of GEMINI_MODELS) {
+      const text = await callGemini(key, model, input)
+      if (text?.trim()) return { text, configured: true }
     }
-    return body.candidates?.[0]?.content?.parts?.[0]?.text ?? null
+    return { text: null, configured: true }
   } catch {
-    return null
+    return { text: null, configured: true }
   }
 }
 
@@ -141,12 +151,19 @@ export async function chat(input: AiChatInput) {
   }
 
   const general = await generalAnswer(input)
-  return general
-    ? response(general, 'world_ai')
-    : response(
-        urdu
-          ? 'عام سوالات کے لیے Settings میں Gemini API کلید لگائیں، یا Vercel پر GEMINI_API_KEY سیٹ کریں۔ کاروباری ڈیٹا کے بارے میں ابھی پوچھ سکتے ہیں۔'
-          : 'Add a Gemini API key in Settings (or GEMINI_API_KEY on Vercel) for general questions. Business-data questions work now.',
-        'system',
-      )
+  if (general.text) return response(general.text, 'world_ai')
+  if (general.configured) {
+    return response(
+      urdu
+        ? 'Gemini اس وقت جواب نہیں دے سکا۔ کچھ لمحے بعد دوبارہ کوشش کریں۔'
+        : 'Gemini is configured but could not answer just now. Please try again in a moment.',
+      'system',
+    )
+  }
+  return response(
+    urdu
+      ? 'عام سوالات کے لیے Settings میں Gemini API کلید لگائیں، یا Vercel پر GEMINI_API_KEY سیٹ کریں۔ کاروباری ڈیٹا کے بارے میں ابھی پوچھ سکتے ہیں۔'
+      : 'Add a Gemini API key in Settings (or GEMINI_API_KEY on Vercel) for general questions. Business-data questions work now.',
+    'system',
+  )
 }
