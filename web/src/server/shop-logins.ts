@@ -1,4 +1,4 @@
-import { prisma } from '@/server/db'
+import { basePrisma } from '@/server/db'
 import { hashPassword, verifyPassword } from '@/server/auth'
 import { DEFAULT_SHOP_LOGINS } from '@/server/shop-login-defaults'
 
@@ -35,7 +35,7 @@ async function passwordMatches(plain: string, encoded: string | null | undefined
 
 async function repairShopLogins() {
   for (const login of DEFAULT_SHOP_LOGINS) {
-    const existing = await prisma.user.findUnique({
+    const existing = await basePrisma.user.findUnique({
       where: { username: login.username },
     })
     const passwordOk = !!existing && (await passwordMatches(login.password, existing.password))
@@ -52,7 +52,7 @@ async function repairShopLogins() {
     const password =
       existing && passwordOk ? existing.password : await hashPassword(login.password)
     if (existing) {
-      await prisma.user.update({
+      await basePrisma.user.update({
         where: { id: existing.id },
         data: {
           email: login.email,
@@ -69,7 +69,7 @@ async function repairShopLogins() {
       continue
     }
 
-    await prisma.user.create({
+    await basePrisma.user.create({
       data: {
         username: login.username,
         email: login.email,

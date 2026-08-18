@@ -118,10 +118,10 @@ async function dispatch(
   if (path[0] === 'auth' && path[1] === 'login' && method === 'POST') {
     const ip = clientIp(request)
     const username = String(payload.username ?? '')
-    const ipLimited = rateLimit(`login:${ip}`, 12, 15 * 60_000)
+    const ipLimited = rateLimit(`login:${ip}`, 40, 15 * 60_000)
     const userLimited = rateLimit(
       `login:user:${username.trim().toLowerCase() || 'unknown'}`,
-      8,
+      40,
       15 * 60_000,
     )
     const limited = !ipLimited.ok ? ipLimited : userLimited
@@ -742,6 +742,16 @@ async function handle(request: NextRequest, context: RouteContext) {
   const method = request.method.toUpperCase()
   const { path } = await context.params
   try {
+    if (!process.env.DATABASE_URL?.trim()) {
+      throw new Error(
+        'Database is not configured. Set DATABASE_URL in Vercel Project Settings → Environment Variables.',
+      )
+    }
+    try {
+      await ensureShopLogins()
+    } catch {
+      // Login/data routes still run; they will surface a real DB error if needed.
+    }
     const user = await authenticate(request, method, path)
 
     // Demo sandbox cannot manage accounts, audit logs, or backups
@@ -799,7 +809,9 @@ async function handle(request: NextRequest, context: RouteContext) {
           : message === 'Access denied' ||
               message.startsWith('Demo account cannot')
             ? 403
-            : message.startsWith('API route not found')
+            : message.startsWith('Database is not configured')
+              ? 503
+              : message.startsWith('API route not found')
               ? 404
               : isDbTransient
                 ? 503
@@ -817,6 +829,7 @@ async function handle(request: NextRequest, context: RouteContext) {
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export const GET = handle
 export const POST = handle

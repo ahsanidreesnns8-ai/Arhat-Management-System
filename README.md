@@ -4,6 +4,8 @@ Full-stack grain trading & commission agency (**arhat**) management system.
 
 **Repo:** https://github.com/ahsanidreesnns8-ai/Arhat-Management-System
 
+This website runs on **Vercel + Postgres**. It does not depend on Cursor Cloud Agents. After deploy, cancelling a Cursor plan does not take the site down.
+
 ## Deploy on Vercel (recommended)
 
 The production app lives in **`web/`** — **Next.js + TypeScript** (UI + API), ready for `*.vercel.app`.
@@ -12,8 +14,9 @@ The production app lives in **`web/`** — **Next.js + TypeScript** (UI + API), 
 |------|--------|
 | 1 | Import this GitHub repo in [vercel.com/new](https://vercel.com/new) |
 | 2 | Set **Root Directory** → `web` |
-| 3 | Add env `DATABASE_URL` (Postgres, e.g. free [Neon](https://neon.tech)) and `JWT_SECRET` |
-| 4 | Deploy → open your `https://….vercel.app` link |
+| 3 | Add env `DATABASE_URL` (Postgres, e.g. free [Neon](https://neon.tech)). `JWT_SECRET` is optional. |
+| 4 | Set **Production Branch** to `main` |
+| 5 | Deploy → open your `https://….vercel.app` link |
 
 Details: [`web/README.md`](web/README.md)
 

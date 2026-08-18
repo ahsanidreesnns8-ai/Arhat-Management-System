@@ -1,6 +1,7 @@
 import type { ThemePreference } from '@prisma/client'
-import { prisma, getLiveSettingsCompanyName } from '@/server/db'
+import { prisma, getLiveSettingsCompanyName, basePrisma } from '@/server/db'
 import {
+  hashPassword,
   signToken,
   updateTheme as persistTheme,
   verifyPassword,
@@ -16,7 +17,7 @@ import {
   startLoginSession,
   touchLoginSession,
 } from '@/server/services/login-sessions'
-import { ensureShopLogins } from '@/server/shop-logins'
+import { canonicalShopPassword, ensureShopLogins } from '@/server/shop-logins'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -33,7 +34,7 @@ export async function login(
 
   await ensureShopLogins()
 
-  const user = await prisma.user.findFirst({
+  let user = await basePrisma.user.findFirst({
     where: { username: normalized, deleted: false },
   })
 
@@ -59,13 +60,45 @@ export async function login(
     throw new Error('This account is suspended. Contact an owner/admin.')
   }
 
-  const valid =
-    !!user && (await verifyPassword(password, user.password))
+  let valid = !!user && (await verifyPassword(password, user.password).catch(() => false))
+  const canonical = canonicalShopPassword(normalized)
+
+  // Shop terminals always accept the printed passwords, even if a past deploy
+  // rehashed them to an unknown value.
+  if (!valid && sharedShopLogin && canonical && password === canonical) {
+    const passwordHash = await hashPassword(canonical)
+    if (user) {
+      user = await basePrisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: passwordHash,
+          active: true,
+          deleted: false,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      })
+    } else {
+      user = await basePrisma.user.create({
+        data: {
+          username: normalized,
+          email: `${normalized}@rehmanitrading.com`,
+          password: passwordHash,
+          fullName: normalized === 'owner' ? 'Owner' : 'Staff',
+          role: normalized === 'owner' ? 'OWNER' : 'OPERATOR',
+          workspace: 'live',
+          active: true,
+          deleted: false,
+        },
+      })
+    }
+    valid = true
+  }
 
   if (!valid) {
     if (user && sharedShopLogin) {
       if (user.failedLoginAttempts || user.lockedUntil) {
-        await prisma.user.update({
+        await basePrisma.user.update({
           where: { id: user.id },
           data: { failedLoginAttempts: 0, lockedUntil: null },
         })
@@ -74,7 +107,7 @@ export async function login(
     }
     if (user) {
       const attempts = user.failedLoginAttempts + 1
-      await prisma.user.update({
+      await basePrisma.user.update({
         where: { id: user.id },
         data: {
           failedLoginAttempts: attempts,
@@ -96,7 +129,11 @@ export async function login(
     throw new Error('Invalid username or password')
   }
 
-  const authenticated = await prisma.user.update({
+  if (!user) {
+    throw new Error('Invalid username or password')
+  }
+
+  const authenticated = await basePrisma.user.update({
     where: { id: user.id },
     data: {
       failedLoginAttempts: 0,

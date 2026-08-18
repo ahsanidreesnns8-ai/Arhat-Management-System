@@ -4,8 +4,9 @@
 2. Set **Root Directory** to `web` (if not prefilled).
 3. Add env vars:
    - `DATABASE_URL` = your Neon Postgres URL (https://console.neon.tech)
-   - `JWT_SECRET` = any long random string
-4. Deploy → copy your permanent `https://….vercel.app` URL.
+   - `JWT_SECRET` = optional long random string (a built-in secret is used if omitted)
+4. Set the Vercel **Production Branch** to `main` so the site does not depend on Cursor agent branches.
+5. Deploy → copy your permanent `https://….vercel.app` URL.
 
 Login accounts:
 
@@ -77,10 +78,11 @@ If both are set, the Vercel / `.env` key is used first.
 3. Set **Root Directory** to `web`.
 4. Add env vars:
    - `DATABASE_URL` — Postgres connection string ([Neon](https://neon.tech) free tier works)
-   - `JWT_SECRET` — long random string
-   - optional: `GEMINI_API_KEY`, `GROQ_API_KEY`
-5. Deploy. Build uses `npm run vercel-build` (generate + db push + seed + next build).
-6. Open the provided `https://….vercel.app` link.
+   - `JWT_SECRET` — optional (built-in secret is used if omitted)
+   - optional: `GEMINI_API_KEY`
+5. Set **Production Branch** to `main`.
+6. Deploy. Build uses `npm run vercel-build` (generate + db push + seed + next build).
+7. Open the provided `https://….vercel.app` link.
 
 ### One-time Neon setup
 

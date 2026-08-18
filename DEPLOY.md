@@ -1,22 +1,28 @@
 # Deploy
 
-## Vercel (TypeScript / Next.js) — easiest `*.vercel.app` link
+This ERP is a **standalone Vercel app**. It does not use Cursor Cloud Agents, tunnels, or any temporary demo URL. Cancelling a Cursor plan does **not** stop the website once it is deployed on Vercel.
 
-1. Open [vercel.com/new](https://vercel.com/new) and import this GitHub repository.
-2. **Root Directory:** `web`
-3. **Environment variables:**
+Production URL: `https://arhat-management-system.vercel.app`
 
-| Name | Required | Notes |
+## What the live site needs (only these)
+
+| Name | Required | Where |
 |------|----------|--------|
-| `DATABASE_URL` | Yes | PostgreSQL URL ([Neon](https://neon.tech) free tier is fine) |
-| `JWT_SECRET` | Yes | Long random string |
-| `GEMINI_API_KEY` | No | AI assistant |
-| `GROQ_API_KEY` | No | AI fallback |
+| `DATABASE_URL` | Yes | Vercel → Project → Settings → Environment Variables. PostgreSQL from [Neon](https://neon.tech) (free tier is enough). |
+| `JWT_SECRET` | No | Optional. A built-in secret is used if this is missing so login does not break. |
+| `GEMINI_API_KEY` | No | AI assistant only |
 
-4. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
-5. Use the generated URL, e.g. `https://arhat-management-system.vercel.app`.
+Cursor is **not** an environment variable and is **not** part of runtime.
 
-Shop logins (always restored on deploy):
+## Vercel project settings (one-time)
+
+1. Import this GitHub repository at [vercel.com/new](https://vercel.com/new).
+2. **Root Directory:** `web`
+3. **Production Branch:** `main` (so the site does not depend on Cloud Agent branches).
+4. Add `DATABASE_URL`.
+5. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
+
+Shop logins are restored on every deploy and on every login:
 
 | Username | Password |
 |----------|----------|
