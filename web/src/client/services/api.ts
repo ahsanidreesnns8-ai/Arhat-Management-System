@@ -4,6 +4,7 @@ import type {
   Dheri, Farmer, Payment, PriceCalculationResult, Product, QueueEntry,
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
+  WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct,
 } from '../types'
 
 const api = axios.create({
@@ -227,6 +228,22 @@ export const registerApi = {
   addEntry: (data: Record<string, unknown>) =>
     api.post<ApiResponse<RegisterEntry>>('/register/entries', data),
   zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
+}
+
+export const wheatKhataApi = {
+  book: () => api.get<ApiResponse<WheatKhataBook>>('/wheat-khata'),
+  addMoney: (data: { amount: number; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataMoney>>('/wheat-khata/money', data),
+  addParty: (data: { kind: 'RECEIVING' | 'GIVING'; name: string; address?: string; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataParty>>('/wheat-khata/parties', data),
+  getParty: (id: number) => api.get<ApiResponse<WheatKhataParty>>(`/wheat-khata/parties/${id}`),
+  previewProduct: (data: { bags: number; ratePerBag: number; bagWeightKg?: number }) =>
+    api.post<ApiResponse<{ bags: number; bagWeightKg: number; ratePerBag: number; totalPrice: number; totalWeightKg: number }>>(
+      '/wheat-khata/preview',
+      data,
+    ),
+  addProduct: (data: { partyId: number; bags: number; ratePerBag: number; bagWeightKg?: number; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataProduct>>('/wheat-khata/products', data),
 }
 
 export const truckApi = {
