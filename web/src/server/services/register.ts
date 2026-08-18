@@ -3,6 +3,7 @@ import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 
 const KINDS = ['GIVING', 'RECEIVING', 'ZAKAT', 'FARMER_ADVANCE'] as const
+const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
 type RegisterKind = (typeof KINDS)[number]
 
 function karachiParts(date: Date) {
@@ -55,6 +56,70 @@ function entryDto(row: {
   }
 }
 
+type EntryDto = ReturnType<typeof entryDto>
+
+function totalsFromEntries(entries: Array<{ kind: string; amount: number }>) {
+  const receivedTotal = entries
+    .filter((row) => row.kind === 'RECEIVING')
+    .reduce((sum, row) => sum + row.amount, 0)
+  const givenTotal = entries
+    .filter((row) => row.kind === 'GIVING')
+    .reduce((sum, row) => sum + row.amount, 0)
+  return {
+    receivedTotal,
+    givenTotal,
+    balance: receivedTotal - givenTotal,
+    receivedCount: entries.filter((row) => row.kind === 'RECEIVING').length,
+    givenCount: entries.filter((row) => row.kind === 'GIVING').length,
+  }
+}
+
+function partyDto(
+  party: {
+    id: bigint
+    kind: string
+    name: string
+    address: string | null
+    notes: string | null
+    createdAt: Date
+    entries?: Array<{
+      id: bigint
+      kind: string
+      amount: { toNumber(): number }
+      notes: string | null
+      createdAt: Date
+      partyId: bigint | null
+      farmerId: bigint | null
+      paymentId: bigint | null
+      party?: { id: bigint; name: string; address: string | null; notes: string | null } | null
+      farmer?: { id: bigint; name: string; farmerId: string; address: string | null } | null
+    }>
+  },
+  includeEntries = false,
+) {
+  const entries = (party.entries || []).map((row) =>
+    entryDto({
+      ...row,
+      party: row.party ?? {
+        id: party.id,
+        name: party.name,
+        address: party.address,
+        notes: party.notes,
+      },
+    }),
+  )
+  return {
+    id: Number(party.id),
+    kind: party.kind,
+    name: party.name,
+    address: party.address,
+    notes: party.notes,
+    createdAt: party.createdAt.toISOString(),
+    ...totalsFromEntries(entries),
+    ...(includeEntries ? { entries } : {}),
+  }
+}
+
 function parseKind(value: unknown, allowed: readonly string[] = KINDS): RegisterKind {
   const kind = String(value ?? '').trim().toUpperCase()
   if (!allowed.includes(kind)) throw new Error('Invalid register type')
@@ -62,19 +127,33 @@ function parseKind(value: unknown, allowed: readonly string[] = KINDS): Register
 }
 
 export async function listParties(kind: string) {
-  const k = parseKind(kind, ['GIVING', 'RECEIVING'])
+  if (kind) parseKind(kind, ['GIVING', 'RECEIVING'])
   const rows = await prisma.registerParty.findMany({
-    where: { kind: k, deleted: false },
+    where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
     orderBy: { name: 'asc' },
+    include: {
+      entries: {
+        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
   })
-  return rows.map((row) => ({
-    id: Number(row.id),
-    kind: row.kind,
-    name: row.name,
-    address: row.address,
-    notes: row.notes,
-    createdAt: row.createdAt.toISOString(),
-  }))
+  return rows.map((row) => partyDto(row))
+}
+
+export async function getPartyLedger(id: number | bigint) {
+  const party = await prisma.registerParty.findFirst({
+    where: { id: BigInt(id), deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
+    include: {
+      entries: {
+        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
+        orderBy: { createdAt: 'desc' },
+        include: { farmer: true },
+      },
+    },
+  })
+  if (!party) throw new Error('Person not found')
+  return partyDto(party, true)
 }
 
 export async function createParty(input: {
@@ -83,25 +162,51 @@ export async function createParty(input: {
   address?: string | null
   notes?: string | null
 }) {
-  const kind = parseKind(input.kind, ['GIVING', 'RECEIVING'])
+  if (input.kind) parseKind(input.kind, ['GIVING', 'RECEIVING'])
   const name = String(input.name ?? '').trim()
   if (!name) throw new Error('Name is required')
-  const row = await prisma.registerParty.create({
-    data: {
-      kind,
-      name,
-      address: String(input.address ?? '').trim() || null,
-      notes: String(input.notes ?? '').trim() || null,
+  const address = String(input.address ?? '').trim() || null
+  const notes = String(input.notes ?? '').trim() || null
+
+  const existing = await prisma.registerParty.findFirst({
+    where: {
+      deleted: false,
+      kind: { in: [...MONEY_PARTY_KINDS] },
+      name: { equals: name, mode: 'insensitive' },
+    },
+    include: {
+      entries: {
+        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   })
-  return {
-    id: Number(row.id),
-    kind: row.kind,
-    name: row.name,
-    address: row.address,
-    notes: row.notes,
-    createdAt: row.createdAt.toISOString(),
+  if (existing) {
+    const row = await prisma.registerParty.update({
+      where: { id: existing.id },
+      data: {
+        address: address ?? existing.address,
+        notes: notes ?? existing.notes,
+      },
+      include: {
+        entries: {
+          where: { kind: { in: ['GIVING', 'RECEIVING'] } },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    })
+    return partyDto(row)
   }
+
+  const row = await prisma.registerParty.create({
+    data: {
+      kind: 'PERSON',
+      name,
+      address,
+      notes,
+    },
+  })
+  return partyDto({ ...row, entries: [] })
 }
 
 export async function listEntries(kind?: string | null) {
@@ -169,7 +274,11 @@ export async function createEntry(
 
   if (input.partyId == null) throw new Error('Choose a person')
   const party = await prisma.registerParty.findFirst({
-    where: { id: BigInt(input.partyId), deleted: false, kind },
+    where: {
+      id: BigInt(input.partyId),
+      deleted: false,
+      kind: { in: [...MONEY_PARTY_KINDS] },
+    },
   })
   if (!party) throw new Error('Person not found for this register')
   const row = await prisma.registerEntry.create({
@@ -202,3 +311,5 @@ export async function zakatSummary() {
     entries: rows.map((row) => entryDto({ ...row, party: null, farmer: null })),
   }
 }
+
+export type { EntryDto }

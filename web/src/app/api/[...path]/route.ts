@@ -649,6 +649,9 @@ async function dispatch(
 
   if (path[0] === 'register') {
     if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
+    if (path[1] === 'parties' && path.length === 3 && method === 'GET') {
+      return result(await register.getPartyLedger(numericId(path[2])))
+    }
     if (path[1] === 'parties' && method === 'GET') {
       return result(await register.listParties(url.searchParams.get('kind') ?? ''))
     }
@@ -672,6 +675,9 @@ async function dispatch(
 
   if (path[0] === 'bills' && method === 'GET') {
     const lang = url.searchParams.get('lang') ?? 'en'
+    if (path[1] === 'register' && path[2] === 'party' && path.length === 4) {
+      return html(await bills.registerPartyBill(numericId(path[3]), lang))
+    }
     if (path[1] === 'register' && path.length === 3) {
       return html(await bills.registerEntryBill(numericId(path[2]), lang))
     }

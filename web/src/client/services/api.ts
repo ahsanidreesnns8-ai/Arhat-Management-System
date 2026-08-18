@@ -213,6 +213,8 @@ export const billApi = {
   saleFarmer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/farmer`, lang),
   saleBuyer: (saleId: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/sale/${saleId}/buyer`, lang),
   register: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/register/${id}`, lang),
+  registerParty: (id: number, lang: 'en' | 'ur' = 'en') =>
+    billRequest(`/bills/register/party/${id}`, lang),
 }
 
 export const registerApi = {

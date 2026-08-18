@@ -6,9 +6,16 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { formatMann, farmerBill } from '../src/server/services/bills'
+import { formatMann, farmerBill, registerPartyBill } from '../src/server/services/bills'
 import { createFarmer } from '../src/server/services/farmers'
-import { createParty, createEntry, listEntries, zakatSummary } from '../src/server/services/register'
+import {
+  createParty,
+  createEntry,
+  listEntries,
+  listParties,
+  getPartyLedger,
+  zakatSummary,
+} from '../src/server/services/register'
 import { runWithWorkspace } from '../src/server/workspace'
 
 const stamp = `REG${Date.now().toString().slice(-8)}`
@@ -44,6 +51,49 @@ async function main() {
       ids.entryIds.push(BigInt(given.id))
       assert(given.amount === 1500, 'giving amount not stored')
       assert(given.day && given.date && given.time, 'giving entry missing day/date/time')
+
+      const receivedAgain = await createEntry({
+        kind: 'RECEIVING',
+        partyId: person.id,
+        amount: 800,
+        notes: 'first receive',
+      })
+      ids.entryIds.push(BigInt(receivedAgain.id))
+      const receivedMore = await createEntry({
+        kind: 'RECEIVING',
+        partyId: person.id,
+        amount: 200,
+        notes: 'second receive',
+      })
+      ids.entryIds.push(BigInt(receivedMore.id))
+
+      const reused = await createParty({
+        kind: 'RECEIVING',
+        name: `Register Person ${stamp}`,
+        address: 'Lahore',
+      })
+      assert(reused.id === person.id, 'same person name must reuse the existing account')
+
+      const ledger = await getPartyLedger(person.id)
+      assert(ledger.givenTotal === 1500, `given total expected 1500 got ${ledger.givenTotal}`)
+      assert(ledger.receivedTotal === 1000, `received total expected 1000 got ${ledger.receivedTotal}`)
+      assert(ledger.balance === -500, `net expected -500 got ${ledger.balance}`)
+      assert(ledger.receivedCount === 2, 'two receive lines should count')
+      assert((ledger.entries || []).length === 3, 'ledger should include give and receive lines')
+
+      const people = await listParties('RECEIVING')
+      const card = people.find((row) => row.id === person.id)
+      assert(card?.receivedTotal === 1000, 'person card received total should update')
+      assert(card?.givenTotal === 1500, 'person card given total should update')
+
+      const statement = await registerPartyBill(person.id, 'en')
+      assert(statement.includes('Register Person'), 'statement missing person name')
+      assert(statement.includes('first receive'), 'statement missing first receive note')
+      assert(statement.includes('second receive'), 'statement missing second receive note')
+      assert(statement.includes('shop help'), 'statement missing given note')
+      assert(statement.includes('Total received'), 'statement missing received total')
+      assert(statement.includes('Total given'), 'statement missing given total')
+      assert(statement.includes('Owner gave more'), 'statement missing net label')
 
       const receivedParty = await createParty({ kind: 'RECEIVING', name: `Recv ${stamp}` })
       const received = await createEntry({

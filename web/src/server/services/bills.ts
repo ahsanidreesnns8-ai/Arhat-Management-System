@@ -1,6 +1,7 @@
 import { prisma } from '@/server/db'
 import { copyrightText, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
+import { getPartyLedger } from '@/server/services/register'
 
 function escape(value: unknown) {
   return String(value ?? '')
@@ -786,36 +787,39 @@ export async function saleBill(
   )
 }
 
+export async function registerPartyBill(id: number | bigint, lang = 'en') {
+  const ledger = await getPartyLedger(id)
+  return renderRegisterLedgerBill(ledger, lang)
+}
+
 export async function registerEntryBill(id: number | bigint, lang = 'en') {
   const entry = await prisma.registerEntry.findFirst({
     where: { id: BigInt(id) },
     include: { party: true, farmer: true },
   })
   if (!entry) throw new Error('Register entry not found')
+  if (entry.partyId) {
+    return registerPartyBill(entry.partyId, lang)
+  }
   const urdu = lang === 'ur'
   const kind = entry.kind
   const title =
-    kind === 'GIVING'
-      ? urdu ? 'دی گئی رقم' : 'Giving Amount'
-      : kind === 'RECEIVING'
-        ? urdu ? 'وصول شدہ رقم' : 'Receiving Amount'
-        : kind === 'ZAKAT'
-          ? urdu ? 'زکوٰۃ' : 'Zakat Amount'
-          : urdu ? 'کسان ایڈوانس' : 'Advance to Farmer'
+    kind === 'ZAKAT'
+      ? urdu ? 'زکوٰۃ' : 'Zakat Amount'
+      : urdu ? 'کسان ایڈوانس' : 'Advance to Farmer'
   const who =
     entry.farmer?.name ||
-    entry.party?.name ||
     (kind === 'ZAKAT' ? (urdu ? 'زکوٰۃ' : 'Zakat') : '—')
-  const address = entry.farmer?.address || entry.party?.address || ''
-  const dates = formatBillDates()
+  const address = entry.farmer?.address || ''
+  const stamp = karachiStamp(entry.createdAt)
   const partyHtml = `<div class="party-card">
     <h3 class="${urdu ? 'urdu' : ''}">${escape(who)}</h3>
     <div class="party-grid">
       <div><span class="label">${urdu ? 'قسم' : 'Type'}</span><div class="value">${escape(title)}</div></div>
       <div><span class="label">${urdu ? 'رقم' : 'Amount'}</span><div class="value">PKR ${money(entry.amount)}</div></div>
-      <div><span class="label">${urdu ? 'دن' : 'Day'}</span><div class="value">${escape(dates.dayEn)}</div></div>
-      <div><span class="label">${urdu ? 'تاریخ' : 'Date'}</span><div class="value">${escape(dates.dateEn)}</div></div>
-      <div><span class="label">${urdu ? 'وقت' : 'Time'}</span><div class="value">${escape(dates.timeEn)}</div></div>
+      <div><span class="label">${urdu ? 'دن' : 'Day'}</span><div class="value">${escape(stamp.day)}</div></div>
+      <div><span class="label">${urdu ? 'تاریخ' : 'Date'}</span><div class="value">${escape(stamp.date)}</div></div>
+      <div><span class="label">${urdu ? 'وقت' : 'Time'}</span><div class="value">${escape(stamp.time)}</div></div>
       ${address ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(address)}</div></div>` : ''}
       ${entry.notes ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'نوٹ' : 'Note'}</span><div class="value">${dash(entry.notes)}</div></div>` : ''}
     </div>
@@ -824,6 +828,98 @@ export async function registerEntryBill(id: number | bigint, lang = 'en') {
     urdu ? ['تفصیل', 'رقم'] : ['Particulars', 'Amount (PKR)'],
     [[title, money(entry.amount)]],
     [urdu ? 'کل' : 'Total', money(entry.amount)],
+  )
+  return page(title, partyHtml, body, urdu)
+}
+
+function karachiStamp(date: Date) {
+  const tz = 'Asia/Karachi'
+  return {
+    day: date.toLocaleDateString('en-PK', { weekday: 'long', timeZone: tz }),
+    date: date.toLocaleDateString('en-PK', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: tz,
+    }),
+    time: date.toLocaleTimeString('en-PK', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    }),
+  }
+}
+
+async function renderRegisterLedgerBill(
+  ledger: Awaited<ReturnType<typeof getPartyLedger>>,
+  lang: string,
+) {
+  const urdu = lang === 'ur'
+  const title = urdu ? 'آرہٹ کھاتہ' : 'Arhat Register Statement'
+  const net = ledger.balance
+  const netLabel =
+    net > 0
+      ? urdu
+        ? 'مالک نے زیادہ وصول کی'
+        : 'Owner received more'
+      : net < 0
+        ? urdu
+          ? 'مالک نے زیادہ دی'
+          : 'Owner gave more'
+        : urdu
+          ? 'حساب برابر'
+          : 'Settled'
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(ledger.name)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'وصول شدہ' : 'Received from them'}</span><div class="value">PKR ${money(ledger.receivedTotal)}</div></div>
+      <div><span class="label">${urdu ? 'دی گئی' : 'Given to them'}</span><div class="value">PKR ${money(ledger.givenTotal)}</div></div>
+      <div><span class="label">${urdu ? 'بقایا' : 'Net'}</span><div class="value">PKR ${money(Math.abs(net))} · ${escape(netLabel)}</div></div>
+      ${ledger.address ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(ledger.address)}</div></div>` : ''}
+      ${ledger.notes ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'نوٹ' : 'Note'}</span><div class="value">${dash(ledger.notes)}</div></div>` : ''}
+    </div>
+  </div>`
+  const lines = [...(ledger.entries || [])].reverse()
+  const rows = lines.length
+    ? lines.map((row) => [
+        row.day,
+        row.date,
+        row.time,
+        row.kind === 'RECEIVING' ? (urdu ? 'وصول' : 'Received') : urdu ? 'دی گئی' : 'Given',
+        money(row.amount),
+        row.notes || '—',
+      ])
+    : [[urdu ? 'کوئی اندراج نہیں' : 'No entries yet', '', '', '', '0', '—']]
+  rows.push([
+    '',
+    '',
+    '',
+    urdu ? 'کل وصول' : 'Total received',
+    money(ledger.receivedTotal),
+    '',
+  ])
+  rows.push([
+    '',
+    '',
+    '',
+    urdu ? 'کل دی گئی' : 'Total given',
+    money(ledger.givenTotal),
+    '',
+  ])
+  const body = table(
+    urdu
+      ? ['دن', 'تاریخ', 'وقت', 'قسم', 'رقم', 'نوٹ']
+      : ['Day', 'Date', 'Time', 'Type', 'Amount (PKR)', 'Note'],
+    rows,
+    [
+      urdu ? 'بقایا' : 'Net',
+      '',
+      '',
+      netLabel,
+      money(Math.abs(net)),
+      '',
+    ],
   )
   return page(title, partyHtml, body, urdu)
 }

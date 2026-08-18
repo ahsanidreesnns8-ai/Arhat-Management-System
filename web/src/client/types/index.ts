@@ -430,6 +430,12 @@ export interface RegisterParty {
   address?: string | null
   notes?: string | null
   createdAt: string
+  receivedTotal?: number
+  givenTotal?: number
+  balance?: number
+  receivedCount?: number
+  givenCount?: number
+  entries?: RegisterEntry[]
 }
 
 export interface RegisterEntry {
