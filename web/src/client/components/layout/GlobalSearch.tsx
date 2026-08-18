@@ -27,6 +27,7 @@ const MODULE_SHORTCUTS: {
   { id: 'farmer-product', to: '/farmer-product', labelKey: 'farmerProduct', keywords: ['farmer product', 'کسان پروڈکٹ'] },
   { id: 'daily-trade', to: '/daily-trade', labelKey: 'dailyTrade', keywords: ['daily trade', 'stock sell', 'extra kg', 'روزانہ'] },
   { id: 'arhat-register', to: '/arhat-register', labelKey: 'arhatRegister', keywords: ['arhat register', 'giving', 'zakat', 'advance', 'رجسٹر'], ownerOnly: true },
+  { id: 'wheat-khata', to: '/wheat-khata', labelKey: 'wheatKhata', keywords: ['wheat khata', 'wheat', 'khata', 'گندم', 'کھاتہ'] },
   { id: 'queue', to: '/queue', labelKey: 'queue', keywords: ['queue', 'قطار'] },
   { id: 'sales', to: '/sales', labelKey: 'sales', keywords: ['sales', 'invoice', 'فروخت', 'انوائس'] },
   { id: 'payments', to: '/payments', labelKey: 'payments', keywords: ['payments', 'ادائیگی'] },

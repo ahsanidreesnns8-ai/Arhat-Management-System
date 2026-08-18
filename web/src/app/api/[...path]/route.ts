@@ -31,6 +31,7 @@ import * as stockLots from '@/server/services/stock-lots'
 import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
 import * as register from '@/server/services/register'
+import * as wheatKhata from '@/server/services/wheat-khata'
 import { isOwnerFinanceRole } from '@/lib/roles'
 
 type RouteContext = {
@@ -650,6 +651,27 @@ async function dispatch(
     }
     if (path[1] === 'export' && method === 'GET') {
       throw new Error('Excel export is not available on Vercel serverless')
+    }
+  }
+
+  if (path[0] === 'wheat-khata') {
+    if (path.length === 1 && method === 'GET') {
+      return result(await wheatKhata.getBook())
+    }
+    if (path[1] === 'money' && method === 'POST') {
+      return result(await wheatKhata.addMoney(payload), 'Money added', 201)
+    }
+    if (path[1] === 'parties' && path.length === 3 && method === 'GET') {
+      return result(await wheatKhata.getParty(numericId(path[2])))
+    }
+    if (path[1] === 'parties' && method === 'POST') {
+      return result(await wheatKhata.createParty(payload), 'Party saved', 201)
+    }
+    if (path[1] === 'products' && method === 'POST') {
+      return result(await wheatKhata.addProduct(payload), 'Product saved', 201)
+    }
+    if (path[1] === 'preview' && method === 'POST') {
+      return result(wheatKhata.previewProduct(payload))
     }
   }
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus, Wheat,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -167,7 +167,7 @@ export default function DashboardPage() {
         description={`Welcome to ${companyName} — tap any card for full details`}
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Button
           className="h-auto py-3 flex-col sm:flex-row gap-1.5"
           onClick={() => { setPartyForm(emptyPartyForm()); setFarmerOpen(true) }}
@@ -189,6 +189,11 @@ export default function DashboardPage() {
         <Link to="/farmer-product" className="contents">
           <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
             <PackagePlus className="h-4 w-4" /> Farmer Product
+          </Button>
+        </Link>
+        <Link to="/wheat-khata" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Wheat className="h-4 w-4" /> Wheat Khata
           </Button>
         </Link>
         {showFinance && (

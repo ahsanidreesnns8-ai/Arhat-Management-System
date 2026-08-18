@@ -10,6 +10,7 @@ const PAGE_SHORTCUTS = [
   { id: 'calculator', title: 'Price Calculator', titleUr: 'قیمت کیلکولیٹر', keywords: ['calculator', 'price', 'کیلکولیٹر'], link: '/calculator' },
   { id: 'farmer-product', title: 'Farmer Product', titleUr: 'کسان پروڈکٹ', keywords: ['farmer product', 'کسان پروڈکٹ'], link: '/farmer-product' },
   { id: 'daily-trade', title: 'Daily Trade', titleUr: 'روزانہ تجارت', keywords: ['daily trade', 'stock', 'extra kg', 'آرھٹ', 'روزانہ'], link: '/daily-trade' },
+  { id: 'wheat-khata', title: 'Wheat Khata', titleUr: 'گندم کھاتہ', keywords: ['wheat khata', 'wheat', 'khata', 'گندم', 'کھاتہ'], link: '/wheat-khata' },
   { id: 'queue', title: 'Queue', titleUr: 'قطار', keywords: ['queue', 'قطار'], link: '/queue' },
   { id: 'sales', title: 'Sales', titleUr: 'فروخت', keywords: ['sales', 'invoice', 'فروخت', 'انوائس'], link: '/sales' },
   { id: 'payments', title: 'Payments', titleUr: 'ادائیگیاں', keywords: ['payments', 'ادائیگی'], link: '/payments' },
@@ -41,7 +42,7 @@ export async function search(query: string) {
   if (q.length < 2) return pages
 
   const contains = { contains: q, mode: 'insensitive' as const }
-  const [farmers, buyers, trucks, dheris, sales, products] =
+  const [farmers, buyers, trucks, dheris, sales, products, wheatParties] =
     await Promise.all([
       prisma.farmer.findMany({
         where: {
@@ -84,6 +85,13 @@ export async function search(query: string) {
           deleted: false,
           active: true,
           OR: [{ name: contains }, { productCode: contains }],
+        },
+        take: 5,
+      }),
+      prisma.wheatKhataParty.findMany({
+        where: {
+          deleted: false,
+          OR: [{ name: contains }, { address: contains }],
         },
         take: 5,
       }),
@@ -132,6 +140,13 @@ export async function search(query: string) {
       title: item.name,
       subtitle: `Code: ${item.productCode}`,
       link: `/stock?product=${item.id}`,
+    })),
+    ...wheatParties.map((item) => ({
+      id: `wheat-${item.id}`,
+      type: 'WHEAT_KHATA',
+      title: item.name,
+      subtitle: item.kind === 'GIVING' ? 'Wheat Khata selling party' : 'Wheat Khata receiving party',
+      link: '/wheat-khata',
     })),
   ]
 }

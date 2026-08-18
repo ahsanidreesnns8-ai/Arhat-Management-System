@@ -22,6 +22,7 @@ const ROUTES: { path: string; label: string; keys: string[] }[] = [
   { path: '/calculator', label: 'Calculator', keys: ['calculator', 'price calculator', 'کیلکولیٹر', 'قیمت'] },
   { path: '/farmer-product', label: 'Farmer Product', keys: ['farmer product', 'کسان پروڈکٹ'] },
   { path: '/daily-trade', label: 'Daily Trade', keys: ['daily trade', 'stock sell', 'extra kg', 'روزانہ تجارت'] },
+  { path: '/wheat-khata', label: 'Wheat Khata', keys: ['wheat khata', 'wheat', 'khata', 'گندم کھاتہ', 'گندم'] },
   { path: '/queue', label: 'Queue', keys: ['queue', 'قطار'] },
   { path: '/sales', label: 'Sales', keys: ['sales', 'sale', 'فروخت', 'سیلز'] },
   { path: '/payments', label: 'Payments', keys: ['payments', 'payment', 'ادائیگی', 'ادائیگیاں'] },

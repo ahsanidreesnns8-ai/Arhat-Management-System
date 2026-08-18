@@ -556,3 +556,52 @@ model RegisterEntry {
   @@index([workspace, kind, createdAt])
   @@map("register_entries")
 }
+
+/// Cash deposited into Wheat Khata (Add Money)
+model WheatKhataMoney {
+  id        BigInt   @id @default(autoincrement())
+  workspace String   @default("live") @db.VarChar(20)
+  amount    Decimal  @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspace, createdAt])
+  @@map("wheat_khata_money")
+}
+
+/// Receiving party (owner buys wheat) or selling/giving party (owner sells wheat)
+model WheatKhataParty {
+  id        BigInt              @id @default(autoincrement())
+  workspace String              @default("live") @db.VarChar(20)
+  kind      String              @db.VarChar(20)
+  name      String              @db.VarChar(255)
+  address   String?
+  notes     String?
+  deleted   Boolean             @default(false)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  products  WheatKhataProduct[]
+
+  @@index([workspace, kind])
+  @@index([workspace, name])
+  @@map("wheat_khata_parties")
+}
+
+/// Wheat bags received from or given to a Wheat Khata party
+model WheatKhataProduct {
+  id          BigInt          @id @default(autoincrement())
+  workspace   String          @default("live") @db.VarChar(20)
+  partyId     BigInt          @map("party_id")
+  bags        Int
+  bagWeightKg Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
+  ratePerBag  Decimal         @map("rate_per_bag") @db.Decimal(12, 2)
+  totalPrice  Decimal         @map("total_price") @db.Decimal(15, 2)
+  notes       String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  party       WheatKhataParty @relation(fields: [partyId], references: [id])
+
+  @@index([workspace, partyId, createdAt])
+  @@map("wheat_khata_products")
+}

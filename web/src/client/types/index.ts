@@ -455,6 +455,59 @@ export interface RegisterEntry {
   farmerCode?: string | null
 }
 
+export interface WheatKhataMoney {
+  id: number
+  amount: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface WheatKhataProduct {
+  id: number
+  partyId: number
+  partyName?: string | null
+  partyAddress?: string | null
+  bags: number
+  bagWeightKg: number
+  totalWeightKg: number
+  ratePerBag: number
+  totalPrice: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface WheatKhataParty {
+  id: number
+  kind: 'RECEIVING' | 'GIVING' | string
+  name: string
+  address?: string | null
+  notes?: string | null
+  createdAt: string
+  productCount: number
+  totalBags: number
+  totalWeightKg: number
+  totalPrice: number
+  products?: WheatKhataProduct[]
+}
+
+export interface WheatKhataBook {
+  totals: {
+    moneyIn: number
+    receivingAmount: number
+    givingAmount: number
+    totalAmount: number
+  }
+  money: WheatKhataMoney[]
+  receivingParties: WheatKhataParty[]
+  givingParties: WheatKhataParty[]
+}
+
 export interface ZakatSummary {
   allTime: number
   last12Months: number

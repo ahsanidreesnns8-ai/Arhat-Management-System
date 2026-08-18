@@ -17,6 +17,7 @@ import {
   Users,
   Wallet,
   Warehouse,
+  Wheat,
 } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { Stagger, StaggerItem } from '../components/motion/Stagger'
@@ -44,6 +45,12 @@ const sections: Array<{
     icon: Scale,
     title: 'Daily Trade',
     description: 'Today’s board. Refresh saves the day here and starts from zero.',
+  },
+  {
+    to: '/wheat-khata',
+    icon: Wheat,
+    title: 'Wheat Khata',
+    description: 'Cash in, receive wheat from parties, and sell wheat to parties',
   },
   {
     to: '/farmers',
