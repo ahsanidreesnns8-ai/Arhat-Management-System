@@ -49,8 +49,8 @@ src/
 
 | Field | Value |
 |-------|-------|
-| Username | `owner` |
-| Password | `admin123` |
+| Username | `owner` or `staff` |
+| Password | `owner123` or `staff123` |
 
 ## Docker
 

@@ -183,6 +183,11 @@ export default function SettingsPage() {
     toast.success(next === 'ur' ? 'زبان اردو کر دی گئی' : 'Language set to English')
   }
 
+  // Hooks must run unconditionally (before any early return)
+  useVoicePageActions({
+    save: () => { void handleSave() },
+  })
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -191,11 +196,6 @@ export default function SettingsPage() {
       </div>
     )
   }
-
-  useVoicePageActions({
-    save: () => { void handleSave() },
-  })
-
 
   return (
     <div className="space-y-6">

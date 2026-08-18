@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" role="img" aria-label="RTC">
+  <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" stroke-width="3.5"/>
+  <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" stroke-width="0.8" opacity="0.55"/>
+  <text x="36" y="43" text-anchor="middle" fill="#C5A059" font-size="16" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1">RTC</text>
+</svg>

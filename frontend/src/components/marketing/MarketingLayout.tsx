@@ -28,7 +28,7 @@ export default function MarketingLayout() {
             {phone}
           </a>
           <p className={isUrdu ? 'font-urdu' : ''}>
-            {isUrdu ? 'گالا منڈی، ننکانہ صاحب — ڈیجیٹل آرھٹ سسٹم' : 'Gala Mandi, Nankana Sahib — Digital Arhat System'}
+            {isUrdu ? 'غلّہ منڈی، ننکانہ صاحب — ڈیجیٹل آرھٹ سسٹم' : 'Ghalla Mandi, Nankana Sahib — Digital Arhat System'}
           </p>
         </div>
       </div>
@@ -127,8 +127,8 @@ export default function MarketingLayout() {
             <RhmaniLogo size="sm" variant="mark" light />
             <p className={`mt-4 text-sm text-slate-300 leading-relaxed ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu
-                ? 'ننکانہ صاحب کی گالا منڈی کے لیے مکمل ڈیجیٹل آرھٹ، کھاتہ، سیلز، ادائیگی اور رپورٹنگ سسٹم۔'
-                : 'Complete digital arhat, khata, sales, payments and reporting system for Gala Mandi Nankana Sahib.'}
+                ? 'ننکانہ صاحب کی غلّہ منڈی کے لیے مکمل ڈیجیٹل آرھٹ، کھاتہ، سیلز، ادائیگی اور رپورٹنگ سسٹم۔'
+                : 'Complete digital arhat, khata, sales, payments and reporting system for Ghalla Mandi Nankana Sahib.'}
             </p>
           </div>
           <div>
@@ -153,7 +153,7 @@ export default function MarketingLayout() {
             <h4 className="text-white font-semibold mb-3">{isUrdu ? 'رابطہ' : 'Contact'}</h4>
             <ul className="space-y-2 text-sm text-slate-300">
               <li>{companyName}</li>
-              <li>{isUrdu ? 'گالا منڈی، ننکانہ صاحب' : 'Gala Mandi, Nankana Sahib'}</li>
+              <li>{isUrdu ? 'غلّہ منڈی، ننکانہ صاحب' : 'Ghalla Mandi, Nankana Sahib'}</li>
               <li><a href={`tel:${phone.replace(/\s/g, '')}`} className="hover:text-accent-500">{phone}</a></li>
               <li>{settings?.email || 'info@rehmani.trading'}</li>
             </ul>

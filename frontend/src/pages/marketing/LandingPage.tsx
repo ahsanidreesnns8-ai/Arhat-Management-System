@@ -50,7 +50,7 @@ const mandiFeatures = [
 
 const powerFeatures = [
   { icon: Users, en: 'Farmer & Buyer Khata', ur: 'کسان و خریدار کھاتہ', descEn: 'Full ledgers, credit, and outstanding at a glance.', descUr: 'مکمل کھاتہ، کریڈٹ اور بقایا ایک نظر میں۔' },
-  { icon: Receipt, en: 'Sales & Bills', ur: 'سیلز اور بل', descEn: 'EN/UR receipts with logo and Gala Mandi footer.', descUr: 'لوگو اور گالا منڈی فوٹر کے ساتھ دو زبانی رسیدیں۔' },
+  { icon: Receipt, en: 'Sales & Bills', ur: 'سیلز اور بل', descEn: 'EN/UR receipts with logo and Ghalla Mandi footer.', descUr: 'لوگو اور غلّہ منڈی فوٹر کے ساتھ دو زبانی رسیدیں۔' },
   { icon: Wallet, en: 'Payments & Cashbook', ur: 'ادائیگی اور کیش بک', descEn: 'Pay farmers, receive from buyers, filter by date.', descUr: 'کسان کو ادا، خریدار سے وصول، تاریخ سے فلٹر۔' },
   { icon: Warehouse, en: 'Stock Control', ur: 'اسٹاک کنٹرول', descEn: 'In/out movements and low-stock visibility.', descUr: 'آمد/روانگی اور کم اسٹاک کی صورتحال۔' },
   { icon: BarChart3, en: 'Mandi Reports', ur: 'منڈی رپورٹس', descEn: 'Commission, sales, stock — preview & print EN/UR.', descUr: 'کمیشن، فروخت، اسٹاک — پریویو اور پرنٹ اردو/انگریزی۔' },
@@ -88,8 +88,8 @@ export default function LandingPage() {
             </span>
             <h1 className={`mt-4 text-4xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu
-                ? 'ڈیجیٹل کھاتہ اور آرھٹ سسٹم — گالا منڈی ننکانہ صاحب'
-                : 'Digital Khata & Arhat System for Gala Mandi'}
+                ? 'ڈیجیٹل کھاتہ اور آرھٹ سسٹم — غلّہ منڈی ننکانہ صاحب'
+                : 'Digital Khata & Arhat System for Ghalla Mandi'}
             </h1>
             <p className={`mt-3 text-lg text-accent-500 font-semibold ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu ? 'آڑھتی · بیوپاری · کسان · خریدار' : 'Adhati · Beopari · Farmers · Buyers'}
@@ -323,7 +323,7 @@ export default function LandingPage() {
           <p className={`mt-3 text-slate-300 ${isUrdu ? 'font-urdu' : ''}`}>
             {isUrdu
               ? 'آڑھت، ڈھیری، کھاتہ، بل اور رپورٹس — ایک محفوظ پلیٹ فارم۔'
-              : 'Arhat, dheri, khata, bills and reports — one secure platform for Gala Mandi.'}
+              : 'Arhat, dheri, khata, bills and reports — one secure platform for Ghalla Mandi.'}
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-slate-200">
             <span className="inline-flex items-center gap-2"><Smartphone className="h-4 w-4 text-accent-500" />{isUrdu ? 'موبائل دوستانہ' : 'Mobile friendly'}</span>

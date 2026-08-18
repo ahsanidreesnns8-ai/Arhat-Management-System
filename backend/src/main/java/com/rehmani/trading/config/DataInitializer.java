@@ -28,13 +28,20 @@ public class DataInitializer {
     CommandLineRunner seedDevData() {
         return args -> {
             if (userRepository.count() == 0) {
-                log.info("Seeding dev owner user");
+                log.info("Seeding dev owner and staff users");
                 userRepository.save(User.builder()
                         .username("owner")
                         .email("owner@rehmanitrading.com")
-                        .password(passwordEncoder.encode("admin123"))
+                        .password(passwordEncoder.encode("owner123"))
                         .fullName("System Owner")
                         .role(UserRole.OWNER)
+                        .build());
+                userRepository.save(User.builder()
+                        .username("staff")
+                        .email("staff@rehmanitrading.com")
+                        .password(passwordEncoder.encode("staff123"))
+                        .fullName("Staff")
+                        .role(UserRole.OPERATOR)
                         .build());
             }
 

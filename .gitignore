@@ -31,3 +31,10 @@ mysql_data/
 
 # Vite cache
 frontend/.vite/
+.env
+
+# Next.js local env
+web/.env
+web/.env.local
+web/node_modules
+web/.next
