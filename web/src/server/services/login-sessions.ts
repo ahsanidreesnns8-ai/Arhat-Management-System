@@ -45,6 +45,25 @@ export async function touchLoginSession(sessionId: bigint | number | string) {
   })
 }
 
+export async function endAllSessionsForUser(userId: bigint | number) {
+  const rows = await prisma.loginSession.findMany({
+    where: { userId: BigInt(userId), active: true },
+  })
+  const logoutAt = new Date()
+  for (const row of rows) {
+    await prisma.loginSession.update({
+      where: { id: row.id },
+      data: {
+        active: false,
+        logoutAt,
+        lastSeenAt: logoutAt,
+        durationSec: durationBetween(row.loginAt, logoutAt),
+      },
+    })
+  }
+  return rows.length
+}
+
 export async function endLoginSession(sessionId: bigint | number | string) {
   const id = BigInt(sessionId)
   const existing = await prisma.loginSession.findFirst({ where: { id } })

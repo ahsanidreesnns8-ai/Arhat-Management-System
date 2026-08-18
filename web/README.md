@@ -7,8 +7,7 @@
    - `JWT_SECRET` = any long random string
 4. Deploy → copy your permanent `https://….vercel.app` URL.
 
-Login: `owner` / `owner123` · `staff` / `staff123`  
-The owner can add more users in **Owner Panel** (name, username, password). Those people can then sign in with that username and password.
+Login accounts are `owner` and `staff`. Seed **does not reset passwords** on deploy. Set unique passwords in **Owner Panel** (never reuse leaked passwords). The owner can add more users (name, username, password) and delete those extra users.
 
 ---
 
@@ -38,10 +37,12 @@ npm run dev
 App: http://localhost:3000  
 API: http://localhost:3000/api  
 
-Default logins:
-- `owner` / `owner123`
-- `staff` / `staff123`
-- Additional users created in Owner Panel
+On first seed of an empty database, set `OWNER_PASSWORD` and `STAFF_PASSWORD` in `.env` (10+ characters, letters and numbers). Seed never overwrites existing passwords.
+
+Shop logins:
+- `owner` — change the password in Owner Panel
+- `staff` — change the password in Owner Panel
+- Additional users created (and deleted) in Owner Panel
 
 ## AI Assistant (Gemini)
 

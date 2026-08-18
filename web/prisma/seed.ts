@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcryptjs'
+import { randomBytes } from 'node:crypto'
+import { assertStrongPassword } from '../src/server/password-policy'
 
 const prisma = new PrismaClient()
 
@@ -61,37 +63,49 @@ async function ensureSync(id: number, workspace: 'live' | 'demo') {
   })
 }
 
-async function upsertLoginUser(input: {
+async function bootstrapPassword(username: string, envKey: string) {
+  const fromEnv = process.env[envKey]?.trim()
+  if (fromEnv) {
+    assertStrongPassword(fromEnv, username)
+    return fromEnv
+  }
+  const generated = `Rtc-${randomBytes(9).toString('base64url')}`
+  console.warn(
+    `[seed] ${envKey} is not set. Created ${username} with a one-time password. Change it in Owner Panel immediately.`,
+  )
+  return generated
+}
+
+async function ensureLoginUser(input: {
   username: string
   email: string
-  password: string
+  passwordEnv: string
   fullName: string
   role: 'OWNER' | 'OPERATOR'
   workspace: 'live' | 'demo'
 }) {
-  const passwordHash = await hash(input.password, 12)
   const existing = await prisma.user.findUnique({ where: { username: input.username } })
   if (existing) {
+    // Never overwrite an existing password — deploys must not reset live logins.
     return prisma.user.update({
       where: { id: existing.id },
       data: {
         email: input.email,
-        password: passwordHash,
         fullName: input.fullName,
         role: input.role,
         workspace: input.workspace,
         active: true,
         deleted: false,
-        failedLoginAttempts: 0,
-        lockedUntil: null,
       },
     })
   }
+
+  const password = await bootstrapPassword(input.username, input.passwordEnv)
   return prisma.user.create({
     data: {
       username: input.username,
       email: input.email,
-      password: passwordHash,
+      password: await hash(password, 12),
       fullName: input.fullName,
       role: input.role,
       workspace: input.workspace,
@@ -107,19 +121,19 @@ async function main() {
   await ensureSync(1, 'live')
   await ensureSync(2, 'demo')
 
-  await upsertLoginUser({
+  await ensureLoginUser({
     username: 'owner',
     email: 'owner@rehmanitrading.com',
-    password: 'owner123',
+    passwordEnv: 'OWNER_PASSWORD',
     fullName: 'Owner',
     role: 'OWNER',
     workspace: 'live',
   })
 
-  await upsertLoginUser({
+  await ensureLoginUser({
     username: 'staff',
     email: 'staff@rehmanitrading.com',
-    password: 'staff123',
+    passwordEnv: 'STAFF_PASSWORD',
     fullName: 'Staff',
     role: 'OPERATOR',
     workspace: 'live',

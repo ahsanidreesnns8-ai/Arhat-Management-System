@@ -243,7 +243,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="login-link-underline text-slate-400 hover:text-[#E8C87A] transition-colors"
-                  onClick={() => toast('Contact the owner to reset your password', { icon: '🔐' })}
+                  onClick={() => toast('Ask the owner to set a new password in Owner Panel', { icon: '🔐' })}
                 >
                   Forgot password?
                 </button>

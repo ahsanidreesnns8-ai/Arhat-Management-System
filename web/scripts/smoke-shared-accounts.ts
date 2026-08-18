@@ -18,7 +18,10 @@ import { createBuyer } from '../src/server/services/buyers'
 import { createSale } from '../src/server/services/sales'
 import { runWithWorkspace } from '../src/server/workspace'
 
+import { requireShopPassword } from './smoke-credentials'
+
 const stamp = `SHR${Date.now().toString().slice(-8)}`
+const STAFF_PASSWORD = requireShopPassword('staff')
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message)
@@ -111,15 +114,15 @@ async function main() {
       (refreshed?.failedLoginAttempts ?? 0) === 0,
       'shared staff failed attempts must stay at 0',
     )
-    const okLogin = await login('staff', 'staff123', { userAgent: 'smoke-ok' })
+    const okLogin = await login('staff', STAFF_PASSWORD, { userAgent: 'smoke-ok' })
     createdSessionIds.push(BigInt(okLogin.sessionId))
     assert(okLogin.token, 'staff must still log in after many mistypes')
     await logout(okLogin.token)
     console.log('shared staff lockout skip OK')
 
     const [loginOne, loginTwo] = await Promise.all([
-      login('staff', 'staff123', { userAgent: 'smoke-parallel-1' }),
-      login('staff', 'staff123', { userAgent: 'smoke-parallel-2' }),
+      login('staff', STAFF_PASSWORD, { userAgent: 'smoke-parallel-1' }),
+      login('staff', STAFF_PASSWORD, { userAgent: 'smoke-parallel-2' }),
     ])
     createdSessionIds.push(BigInt(loginOne.sessionId), BigInt(loginTwo.sessionId))
     assert(loginOne.token !== loginTwo.token, 'parallel staff logins need distinct tokens')

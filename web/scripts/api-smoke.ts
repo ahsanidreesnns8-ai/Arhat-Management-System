@@ -1,7 +1,14 @@
+import { config } from 'dotenv'
+config({ path: '.env' })
+
 /**
  * Production API smoke test — run: npx tsx scripts/api-smoke.ts
  */
+import { requireShopPassword } from './smoke-credentials'
+
 const BASE = process.env.SMOKE_BASE || 'https://arhat-management-system.vercel.app'
+const OWNER_PASSWORD = requireShopPassword('owner')
+const STAFF_PASSWORD = requireShopPassword('staff')
 
 type Result = { name: string; ok: boolean; status: number; detail: string }
 
@@ -76,14 +83,14 @@ async function main() {
 
   let liveToken = ''
   try {
-    liveToken = await login('owner', 'owner123')
+    liveToken = await login('owner', OWNER_PASSWORD)
     results.push({ name: 'login owner', ok: true, status: 200, detail: 'ok' })
   } catch (e) {
     results.push({ name: 'login owner', ok: false, status: 0, detail: String(e) })
   }
   let staffToken = ''
   try {
-    staffToken = await login('staff', 'staff123')
+    staffToken = await login('staff', STAFF_PASSWORD)
     results.push({ name: 'login staff', ok: true, status: 200, detail: 'ok' })
   } catch (e) {
     results.push({ name: 'login staff', ok: false, status: 0, detail: String(e) })
@@ -91,7 +98,7 @@ async function main() {
 
   if (staffToken) {
     try {
-      const [a, b] = await Promise.all([login('staff', 'staff123'), login('staff', 'staff123')])
+      const [a, b] = await Promise.all([login('staff', STAFF_PASSWORD), login('staff', STAFF_PASSWORD)])
       const pulseA = await req('sync/pulse', { token: a })
       const pulseB = await req('sync/pulse', { token: b })
       results.push({

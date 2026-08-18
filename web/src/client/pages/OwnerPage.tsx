@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Shield, Users, Database, Activity, Plus, Clock } from 'lucide-react'
+import { Shield, Users, Database, Activity, Plus, Clock, KeyRound, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -11,14 +11,29 @@ import type { StaffUsageSummary, SystemUser } from '../types'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { formatDateTime } from '../utils/format'
 
+const PASSWORD_HINT =
+  'At least 10 characters, with letters and numbers. Do not reuse a leaked password.'
+
+function isSystemAccount(username: string) {
+  const value = username.trim().toLowerCase()
+  return value === 'owner' || value === 'staff'
+}
+
 export default function OwnerPage() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [users, setUsers] = useState<SystemUser[]>([])
   const [logs, setLogs] = useState<Array<{ action: string; entityType: string; createdAt: string }>>([])
   const [staffUsage, setStaffUsage] = useState<StaffUsageSummary | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ username: '', fullName: '', password: '' })
   const [saving, setSaving] = useState(false)
+  const [passwordUser, setPasswordUser] = useState<SystemUser | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [deleteUserRow, setDeleteUserRow] = useState<SystemUser | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => {
     userApi.getAll().then((res) => setUsers(res.data.data || [])).catch(() => toast.error('Failed to load users'))
@@ -54,13 +69,67 @@ export default function OwnerPage() {
   }
 
   const toggleActive = async (u: SystemUser) => {
+    if (isSystemAccount(u.username)) {
+      toast.error('System accounts cannot be suspended')
+      return
+    }
     try {
       if (u.active) await userApi.suspend(u.id)
       else await userApi.activate(u.id)
       toast.success(u.active ? 'User suspended' : 'User activated')
       load()
-    } catch {
-      toast.error('Update failed')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Update failed')
+    }
+  }
+
+  const savePassword = async () => {
+    if (!passwordUser) return
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+    setSavingPassword(true)
+    try {
+      await userApi.updatePassword(passwordUser.id, newPassword)
+      const changingSelf = user?.id === passwordUser.id || user?.username === passwordUser.username
+      setPasswordUser(null)
+      setNewPassword('')
+      setConfirmPassword('')
+      if (changingSelf) {
+        toast.success('Password updated. Sign in again with the new password.')
+        logout()
+        window.location.assign('/login')
+        return
+      }
+      toast.success(`Password updated for ${passwordUser.username}`)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Failed to update password')
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteUserRow) return
+    if (deleteConfirm.trim().toLowerCase() !== deleteUserRow.username.toLowerCase()) {
+      toast.error('Type the username to confirm delete')
+      return
+    }
+    setDeleting(true)
+    try {
+      await userApi.delete(deleteUserRow.id)
+      toast.success(`${deleteUserRow.username} deleted — they can no longer log in`)
+      setDeleteUserRow(null)
+      setDeleteConfirm('')
+      load()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Failed to delete user')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -215,20 +284,56 @@ export default function OwnerPage() {
         <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 text-sm font-semibold">
           Users
         </div>
+        <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-800">
+          Add a name, username, and password. You can change any password, or delete users you created. The owner and staff shop logins cannot be deleted.
+        </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {users.map((u) => (
-            <div key={u.id} className="px-3 py-2.5 flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{u.fullName}</p>
-                <p className="text-[11px] text-gray-500 truncate">
-                  {u.username} · {u.role} · {u.active ? 'Active' : 'Suspended'}
-                </p>
+          {users.map((u) => {
+            const system = isSystemAccount(u.username)
+            return (
+              <div key={u.id} className="px-3 py-2.5 flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{u.fullName}</p>
+                  <p className="text-[11px] text-gray-500 truncate">
+                    {u.username} · {u.role} · {u.active ? 'Active' : 'Suspended'}
+                    {system ? ' · system' : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setPasswordUser(u)
+                      setNewPassword('')
+                      setConfirmPassword('')
+                    }}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Password
+                  </Button>
+                  {!system && (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => toggleActive(u)}>
+                        {u.active ? 'Suspend' : 'Activate'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          setDeleteUserRow(u)
+                          setDeleteConfirm('')
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => toggleActive(u)}>
-                {u.active ? 'Suspend' : 'Activate'}
-              </Button>
-            </div>
-          ))}
+            )
+          })}
           {!users.length && (
             <p className="p-3 text-sm text-gray-500">No users</p>
           )}
@@ -275,9 +380,62 @@ export default function OwnerPage() {
           <Input label="Name *" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
           <Input label="Username *" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" />
           <Input label="Password *" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
+          <p className="text-[11px] text-slate-500">{PASSWORD_HINT}</p>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button onClick={createUser} loading={saving}>Save</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!passwordUser}
+        onClose={() => setPasswordUser(null)}
+        title={passwordUser ? `Change password · ${passwordUser.username}` : 'Change password'}
+      >
+        <div className="space-y-2.5">
+          <p className="text-[12px] text-slate-500">
+            This signs {passwordUser?.username} out on every device. {PASSWORD_HINT}
+          </p>
+          <Input
+            label="New password *"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+          <Input
+            label="Confirm password *"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setPasswordUser(null)}>Cancel</Button>
+            <Button onClick={savePassword} loading={savingPassword}>Update password</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!deleteUserRow}
+        onClose={() => setDeleteUserRow(null)}
+        title={deleteUserRow ? `Delete ${deleteUserRow.username}` : 'Delete user'}
+      >
+        <div className="space-y-2.5">
+          <p className="text-[12px] text-slate-500">
+            This removes {deleteUserRow?.fullName} ({deleteUserRow?.username}). They will not be able to log in. Type the username to confirm.
+          </p>
+          <Input
+            label="Username *"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            autoComplete="off"
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setDeleteUserRow(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete user</Button>
           </div>
         </div>
       </Modal>

@@ -5,6 +5,8 @@ import {
   isSharedShopLogin,
   normalizeLoginUsername,
 } from '@/server/allowed-logins'
+import { assertStrongPassword } from '@/server/password-policy'
+import { endAllSessionsForUser } from '@/server/services/login-sessions'
 
 export type UserInput = {
   username?: string
@@ -69,9 +71,12 @@ export async function getUser(id: number | bigint) {
 
 export async function createUser(input: UserInput) {
   const username = parseUsername(input.username)
+  if (isSharedShopLogin(username)) {
+    throw new Error('That username is reserved for the shop login')
+  }
   if (!input.fullName?.trim()) throw new Error('Name is required')
   if (!input.password?.trim()) throw new Error('Password is required')
-  if (input.password.trim().length < 4) throw new Error('Password must be at least 4 characters')
+  assertStrongPassword(input.password, username)
   const role = parseRole(input.role || 'OPERATOR')
   const email = (input.email?.trim() || localEmail(username)).toLowerCase()
 
@@ -126,6 +131,12 @@ export async function updateUser(id: number | bigint, input: UserInput) {
     where: { id: BigInt(id), deleted: false },
   })
   if (!existing) throw new Error('User not found')
+  if (isSharedShopLogin(existing.username) && username !== existing.username) {
+    throw new Error('System account username cannot be changed')
+  }
+  if (input.password?.trim()) {
+    assertStrongPassword(input.password, username)
+  }
   const email = (input.email?.trim() || existing.email).toLowerCase()
   const duplicate = await prisma.user.findFirst({
     where: {
@@ -138,6 +149,7 @@ export async function updateUser(id: number | bigint, input: UserInput) {
     throw new Error('Username already exists')
   }
   if (duplicate) throw new Error('Email already exists')
+  const passwordChanged = Boolean(input.password?.trim())
   const row = await prisma.user.update({
     where: { id: existing.id },
     data: {
@@ -146,16 +158,42 @@ export async function updateUser(id: number | bigint, input: UserInput) {
       fullName: input.fullName.trim(),
       role,
       ...(input.active != null && { active: input.active }),
-      ...(input.password?.trim() && {
-        password: await hashPassword(input.password),
+      ...(passwordChanged && {
+        password: await hashPassword(input.password!),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       }),
     },
   })
+  if (passwordChanged) {
+    await endAllSessionsForUser(existing.id)
+  }
   return userDto(row)
 }
 
+export async function updatePassword(id: number | bigint, newPassword: string) {
+  const existing = await prisma.user.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!existing) throw new Error('User not found')
+  if (!newPassword?.trim()) throw new Error('Password is required')
+  assertStrongPassword(newPassword, existing.username)
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: {
+      password: await hashPassword(newPassword),
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  })
+  await endAllSessionsForUser(existing.id)
+}
+
 export async function setUserActive(id: number | bigint, active: boolean) {
-  await getUser(id)
+  const existing = await getUser(id)
+  if (isSharedShopLogin(existing.username)) {
+    throw new Error('System accounts cannot be suspended')
+  }
   await prisma.user.update({ where: { id: BigInt(id) }, data: { active } })
 }
 
@@ -164,6 +202,7 @@ export async function deleteUser(id: number | bigint) {
   if (isSharedShopLogin(existing.username)) {
     throw new Error('System accounts cannot be deleted')
   }
+  await endAllSessionsForUser(existing.id)
   await prisma.user.update({
     where: { id: BigInt(id) },
     data: { deleted: true, active: false },

@@ -49,8 +49,7 @@ export async function verifyPassword(password: string, encoded: string) {
 }
 
 export async function hashPassword(password: string) {
-  // 10 is faster than 12 and still strong for this app
-  return hash(password, 10)
+  return hash(password, 12)
 }
 
 export async function requireAuth(request: NextRequest): Promise<AuthUser> {
@@ -75,6 +74,19 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
       },
     })
     if (!user) throw new Error('User not found or inactive')
+    if (payload.sid != null && String(payload.sid).length > 0) {
+      let sessionId: bigint
+      try {
+        sessionId = BigInt(String(payload.sid))
+      } catch {
+        throw new Error('Invalid or expired token')
+      }
+      const session = await prisma.loginSession.findFirst({
+        where: { id: sessionId, userId: user.id, active: true },
+        select: { id: true },
+      })
+      if (!session) throw new Error('Invalid or expired token')
+    }
     return user
   } catch (error) {
     if (error instanceof Error && error.message === 'User not found or inactive') {

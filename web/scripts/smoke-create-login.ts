@@ -6,7 +6,12 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { createUser, deleteUser } from '../src/server/services/users'
+import {
+  createUser,
+  deleteUser,
+  listUsers,
+  updatePassword,
+} from '../src/server/services/users'
 import { login } from '../src/server/services/auth-service'
 
 function assert(cond: unknown, message: string): asserts cond {
@@ -18,6 +23,20 @@ async function main() {
   const username = `u${stamp}`
   const password = `Pass${stamp}!`
   const fullName = `Smoke User ${stamp}`
+  const nextPassword = `Next${stamp}!`
+
+  let rejectedWeak = false
+  try {
+    await createUser({
+      username: `w${stamp}`,
+      fullName: 'Weak Password User',
+      password: 'owner123',
+      role: 'OPERATOR',
+    })
+  } catch {
+    rejectedWeak = true
+  }
+  assert(rejectedWeak, 'leaked password owner123 must be rejected')
 
   const created = await createUser({
     username,
@@ -34,11 +53,26 @@ async function main() {
   assert(session.token && session.token.length > 20, 'login must return a token')
   console.log('created user can login OK', username)
 
+  await updatePassword(created.id, nextPassword)
+  const again = await login(username, nextPassword)
+  assert(again.token && again.token.length > 20, 'login must work after password change')
+  console.log('changed password can login OK', username)
+
+  const owner = (await listUsers()).find((row) => row.username === 'owner')
+  assert(owner, 'owner account must exist')
+  let blockedOwnerDelete = false
+  try {
+    await deleteUser(owner.id)
+  } catch (error) {
+    blockedOwnerDelete = error instanceof Error && error.message.includes('cannot be deleted')
+  }
+  assert(blockedOwnerDelete, 'owner account must not be deletable')
+
   await deleteUser(created.id)
 
   let rejected = false
   try {
-    await login(username, password)
+    await login(username, nextPassword)
   } catch {
     rejected = true
   }

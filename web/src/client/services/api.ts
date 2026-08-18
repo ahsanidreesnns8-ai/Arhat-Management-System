@@ -430,6 +430,8 @@ export const userApi = {
   suspend: (id: number) => api.patch<ApiResponse<void>>(`/users/${id}/suspend`),
   activate: (id: number) => api.patch<ApiResponse<void>>(`/users/${id}/activate`),
   delete: (id: number) => api.delete<ApiResponse<void>>(`/users/${id}`),
+  updatePassword: (id: number, password: string) =>
+    api.patch<ApiResponse<void>>(`/users/${id}/password`, { password }),
 }
 
 export const auditApi = {

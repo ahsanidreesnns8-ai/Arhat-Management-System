@@ -111,14 +111,21 @@ async function dispatch(
   }
   if (path[0] === 'auth' && path[1] === 'login' && method === 'POST') {
     const ip = clientIp(request)
-    const limited = rateLimit(`login:${ip}`, 200, 15 * 60_000)
+    const username = String(payload.username ?? '')
+    const ipLimited = rateLimit(`login:${ip}`, 12, 15 * 60_000)
+    const userLimited = rateLimit(
+      `login:user:${username.trim().toLowerCase() || 'unknown'}`,
+      8,
+      15 * 60_000,
+    )
+    const limited = !ipLimited.ok ? ipLimited : userLimited
     if (!limited.ok) {
       throw new Error(
         `Too many login attempts. Try again in ${limited.retryAfterSec}s.`,
       )
     }
     return result(
-      await authService.login(String(payload.username ?? ''), String(payload.password ?? ''), {
+      await authService.login(username, String(payload.password ?? ''), {
         ipAddress: ip,
         userAgent: request.headers.get('user-agent'),
       }),
@@ -577,6 +584,10 @@ async function dispatch(
       await users.setUserActive(id, true)
       return result(null, 'User activated')
     }
+    if (path[2] === 'password' && method === 'PATCH') {
+      await users.updatePassword(id, String(payload.password ?? ''))
+      return result(null, 'Password updated')
+    }
     if (path.length === 2 && method === 'DELETE') {
       await users.deleteUser(id)
       return result(null, 'User deleted')
@@ -770,7 +781,8 @@ async function handle(request: NextRequest, context: RouteContext) {
             message.startsWith('Invalid username or password') ||
             message.startsWith('Account temporarily locked') ||
             message.startsWith('Username and password are required') ||
-            message.startsWith('This account is suspended')
+            message.startsWith('This account is suspended') ||
+            message === 'User not found or inactive'
           ? 401
           : message === 'Access denied' ||
               message.startsWith('Demo account cannot')
