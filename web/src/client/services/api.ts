@@ -216,6 +216,10 @@ export const billApi = {
   register: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/register/${id}`, lang),
   registerParty: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/register/party/${id}`, lang),
+  wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en') =>
+    billRequest(`/bills/wheat-khata/${id}`, lang),
+  wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en') =>
+    billRequest('/bills/wheat-khata/all', lang, { kind }),
 }
 
 export const registerApi = {

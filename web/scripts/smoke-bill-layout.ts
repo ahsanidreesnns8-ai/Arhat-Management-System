@@ -95,6 +95,9 @@ async function main() {
       assert(html.includes('copyright'), 'farmer bill missing copyright')
       assert(html.includes('غلّہ منڈی') || html.includes('Ghalla Mandi'), 'farmer bill missing Ghalla Mandi')
       assert(html.includes('All rights reserved'), 'farmer bill missing all rights reserved')
+      assert(html.includes('size:3.5in 6.5in') || html.includes('size: 3.5in 6.5in'), 'farmer bill missing 3.5x6.5 page size')
+      assert(html.includes('class="slip"'), 'farmer bill missing slip layout')
+      assert(html.includes('Signature') || html.includes('دستخط'), 'farmer bill missing signature line')
       assert(html.includes('Gross'), 'farmer bill should still show Gross')
       assert(html.includes('Payable'), 'farmer bill should still show Payable')
 

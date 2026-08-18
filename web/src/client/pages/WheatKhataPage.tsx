@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Banknote, Building2, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
+import { Banknote, Building2, FileText, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -7,7 +7,8 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PartyCombobox from '../components/forms/PartyCombobox'
-import { wheatKhataApi } from '../services/api'
+import { billApi, wheatKhataApi } from '../services/api'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
@@ -124,6 +125,7 @@ export default function WheatKhataPage() {
   const [productForm, setProductForm] = useState(emptyProductForm)
   const [paymentForm, setPaymentForm] = useState({ partyId: '', amount: '', notes: '' })
   const [calculated, setCalculated] = useState<ReturnType<typeof productPreview>>(null)
+  const [billing, setBilling] = useState(false)
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -181,6 +183,42 @@ export default function WheatKhataPage() {
     setSection(kind)
     setPaymentForm({ partyId, amount: '', notes: '' })
     setPaymentOpen(true)
+  }
+
+  const openEntityBill = async (party: WheatKhataParty) => {
+    setBilling(true)
+    try {
+      const res = await billApi.wheatKhataParty(party.id)
+      openHtmlBill(
+        typeof res.data === 'string' ? res.data : String(res.data),
+        `${party.name} bill`,
+      )
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate bill'))
+    } finally {
+      setBilling(false)
+    }
+  }
+
+  const openAllBills = async () => {
+    const companySection = section === 'COMPANY'
+    const list = companySection ? book.companies : book.parties
+    if (!list.length) {
+      toast.error(companySection ? 'Add a company first' : 'Add a party first')
+      return
+    }
+    setBilling(true)
+    try {
+      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY')
+      openHtmlBill(
+        typeof res.data === 'string' ? res.data : String(res.data),
+        companySection ? 'All company bills' : 'All party bills',
+      )
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate bills'))
+    } finally {
+      setBilling(false)
+    }
   }
 
   useVoicePageActions({
@@ -480,13 +518,17 @@ export default function WheatKhataPage() {
               <Wallet className="h-4 w-4" />
               {isCompany ? 'Receive Amount' : 'Give Amount'}
             </Button>
+            <Button variant="secondary" onClick={() => void openAllBills()} loading={billing} disabled={!entities.length}>
+              <FileText className="h-4 w-4" />
+              All bills
+            </Button>
           </div>
           <div className="px-1">
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
             <p className="text-[11px] text-slate-500">
               {isCompany
-                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money.'
-                : 'Owner receives wheat from the party and gives money to it. Give Amount deducts from total money.'}
+                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money. Bill lists every truck/bag sale and cash received.'
+                : 'Owner receives wheat from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
             </p>
           </div>
           {loading ? (
@@ -533,6 +575,10 @@ export default function WheatKhataPage() {
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => openPayment(section, String(p.id))}>
                       {isCompany ? 'Receive Amount' : 'Give Amount'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => void openEntityBill(p)} loading={billing}>
+                      <FileText className="h-3.5 w-3.5" />
+                      Bill
                     </Button>
                     <button
                       type="button"
@@ -879,6 +925,10 @@ export default function WheatKhataPage() {
 
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setDetailParty(null)}>Close</Button>
+              <Button variant="secondary" onClick={() => void openEntityBill(detailParty)} loading={billing}>
+                <FileText className="h-4 w-4" />
+                Bill
+              </Button>
               <Button variant="secondary" onClick={() => {
                 const kind = detailParty.kind === 'GIVING' ? 'COMPANY' : 'PARTY'
                 setDetailParty(null)
