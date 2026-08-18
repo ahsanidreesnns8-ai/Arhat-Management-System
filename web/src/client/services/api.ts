@@ -238,7 +238,8 @@ export const wheatKhataApi = {
     api.post<ApiResponse<WheatKhataParty>>('/wheat-khata/parties', data),
   getParty: (id: number) => api.get<ApiResponse<WheatKhataParty>>(`/wheat-khata/parties/${id}`),
   previewProduct: (data: {
-    bags: number
+    bags?: number
+    trucks?: number
     ratePerBag: number
     bagWeightKg?: number
     bagPricePerBag?: number
@@ -246,6 +247,7 @@ export const wheatKhataApi = {
   }) =>
     api.post<ApiResponse<{
       bags: number
+      trucks: number
       bagWeightKg: number
       ratePerBag: number
       bagPricePerBag: number
@@ -258,7 +260,8 @@ export const wheatKhataApi = {
     }>>('/wheat-khata/preview', data),
   addProduct: (data: {
     partyId: number
-    bags: number
+    bags?: number
+    trucks?: number
     ratePerBag: number
     bagWeightKg?: number
     bagPricePerBag?: number

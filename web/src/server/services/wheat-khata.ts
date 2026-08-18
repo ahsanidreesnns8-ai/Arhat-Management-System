@@ -4,6 +4,7 @@ import { d, roundRupee, totalWeight } from '@/server/money'
 const PARTY_KINDS = ['RECEIVING', 'GIVING'] as const
 export type WheatKhataPartyKind = (typeof PARTY_KINDS)[number]
 const DEFAULT_BAG_KG = 40
+export const BAGS_PER_TRUCK = 600
 
 function karachiParts(date: Date) {
   const tz = 'Asia/Karachi'
@@ -48,12 +49,21 @@ function parseOptionalMoney(value: unknown, label: string) {
   return roundRupee(amount).toNumber()
 }
 
-function parseBags(value: unknown) {
-  const bags = Number(value)
-  if (!Number.isInteger(bags) || bags <= 0) {
-    throw new Error('Enter number of bags')
+function parseCount(value: unknown, label: string) {
+  if (value == null || String(value).trim() === '') return 0
+  const count = Number(value)
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`Enter a valid ${label}`)
   }
-  return bags
+  return count
+}
+
+function resolveBagsAndTrucks(input: { bags?: unknown; trucks?: unknown }) {
+  const extraBags = parseCount(input.bags, 'bags')
+  const trucks = parseCount(input.trucks, 'trucks')
+  const bags = trucks * BAGS_PER_TRUCK + extraBags
+  if (bags <= 0) throw new Error('Enter number of bags, or trucks (1 truck = 600 bags)')
+  return { bags, trucks, extraBags }
 }
 
 function parseOptionalText(value: unknown) {
@@ -106,6 +116,7 @@ function productDto(row: {
   id: bigint
   partyId: bigint
   bags: number
+  trucks?: number | null
   bagWeightKg: { toNumber(): number }
   ratePerBag: { toNumber(): number }
   bagPricePerBag?: { toNumber(): number } | null
@@ -117,6 +128,7 @@ function productDto(row: {
 }) {
   const stamp = karachiParts(row.createdAt)
   const bags = row.bags
+  const trucks = row.trucks ?? 0
   const bagWeightKg = row.bagWeightKg.toNumber()
   const ratePerBag = row.ratePerBag.toNumber()
   const bagPricePerBag = row.bagPricePerBag?.toNumber() ?? 0
@@ -130,6 +142,7 @@ function productDto(row: {
     partyName: row.party?.name ?? null,
     partyAddress: row.party?.address ?? null,
     bags,
+    trucks,
     bagWeightKg,
     totalWeightKg: totalWeight(bags, bagWeightKg).toNumber(),
     ratePerBag,
@@ -151,6 +164,7 @@ type ProductRow = {
   id: bigint
   partyId: bigint
   bags: number
+  trucks?: number | null
   bagWeightKg: { toNumber(): number }
   ratePerBag: { toNumber(): number }
   bagPricePerBag?: { toNumber(): number } | null
@@ -229,12 +243,13 @@ const partyInclude = {
 
 export function previewProduct(input: {
   bags?: unknown
+  trucks?: unknown
   ratePerBag?: unknown
   bagWeightKg?: unknown
   bagPricePerBag?: unknown
   labourPerBag?: unknown
 }) {
-  const bags = parseBags(input.bags)
+  const { bags, trucks } = resolveBagsAndTrucks(input)
   const ratePerBag = parseAmount(input.ratePerBag, 'Rate of one bag')
   const bagPricePerBag = parseOptionalMoney(input.bagPricePerBag, 'Bag price')
   const labourPerBag = parseOptionalMoney(input.labourPerBag, 'Labour per bag')
@@ -252,6 +267,7 @@ export function previewProduct(input: {
   const weightKg = totalWeight(bags, bagWeightKg).toNumber()
   return {
     bags,
+    trucks,
     bagWeightKg,
     ratePerBag,
     bagPricePerBag,
@@ -261,6 +277,26 @@ export function previewProduct(input: {
     labourAmount,
     totalPrice,
     totalWeightKg: weightKg,
+  }
+}
+
+async function bagStock() {
+  const [received, given] = await Promise.all([
+    prisma.wheatKhataProduct.aggregate({
+      _sum: { bags: true },
+      where: { party: { deleted: false, kind: 'RECEIVING' } },
+    }),
+    prisma.wheatKhataProduct.aggregate({
+      _sum: { bags: true },
+      where: { party: { deleted: false, kind: 'GIVING' } },
+    }),
+  ])
+  const bagsReceived = received._sum.bags ?? 0
+  const bagsGiven = given._sum.bags ?? 0
+  return {
+    bagsReceived,
+    bagsGiven,
+    bagsInStock: bagsReceived - bagsGiven,
   }
 }
 
@@ -291,6 +327,8 @@ export async function getBook() {
     companies.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0)
+  const bagsReceived = parties.reduce((sum, row) => sum + row.totalBags, 0)
+  const bagsGiven = companies.reduce((sum, row) => sum + row.totalBags, 0)
 
   return {
     totals: {
@@ -300,6 +338,10 @@ export async function getBook() {
       cashGiven,
       cashReceived,
       totalAmount: moneyIn + cashReceived - cashGiven,
+      bagsReceived,
+      bagsGiven,
+      bagsInStock: bagsReceived - bagsGiven,
+      bagsPerTruck: BAGS_PER_TRUCK,
     },
     money,
     parties,
@@ -369,6 +411,7 @@ export async function getParty(id: number | bigint) {
 export async function addProduct(input: {
   partyId?: unknown
   bags?: unknown
+  trucks?: unknown
   ratePerBag?: unknown
   bagWeightKg?: unknown
   bagPricePerBag?: unknown
@@ -385,10 +428,19 @@ export async function addProduct(input: {
   if (!party) throw new Error('Party not found')
 
   const preview = previewProduct(input)
+  if (party.kind === 'GIVING') {
+    const stock = await bagStock()
+    if (preview.bags > stock.bagsInStock) {
+      throw new Error(
+        `Only ${stock.bagsInStock} bags in stock. Received ${stock.bagsReceived} from parties, sold ${stock.bagsGiven} to companies.`,
+      )
+    }
+  }
   const row = await prisma.wheatKhataProduct.create({
     data: {
       partyId: party.id,
       bags: preview.bags,
+      trucks: preview.trucks,
       bagWeightKg: preview.bagWeightKg,
       ratePerBag: preview.ratePerBag,
       bagPricePerBag: preview.bagPricePerBag,

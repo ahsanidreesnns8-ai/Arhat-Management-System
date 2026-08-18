@@ -471,6 +471,7 @@ export interface WheatKhataProduct {
   partyName?: string | null
   partyAddress?: string | null
   bags: number
+  trucks?: number
   bagWeightKg: number
   totalWeightKg: number
   ratePerBag: number
@@ -530,6 +531,10 @@ export interface WheatKhataBook {
     cashGiven: number
     cashReceived: number
     totalAmount: number
+    bagsReceived: number
+    bagsGiven: number
+    bagsInStock: number
+    bagsPerTruck: number
   }
   money: WheatKhataMoney[]
   parties: WheatKhataParty[]

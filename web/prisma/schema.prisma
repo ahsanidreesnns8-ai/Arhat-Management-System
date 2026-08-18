@@ -595,6 +595,7 @@ model WheatKhataProduct {
   workspace      String          @default("live") @db.VarChar(20)
   partyId        BigInt          @map("party_id")
   bags           Int
+  trucks         Int             @default(0)
   bagWeightKg    Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
   ratePerBag     Decimal         @map("rate_per_bag") @db.Decimal(12, 2)
   bagPricePerBag Decimal         @default(0.00) @map("bag_price_per_bag") @db.Decimal(12, 2)
