@@ -217,7 +217,7 @@ export default function WheatKhataPage() {
       const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY')
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
-        companySection ? 'All company bills' : 'All party bills',
+        'Bill',
       )
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bills'))

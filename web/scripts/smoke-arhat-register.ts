@@ -99,6 +99,8 @@ async function main() {
       assert(statement.includes('Total received'), 'statement missing received total')
       assert(statement.includes('Total given'), 'statement missing given total')
       assert(statement.includes('Owner gave more'), 'statement missing net label')
+      assert(!statement.includes('Arhat Register Statement'), 'register bill still has module title')
+      assert(!statement.includes('Wheat Khata ·'), 'register bill should not stamp Wheat Khata labels')
 
       const both = await addPersonAmounts({
         partyId: person.id,

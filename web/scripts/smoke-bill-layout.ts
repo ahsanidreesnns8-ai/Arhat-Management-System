@@ -114,6 +114,9 @@ async function main() {
       assert(!buyerHtml.includes('Dheri date'), 'buyer bill still has Dheri date')
       assert(buyerHtml.includes('Qty of one bag'), 'buyer bill missing qty of one bag')
       assert(buyerHtml.includes('aria-label="RTC"'), 'buyer bill missing RTC logo')
+      assert(!buyerHtml.includes('Buyer Bill / Payment Receipt'), 'buyer bill still has module title')
+      assert(!html.includes('Wheat Khata · Company'), 'farmer bill should not stamp Wheat Khata labels')
+      assert(!buyerHtml.includes('Wheat Khata · Party'), 'buyer bill should not stamp Wheat Khata labels')
 
       console.log('farmer/buyer bill layout OK')
       console.log('printed header sample:', html.match(/<div class="dates">[\s\S]*?<\/div>/)?.[0])
