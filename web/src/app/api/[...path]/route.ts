@@ -660,6 +660,7 @@ async function dispatch(
       return result(await arhatAmount.getBook())
     }
     if (path[1] === 'merge' && method === 'GET') {
+      if (!isOwnerFinanceRole(user?.role)) throw new Error('Only the owner can merge Wheat Khata into Arhat Amount')
       return result(await arhatAmount.getMergeReport())
     }
     if (path[1] === 'entries' && method === 'POST') {
@@ -712,6 +713,13 @@ async function dispatch(
         201,
       )
     }
+    if (path[1] === 'person-amounts' && method === 'POST') {
+      return result(
+        await register.addPersonAmounts(payload as Parameters<typeof register.addPersonAmounts>[0], user?.id),
+        'Person amounts saved',
+        201,
+      )
+    }
     if (path[1] === 'zakat' && method === 'GET') {
       return result(await register.zakatSummary())
     }
@@ -720,6 +728,7 @@ async function dispatch(
   if (path[0] === 'bills' && method === 'GET') {
     const lang = url.searchParams.get('lang') ?? 'en'
     if (path[1] === 'arhat-amount' && path[2] === 'merge' && path.length === 3) {
+      if (!isOwnerFinanceRole(user?.role)) throw new Error('Only the owner can merge Wheat Khata into Arhat Amount')
       return html(await bills.arhatAmountMergeBillHtml(lang))
     }
     if (path[1] === 'arhat-amount' && path.length === 2) {

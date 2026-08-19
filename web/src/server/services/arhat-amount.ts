@@ -295,6 +295,23 @@ function wheatLinesFromBook(book: Awaited<ReturnType<typeof getWheatKhataBook>>)
     )
   }
   for (const party of book.parties) {
+    for (const row of party.products || []) {
+      lines.push(
+        line(
+          `wk-prod-${row.id}`,
+          'WHEAT_KHATA',
+          'WHEAT_KHATA',
+          'GIVING',
+          row.totalPrice,
+          joinReason([
+            `Wheat Khata product from party ${party.name}`,
+            `${row.bags} bags`,
+            row.notes,
+          ]),
+          new Date(row.createdAt),
+        ),
+      )
+    }
     for (const row of party.payments || []) {
       lines.push(
         line(
@@ -303,13 +320,30 @@ function wheatLinesFromBook(book: Awaited<ReturnType<typeof getWheatKhataBook>>)
           'WHEAT_KHATA',
           'GIVING',
           row.amount,
-          joinReason([`Given to party ${party.name}`, row.notes]),
+          joinReason([`Wheat Khata cash given to party ${party.name}`, row.notes]),
           new Date(row.createdAt),
         ),
       )
     }
   }
   for (const company of book.companies) {
+    for (const row of company.products || []) {
+      lines.push(
+        line(
+          `wk-prod-${row.id}`,
+          'WHEAT_KHATA',
+          'WHEAT_KHATA',
+          'RECEIVING',
+          row.totalPrice,
+          joinReason([
+            `Wheat Khata product to company ${company.name}`,
+            `${row.bags} bags`,
+            row.notes,
+          ]),
+          new Date(row.createdAt),
+        ),
+      )
+    }
     for (const row of company.payments || []) {
       lines.push(
         line(
@@ -318,7 +352,7 @@ function wheatLinesFromBook(book: Awaited<ReturnType<typeof getWheatKhataBook>>)
           'WHEAT_KHATA',
           'RECEIVING',
           row.amount,
-          joinReason([`Received from company ${company.name}`, row.notes]),
+          joinReason([`Wheat Khata cash received from company ${company.name}`, row.notes]),
           new Date(row.createdAt),
         ),
       )

@@ -5,8 +5,8 @@ Flyway `V1__initial_schema.sql` seeds:
 - Business settings: Rehmani Trading Company
 - Products: Wheat, Paddy, Maize, Barley (40kg default bag)
 - Stock rows for each product (qty 0)
-- Owner user: `owner` / `owner123`
-- Staff user: `staff` / `staff123`
+- Owner user: `owner` / `Nankana#Shop9472Rtc`
+- Staff user: `staff` / `Nankana#Desk5831Rtc`
 
 After the app runs once, create farmers/buyers/dheris/sales from the UI
 or insert carefully with foreign keys intact.

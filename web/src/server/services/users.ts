@@ -190,11 +190,17 @@ export async function updatePassword(id: number | bigint, newPassword: string) {
 }
 
 export async function setUserActive(id: number | bigint, active: boolean) {
-  const existing = await getUser(id)
-  if (isSharedShopLogin(existing.username)) {
-    throw new Error('System accounts cannot be suspended')
+  const existing = await prisma.user.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!existing) throw new Error('User not found')
+  if (existing.username === 'owner' || existing.role === 'OWNER') {
+    throw new Error('Owner account cannot be suspended')
   }
-  await prisma.user.update({ where: { id: BigInt(id) }, data: { active } })
+  await prisma.user.update({ where: { id: existing.id }, data: { active } })
+  if (!active) {
+    await endAllSessionsForUser(existing.id)
+  }
 }
 
 export async function deleteUser(id: number | bigint) {

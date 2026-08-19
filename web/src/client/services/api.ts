@@ -234,6 +234,12 @@ export const registerApi = {
     api.get<ApiResponse<RegisterEntry[]>>('/register/entries', { params: kind ? { kind } : {} }),
   addEntry: (data: Record<string, unknown>) =>
     api.post<ApiResponse<RegisterEntry>>('/register/entries', data),
+  addPersonAmounts: (data: {
+    partyId: number
+    receivedAmount?: number
+    givenAmount?: number
+    notes?: string
+  }) => api.post('/register/person-amounts', data),
   zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
 }
 

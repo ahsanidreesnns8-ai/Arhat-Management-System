@@ -69,14 +69,14 @@ export default function OwnerPage() {
   }
 
   const toggleActive = async (u: SystemUser) => {
-    if (isSystemAccount(u.username)) {
-      toast.error('System accounts cannot be suspended')
+    if (u.username === 'owner' || u.role === 'OWNER') {
+      toast.error('Owner account cannot be suspended')
       return
     }
     try {
       if (u.active) await userApi.suspend(u.id)
       else await userApi.activate(u.id)
-      toast.success(u.active ? 'User suspended' : 'User activated')
+      toast.success(u.active ? 'User suspended — they cannot sign in' : 'User activated — they can sign in again')
       load()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -203,11 +203,37 @@ export default function OwnerPage() {
     <div className="space-y-4">
       <PageHeader
         title="Owner Panel"
-        description="Users, staff access time, backups, audit"
+        description="Change your password, add users, suspend access, and manage staff. Staff cannot change passwords."
         action={
-          <Button size="sm" onClick={() => setModalOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Add user
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                const me =
+                  users.find((row) => row.username === user?.username) ||
+                  (user
+                    ? {
+                        id: user.id,
+                        username: user.username,
+                        fullName: user.fullName,
+                        email: user.email || '',
+                        role: user.role,
+                        active: true,
+                      }
+                    : null)
+                if (!me) return
+                setPasswordUser(me)
+                setNewPassword('')
+                setConfirmPassword('')
+              }}
+            >
+              <KeyRound className="h-3.5 w-3.5" /> Change my password
+            </Button>
+            <Button size="sm" onClick={() => setModalOpen(true)}>
+              <Plus className="h-3.5 w-3.5" /> Add user
+            </Button>
+          </div>
         }
       />
 
@@ -285,7 +311,7 @@ export default function OwnerPage() {
           Users
         </div>
         <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-800">
-          Add a name, username, and password. You can change any password, or delete users you created. The owner and staff shop logins cannot be deleted.
+          Add a name, username, and password so that person can sign in. Change any password — the previous one is deleted. Suspend a user to block the site. Staff cannot do this. The owner login cannot be suspended or deleted.
         </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {users.map((u) => {
@@ -329,6 +355,11 @@ export default function OwnerPage() {
                         Delete
                       </Button>
                     </>
+                  )}
+                  {system && u.username !== 'owner' && (
+                    <Button size="sm" variant="secondary" onClick={() => toggleActive(u)}>
+                      {u.active ? 'Suspend' : 'Activate'}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -395,7 +426,7 @@ export default function OwnerPage() {
       >
         <div className="space-y-2.5">
           <p className="text-[12px] text-slate-500">
-            This signs {passwordUser?.username} out on every device. {PASSWORD_HINT}
+            This permanently replaces the previous password. {passwordUser?.username} will be signed out everywhere. {PASSWORD_HINT}
           </p>
           <Input
             label="New password *"

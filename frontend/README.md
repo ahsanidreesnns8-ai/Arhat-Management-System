@@ -50,7 +50,7 @@ src/
 | Field | Value |
 |-------|-------|
 | Username | `owner` or `staff` |
-| Password | `owner123` or `staff123` |
+| Password | `Nankana#Shop9472Rtc` or `Nankana#Desk5831Rtc` |
 
 ## Docker
 

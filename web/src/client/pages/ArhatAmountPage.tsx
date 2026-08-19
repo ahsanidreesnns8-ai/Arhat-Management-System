@@ -11,6 +11,8 @@ import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import { useAuth } from '../context/AuthContext'
+import { isOwnerFinanceRole } from '../../lib/roles'
 import type { ArhatAmountBook, ArhatAmountLine, ArhatAmountMergeReport } from '../types'
 
 type Section = 'ADD' | 'RECEIVING' | 'GIVING'
@@ -26,6 +28,8 @@ function apiMessage(err: unknown, fallback: string) {
 }
 
 export default function ArhatAmountPage() {
+  const { user } = useAuth()
+  const isOwner = isOwnerFinanceRole(user?.role)
   const [section, setSection] = useState<Section>('ADD')
   const [book, setBook] = useState<ArhatAmountBook>(emptyBook)
   const [loading, setLoading] = useState(true)
@@ -164,15 +168,17 @@ export default function ArhatAmountPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Amount"
-        description="Cash book for the whole shop except Wheat Khata. Buyer money is added, farmer payouts and zakat are deducted, and Arhat Register is included."
+        description="Shop cash book for farmer payouts, buyer receipts, register, and zakat. Wheat Khata stays separate until the owner taps Merge all amount."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void openArhatBill()} loading={billing}>
               <FileText className="h-4 w-4" /> Bill
             </Button>
-            <Button onClick={() => void openMerge()} loading={mergeLoading}>
-              <GitMerge className="h-4 w-4" /> Merge all amount
-            </Button>
+            {isOwner && (
+              <Button onClick={() => void openMerge()} loading={mergeLoading}>
+                <GitMerge className="h-4 w-4" /> Merge all amount
+              </Button>
+            )}
           </div>
         }
       />
@@ -233,7 +239,7 @@ export default function ArhatAmountPage() {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold px-1">Complete history</h3>
         <p className="text-[11px] text-slate-500 px-1">
-          Day, date, time, and the reason money was added or deducted. Wheat Khata stays out of this list until you tap Merge all amount.
+          Wheat Khata stays out of this list until the owner taps Merge all amount.
         </p>
         {loading ? (
           <div className="card-3d p-4"><TableSkeleton rows={6} /></div>
@@ -277,7 +283,7 @@ export default function ArhatAmountPage() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-slate-500">
-              Wheat Khata stays a separate book. This report adds it to Arhat Amount for a combined total.
+              Owner-only. Wheat Khata stays out of Arhat Amount until this merge. Complete history includes money given to farmers, money received from buyers, register, zakat, and Wheat Khata cash and product lines.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -307,6 +313,13 @@ export default function ArhatAmountPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Complete history</h4>
+              <p className="text-[11px] text-slate-500 mb-2">
+                Day, date, time, and why money was added or deducted — including farmer payouts and buyer receipts.
+              </p>
+              <HistoryTable rows={merge.history} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setMergeOpen(false)}>Close</Button>

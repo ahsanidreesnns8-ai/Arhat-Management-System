@@ -22,12 +22,12 @@ Cursor is **not** an environment variable and is **not** part of runtime.
 4. Add `DATABASE_URL`.
 5. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
 
-Shop logins are restored on every deploy and on every login:
+Shop logins are created if missing. Leaked passwords `owner123` / `staff123` are upgraded once; a password the owner has already changed is never overwritten.
 
 | Username | Password |
 |----------|----------|
-| `owner` | `owner123` |
-| `staff` | `staff123` |
+| `owner` | `Nankana#Shop9472Rtc` |
+| `staff` | `Nankana#Desk5831Rtc` |
 
 Local instructions: [`web/README.md`](web/README.md)
 
