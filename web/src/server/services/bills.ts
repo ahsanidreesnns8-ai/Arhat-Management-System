@@ -148,6 +148,7 @@ body{
   font-weight:600;
 }
 .party-grid .value{font-size:8.5px;font-weight:600;color:var(--ink);margin-top:1px;word-break:break-word}
+.party-grid .product-name{color:var(--navy);font-weight:700;font-size:9px}
 .slip-body{flex:1}
 table{width:100%;border-collapse:collapse;margin-top:6px;font-size:7.5px;table-layout:fixed;border:1px solid #475569}
 th,td{border:1px solid #64748b;padding:3px 2px;text-align:left;vertical-align:middle}
@@ -155,17 +156,17 @@ th{
   background:var(--navy);
   color:#fff;
   font-weight:700;
-  font-size:6.7px;
+  font-size:6.3px;
   letter-spacing:0;
-  line-height:1.2;
-  white-space:normal;
+  line-height:1.15;
+  white-space:nowrap;
   overflow:visible;
-  word-break:break-word;
-  overflow-wrap:break-word;
-  hyphens:manual;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  hyphens:none;
 }
 td{word-break:normal;overflow-wrap:anywhere}
-th.num,th.compact,th.money{text-align:center;white-space:normal;overflow:visible}
+th.num,th.compact,th.money{text-align:center;white-space:nowrap;overflow:visible}
 td.num,tfoot td.num{
   text-align:right;
   white-space:nowrap;
@@ -178,7 +179,7 @@ td.compact,tfoot td.compact{padding:3px 1px}
 th.name{text-align:left;white-space:normal;overflow:visible}
 td.name,tfoot td.name{white-space:nowrap;overflow:visible;font-weight:600;padding:3px 2px}
 .farmer-grid{font-size:7.2px}
-.farmer-grid th{font-size:6.6px}
+.farmer-grid th{font-size:6.2px;white-space:nowrap}
 .totals{font-weight:700;background:#f1f5f9}
 .note{margin-top:8px;padding:6px 8px;background:var(--soft);border:1px solid var(--line);font-size:8px;line-height:1.4}
 .note strong{color:var(--navy)}
@@ -314,7 +315,6 @@ function bagWord(urdu: boolean) {
     farmerTitle: '',
     farmerCols: urdu
       ? [
-          'جنس',
           'بوریاں',
           'اضافی',
           'بوری کلو',
@@ -327,24 +327,23 @@ function bagWord(urdu: boolean) {
           'ادائیگی',
         ]
       : [
-          'Product',
           'Bags',
           'Extra',
-          'Qty of\none bag',
+          'Qty of one bag',
           'Total',
           'Man',
-          'Extra\nKG',
+          'Extra KG',
           'Rate',
           'Gross',
           'Commission',
           'Payable',
         ],
     buyerCols: urdu
-      ? ['انوائس', 'جنس', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Invoice', 'Product', 'Bags', 'Extra', 'Qty of\none bag', 'Total', 'Rate', 'Amount'],
+      ? ['انوائس', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Invoice', 'Bags', 'Extra', 'Qty of one bag', 'Total', 'Rate', 'Amount'],
     saleCols: urdu
-      ? ['پارٹی', 'جنس', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Party', 'Product', 'Bags', 'Extra', 'Qty of\none bag', 'Total', 'Rate', 'Amount'],
+      ? ['پارٹی', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Party', 'Bags', 'Extra', 'Qty of one bag', 'Total', 'Rate', 'Amount'],
   }
 }
 
@@ -402,20 +401,19 @@ function extraStyle(value: DecimalInput | number | string, minWidth: number, max
 }
 
 const FARMER_COL_WIDTHS = [
-  '6.8em',
-  '4.2ch',
-  '4.8ch',
-  '6.4ch',
-  '5ch',
-  '3.6ch',
-  '4.8ch',
   '4.4ch',
+  '5.2ch',
+  '11.6ch',
+  '5.2ch',
+  '3.8ch',
+  '7.6ch',
+  '4.6ch',
   '',
   '',
   '',
 ]
-const BUYER_COL_WIDTHS = ['5.2em', '6.6em', '3.8ch', '4.6ch', '6.4ch', '4.8ch', '4.4ch', '']
-const SALE_COL_WIDTHS = ['6em', '6.6em', '3.8ch', '4.6ch', '6.4ch', '4.8ch', '4.4ch', '']
+const BUYER_COL_WIDTHS = ['5.6em', '4.4ch', '5.2ch', '11.6ch', '5.2ch', '4.6ch', '']
+const SALE_COL_WIDTHS = ['6.2em', '4.4ch', '5.2ch', '11.6ch', '5.2ch', '4.6ch', '']
 
 function autoColWidths(
   headers: string[],
@@ -498,6 +496,20 @@ function table(
   return `<table${className}>${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>`
 }
 
+function uniqueProductNames(names: Array<string | null | undefined>) {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const name of names) {
+    const value = String(name ?? '').trim()
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out.join(', ')
+}
+
 function partyDetailsCard(opts: {
   title: string
   codeLabel: string
@@ -506,6 +518,7 @@ function partyDetailsCard(opts: {
   fatherName?: string | null
   city?: string | null
   address?: string | null
+  product?: string | null
   urdu?: boolean
 }) {
   const u = !!opts.urdu
@@ -514,8 +527,9 @@ function partyDetailsCard(opts: {
     <div class="party-grid">
       <div><span class="label">${opts.codeLabel}</span><div class="value">${dash(opts.code)}</div></div>
       <div><span class="label">${u ? 'ولدیت' : 'Father name'}</span><div class="value">${dash(opts.fatherName)}</div></div>
+      <div><span class="label">${u ? 'پتہ' : 'Address'}</span><div class="value">${dash(opts.address)}</div></div>
+      <div><span class="label">${u ? 'جنس' : 'Product'}</span><div class="value product-name">${dash(opts.product)}</div></div>
       <div><span class="label">${u ? 'شہر' : 'City'}</span><div class="value">${dash(opts.city)}</div></div>
-      <div style="grid-column:1/-1"><span class="label">${u ? 'پتہ' : 'Address'}</span><div class="value">${dash(opts.address)}</div></div>
     </div>
   </div>`
 }
@@ -565,7 +579,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   })
 
   const rows = lines.map((item) => [
-    item.product,
     digitStyle(item.bags, 3),
     extraStyle(item.extraKg, 2, 3),
     digitStyle(item.bagQty, 2),
@@ -640,6 +653,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     fatherName: farmer.fatherName,
     city: farmer.city,
     address: farmer.address,
+    product: uniqueProductNames(lines.map((item) => item.product)),
     urdu,
   })
 
@@ -650,7 +664,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       w.farmerCols,
       rows,
       [
-        w.totals,
         digitStyle(bags, 3),
         extraStyle(extraKg, 2, 3),
         '',
@@ -664,9 +677,8 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
       ],
       {
         className: 'farmer-grid',
-        nameCols: [0],
-        compactCols: [1, 2, 3, 4, 5, 6, 7],
-        moneyCols: [8, 9, 10],
+        compactCols: [0, 1, 2, 3, 4, 5, 6],
+        moneyCols: [7, 8, 9],
         colWidths: FARMER_COL_WIDTHS,
       },
     ) + paymentBox,
@@ -705,7 +717,6 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   )
   const rows = flat.map((item) => [
     item.invoice,
-    item.product,
     digitStyle(item.bags, 3),
     extraStyle(item.extraKg, 2, 3),
     digitStyle(item.bagQty, 2),
@@ -753,6 +764,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
       fatherName: buyer.fatherName,
       city: buyer.city,
       address: buyer.address,
+      product: uniqueProductNames(flat.map((item) => item.product)),
       urdu,
     }),
     table(
@@ -760,7 +772,6 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
       rows,
       [
         w.totals,
-        '',
         digitStyle(sum(flat.map((x) => x.bags)), 3),
         extraStyle(
           flat.reduce((s, x) => s.add(d(x.extraKg)), d(0)),
@@ -773,9 +784,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         money(billed),
       ],
       {
-        nameCols: [1],
-        compactCols: [2, 3, 4, 6],
-        moneyCols: [5, 7],
+        compactCols: [1, 2, 3, 5],
+        moneyCols: [4, 6],
         colWidths: BUYER_COL_WIDTHS,
       },
     ) + paymentBox,
@@ -823,7 +833,6 @@ export async function buyerBillSelected(
   const sheets = chunks.map((chunk, index) => {
     const rows = chunk.map((item) => [
       item.sale.invoiceNumber,
-      item.product.name,
       digitStyle(item.numberOfBags, 3),
       extraStyle(item.partialBagWeight, 2, 3),
       digitStyle(item.weightPerBag.toNumber(), 2),
@@ -845,11 +854,10 @@ export async function buyerBillSelected(
       ${table(
         w.buyerCols,
         rows,
-        [w.totals, '', digitStyle(bags, 3), extraStyle(extraKg, 2, 3), '', money(weight), '', money(amount)],
+        [w.totals, digitStyle(bags, 3), extraStyle(extraKg, 2, 3), '', money(weight), '', money(amount)],
         {
-          nameCols: [1],
-          compactCols: [2, 3, 4, 6],
-          moneyCols: [5, 7],
+          compactCols: [1, 2, 3, 5],
+          moneyCols: [4, 6],
           colWidths: BUYER_COL_WIDTHS,
         },
       )}`
@@ -865,6 +873,7 @@ export async function buyerBillSelected(
       fatherName: buyer.fatherName,
       city: buyer.city,
       address: buyer.address,
+      product: uniqueProductNames(items.map((item) => item.product.name)),
       urdu,
     }),
     sheets,
@@ -906,9 +915,10 @@ export async function saleBill(
           fatherName: sale.buyer.fatherName,
           city: sale.buyer.city,
           address: sale.buyer.address,
+          product: uniqueProductNames(items.map((item) => item.product.name)),
           urdu,
         })
-      : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div></div></div>`
+      : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div><div><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">—</div></div><div><span class="label">${urdu ? 'جنس' : 'Product'}</span><div class="value product-name">${dash(uniqueProductNames(items.map((item) => item.product.name)))}</div></div></div></div>`
 
   return page(
     '',
@@ -917,7 +927,6 @@ export async function saleBill(
       w.saleCols,
       items.map((item) => [
         party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
-        item.product.name,
         digitStyle(item.numberOfBags, 3),
         extraStyle(item.partialBagWeight, 2, 3),
         digitStyle(item.weightPerBag.toNumber(), 2),
@@ -925,11 +934,10 @@ export async function saleBill(
         money(item.rate).padStart(4, '0'),
         money(item.amount),
       ]),
-      [w.totals, '', digitStyle(bags, 3), extraStyle(extraKg, 2, 3), '', money(weight), '', money(amount)],
+      [w.totals, digitStyle(bags, 3), extraStyle(extraKg, 2, 3), '', money(weight), '', money(amount)],
       {
-        nameCols: [1],
-        compactCols: [2, 3, 4, 6],
-        moneyCols: [5, 7],
+        compactCols: [1, 2, 3, 5],
+        moneyCols: [4, 6],
         colWidths: SALE_COL_WIDTHS,
       },
     ),
