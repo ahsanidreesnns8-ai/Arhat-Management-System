@@ -306,8 +306,11 @@ export async function addPersonAmounts(input: {
   const given = input.givenAmount == null || String(input.givenAmount).trim() === ''
     ? 0
     : round2(input.givenAmount).toNumber()
+  if (received > 0 && given > 0) {
+    throw new Error('Save received or given, not both at once')
+  }
   if (received <= 0 && given <= 0) {
-    throw new Error('Enter how much you received, how much you gave, or both')
+    throw new Error('Enter how much you received or how much you gave')
   }
   const notes = String(input.notes ?? '').trim() || null
   const saved = []

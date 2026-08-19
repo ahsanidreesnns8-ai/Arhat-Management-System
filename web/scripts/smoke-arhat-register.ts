@@ -93,24 +93,38 @@ async function main() {
 
       const statement = await registerPartyBill(person.id, 'en')
       assert(statement.includes('Register Person'), 'statement missing person name')
-      assert(statement.includes('first receive'), 'statement missing first receive note')
-      assert(statement.includes('second receive'), 'statement missing second receive note')
+      assert(!statement.includes('first receive'), 'statement should not mix receive lines when given is larger')
+      assert(!statement.includes('second receive'), 'statement should not mix receive lines when given is larger')
       assert(statement.includes('shop help'), 'statement missing given note')
-      assert(statement.includes('Total received'), 'statement missing received total')
       assert(statement.includes('Total given'), 'statement missing given total')
-      assert(statement.includes('Owner gave more'), 'statement missing net label')
+      assert(!statement.includes('Total received'), 'statement should not print received when given is larger')
+      assert(!statement.includes('Received from them'), 'statement should not print received header when given is larger')
+      assert(statement.includes('Given to them'), 'statement missing given header')
+      assert(!statement.includes('Owner received more'), 'statement should not mix received wording')
       assert(!statement.includes('Arhat Register Statement'), 'register bill still has module title')
       assert(!statement.includes('Wheat Khata ·'), 'register bill should not stamp Wheat Khata labels')
 
-      const both = await addPersonAmounts({
+      const extraGiven = await addPersonAmounts({
         partyId: person.id,
-        receivedAmount: 50,
         givenAmount: 25,
-        notes: 'full amount',
+        notes: 'extra given',
       })
-      ids.entryIds.push(...both.entries.map((row) => BigInt(row.id)))
-      assert(both.person.receivedTotal === 1050, `full receive expected 1050 got ${both.person.receivedTotal}`)
-      assert(both.person.givenTotal === 1525, `full give expected 1525 got ${both.person.givenTotal}`)
+      ids.entryIds.push(...extraGiven.entries.map((row) => BigInt(row.id)))
+      assert(extraGiven.person.givenTotal === 1525, `extra give expected 1525 got ${extraGiven.person.givenTotal}`)
+      assert(extraGiven.person.receivedTotal === 1000, `received should stay 1000 got ${extraGiven.person.receivedTotal}`)
+
+      let bothRejected = false
+      try {
+        await addPersonAmounts({
+          partyId: person.id,
+          receivedAmount: 50,
+          givenAmount: 25,
+          notes: 'both',
+        })
+      } catch (error) {
+        bothRejected = String(error).includes('not both')
+      }
+      assert(bothRejected, 'saving received and given together must be rejected')
 
       const receivedParty = await createParty({ kind: 'RECEIVING', name: `Recv ${stamp}` })
       const received = await createEntry({
@@ -119,6 +133,11 @@ async function main() {
         amount: 800,
       })
       ids.entryIds.push(BigInt(received.id))
+      const recvStatement = await registerPartyBill(receivedParty.id, 'en')
+      assert(recvStatement.includes('Received from them'), 'receive-only bill missing received header')
+      assert(recvStatement.includes('Total received'), 'receive-only bill missing received total')
+      assert(!recvStatement.includes('Given to them'), 'receive-only bill should not print given header')
+      assert(!recvStatement.includes('Total given'), 'receive-only bill should not print given total')
 
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))

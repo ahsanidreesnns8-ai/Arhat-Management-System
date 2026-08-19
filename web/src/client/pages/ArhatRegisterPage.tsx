@@ -18,10 +18,37 @@ import PartyCombobox from '../components/forms/PartyCombobox'
 type Section = 'PEOPLE' | 'ZAKAT' | 'ADVANCE'
 type MoneyKind = 'GIVING' | 'RECEIVING'
 
-function netCopy(balance: number) {
-  if (balance > 0) return `Owner received ${formatCurrency(balance)} more`
-  if (balance < 0) return `Owner gave ${formatCurrency(Math.abs(balance))} more`
-  return 'Settled'
+type MoneySide = {
+  kind: MoneyKind | null
+  label: 'Received' | 'Given' | 'Settled'
+  amount: number
+  count: number
+}
+
+function moneySide(
+  received: number,
+  given: number,
+  receivedCount = 0,
+  givenCount = 0,
+): MoneySide {
+  const net = received - given
+  if (net > 0) {
+    return { kind: 'RECEIVING', label: 'Received', amount: received, count: receivedCount }
+  }
+  if (net < 0) {
+    return { kind: 'GIVING', label: 'Given', amount: given, count: givenCount }
+  }
+  return { kind: null, label: 'Settled', amount: 0, count: 0 }
+}
+
+function sideNote(party: Pick<RegisterParty, 'receivedTotal' | 'givenTotal'>, kind?: MoneyKind) {
+  const received = party.receivedTotal || 0
+  const given = party.givenTotal || 0
+  if (kind === 'RECEIVING') return `Received ${formatCurrency(received)}`
+  if (kind === 'GIVING') return `Given ${formatCurrency(given)}`
+  const side = moneySide(received, given)
+  if (!side.kind) return side.label
+  return `${side.label} ${formatCurrency(side.amount)}`
 }
 
 export default function ArhatRegisterPage() {
@@ -42,8 +69,6 @@ export default function ArhatRegisterPage() {
 
   const [person, setPerson] = useState({ name: '', address: '', notes: '' })
   const [money, setMoney] = useState({ partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
-  const [fullOpen, setFullOpen] = useState(false)
-  const [fullForm, setFullForm] = useState({ partyId: '', received: '', given: '', notes: '' })
   const [calcPartyId, setCalcPartyId] = useState('')
   const [zakatForm, setZakatForm] = useState({ amount: '', notes: '' })
   const [advance, setAdvance] = useState({ farmerId: '', amount: '', notes: '' })
@@ -88,7 +113,6 @@ export default function ArhatRegisterPage() {
 
   const bookReceived = parties.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
   const bookGiven = parties.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
-  const bookBalance = bookReceived - bookGiven
 
   if (!isOwner) return <Navigate to="/dashboard" replace />
 
@@ -110,7 +134,7 @@ export default function ArhatRegisterPage() {
         address: person.address.trim() || undefined,
         notes: person.notes.trim() || undefined,
       })
-      toast.success('Person saved — you can receive and give money for them')
+      toast.success('Person saved')
       setPerson({ name: '', address: '', notes: '' })
       setPersonOpen(false)
       void load()
@@ -147,37 +171,6 @@ export default function ArhatRegisterPage() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg || 'Could not save amount')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const saveFullAmount = async () => {
-    if (!fullForm.partyId) {
-      toast.error('Choose a name first')
-      return
-    }
-    const received = Number(fullForm.received)
-    const given = Number(fullForm.given)
-    if ((!received || received <= 0) && (!given || given <= 0)) {
-      toast.error('Enter how much you received, how much you gave, or both')
-      return
-    }
-    setSaving(true)
-    try {
-      await registerApi.addPersonAmounts({
-        partyId: Number(fullForm.partyId),
-        receivedAmount: received > 0 ? received : undefined,
-        givenAmount: given > 0 ? given : undefined,
-        notes: fullForm.notes.trim() || undefined,
-      })
-      toast.success('Person totals updated')
-      setFullForm({ partyId: '', received: '', given: '', notes: '' })
-      setFullOpen(false)
-      void load()
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not save person amounts')
     } finally {
       setSaving(false)
     }
@@ -265,14 +258,19 @@ export default function ArhatRegisterPage() {
   const calcParty = parties.find((p) => String(p.id) === calcPartyId) || null
   const calcReceived = calcParty ? calcParty.receivedTotal || 0 : bookReceived
   const calcGiven = calcParty ? calcParty.givenTotal || 0 : bookGiven
-  const calcTurnover = calcReceived + calcGiven
-  const calcNet = calcReceived - calcGiven
+  const calcSide = moneySide(
+    calcReceived,
+    calcGiven,
+    calcParty?.receivedCount || 0,
+    calcParty?.givenCount || 0,
+  )
+  const bookSide = moneySide(bookReceived, bookGiven)
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Arhat Register"
-        description="One person, one ledger: record how much you gave and how much you received. Totals update on every entry."
+        description="One person, one ledger. Totals update on every save."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -299,12 +297,6 @@ export default function ArhatRegisterPage() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => { setPerson({ name: '', address: '', notes: '' }); setPersonOpen(true) }}>
             <Plus className="h-4 w-4" /> Add Person
-          </Button>
-          <Button variant="secondary" onClick={() => {
-            setFullForm({ partyId: '', received: '', given: '', notes: '' })
-            setFullOpen(true)
-          }}>
-            <Wallet className="h-4 w-4" /> Add full amount
           </Button>
           <Button variant="secondary" onClick={() => openMoney('RECEIVING')}>
             <Wallet className="h-4 w-4" /> Receive amount
@@ -346,20 +338,20 @@ export default function ArhatRegisterPage() {
       )}
 
       {section === 'PEOPLE' && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="card-3d p-5">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Received from people</p>
-            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(bookReceived)}</p>
-          </div>
-          <div className="card-3d p-5">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Given to people</p>
-            <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(bookGiven)}</p>
-          </div>
-          <div className="card-3d p-5">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Net</p>
-            <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(Math.abs(bookBalance))}</p>
-            <p className="text-xs text-slate-500 mt-1">{netCopy(bookBalance)}</p>
-          </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">
+            {bookSide.kind === 'RECEIVING' ? 'Received from people' : bookSide.kind === 'GIVING' ? 'Given to people' : 'People'}
+          </p>
+          <p className={`text-2xl font-bold mt-1 ${
+            bookSide.kind === 'RECEIVING'
+              ? 'text-emerald-700 dark:text-emerald-400'
+              : bookSide.kind === 'GIVING'
+                ? 'text-rose-700 dark:text-rose-400'
+                : 'text-primary'
+          }`}>
+            {formatCurrency(bookSide.kind ? bookSide.amount : 0)}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">{bookSide.kind ? bookSide.label : 'Settled'}</p>
         </div>
       )}
 
@@ -367,7 +359,7 @@ export default function ArhatRegisterPage() {
         <div className="card-3d p-4 space-y-3">
           <div>
             <h3 className="text-sm font-semibold">Calculate totals</h3>
-            <p className="text-[11px] text-slate-500">Pick any person — or leave blank for everyone — to see receiving, giving, and total.</p>
+            <p className="text-[11px] text-slate-500">Pick any person — or leave blank for everyone — to see the current side.</p>
           </div>
           <PartyCombobox
             label="Person"
@@ -375,31 +367,22 @@ export default function ArhatRegisterPage() {
               id: String(p.id),
               name: p.name,
               address: p.address,
-              notes: `Received ${formatCurrency(p.receivedTotal || 0)} · Given ${formatCurrency(p.givenTotal || 0)}`,
+              notes: sideNote(p),
             }))}
             value={calcPartyId}
             onChange={setCalcPartyId}
             placeholder="All people, or type a name"
             emptyLabel="Add a person first"
           />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
-            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2">
-              <div className="text-slate-500">Receiving</div>
-              <div className="font-semibold">{formatCurrency(calcReceived)}</div>
-            </div>
-            <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 px-3 py-2">
-              <div className="text-slate-500">Giving</div>
-              <div className="font-semibold">{formatCurrency(calcGiven)}</div>
-            </div>
-            <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2">
-              <div className="text-slate-500">Total</div>
-              <div className="font-semibold">{formatCurrency(calcTurnover)}</div>
-            </div>
-            <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2">
-              <div className="text-slate-500">Net</div>
-              <div className="font-semibold">{formatCurrency(Math.abs(calcNet))}</div>
-              <div className="text-[11px] text-slate-500">{netCopy(calcNet)}</div>
-            </div>
+          <div className={`rounded-lg px-3 py-2 text-[12px] ${
+            calcSide.kind === 'RECEIVING'
+              ? 'bg-emerald-50 dark:bg-emerald-500/10'
+              : calcSide.kind === 'GIVING'
+                ? 'bg-rose-50 dark:bg-rose-500/10'
+                : 'bg-slate-50 dark:bg-white/5'
+          }`}>
+            <div className="text-slate-500">{calcSide.label}</div>
+            <div className="font-semibold">{formatCurrency(calcSide.kind ? calcSide.amount : 0)}</div>
           </div>
         </div>
       )}
@@ -416,45 +399,45 @@ export default function ArhatRegisterPage() {
           <div className="px-1">
             <h3 className="text-sm font-semibold">People</h3>
             <p className="text-[11px] text-slate-500">
-              Receive more than once from the same person, or also give money to them. Totals update automatically.
+              The amount box shows only the larger side. Settled names show neither word.
             </p>
           </div>
           {loading ? (
             <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
           ) : !parties.length ? (
-            <p className="card-3d p-5 text-sm text-slate-500">Add a person first, then receive or give money.</p>
+            <p className="card-3d p-5 text-sm text-slate-500">Add a person first, then save an amount.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {parties.map((p) => {
                 const received = p.receivedTotal || 0
                 const given = p.givenTotal || 0
-                const balance = p.balance ?? received - given
+                const side = moneySide(received, given, p.receivedCount || 0, p.givenCount || 0)
                 return (
                   <div key={p.id} className="card-3d p-4 space-y-3">
                     <div>
                       <p className="font-semibold truncate">{p.name}</p>
                       <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                      <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1.5">
-                        <div className="text-slate-500">Received</div>
-                        <div className="font-semibold text-emerald-800 dark:text-emerald-300">{formatCurrency(received)}</div>
-                        <div className="text-slate-500">{p.receivedCount || 0} time{(p.receivedCount || 0) === 1 ? '' : 's'}</div>
+                    <div className={`rounded-lg px-3 py-2 text-[11px] ${
+                      side.kind === 'RECEIVING'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10'
+                        : side.kind === 'GIVING'
+                          ? 'bg-rose-50 dark:bg-rose-500/10'
+                          : 'bg-slate-50 dark:bg-white/5'
+                    }`}>
+                      <div className="text-slate-500">{side.label}</div>
+                      <div className={`font-semibold ${
+                        side.kind === 'RECEIVING'
+                          ? 'text-emerald-800 dark:text-emerald-300'
+                          : side.kind === 'GIVING'
+                            ? 'text-rose-800 dark:text-rose-300'
+                            : ''
+                      }`}>
+                        {formatCurrency(side.kind ? side.amount : 0)}
                       </div>
-                      <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 px-2 py-1.5">
-                        <div className="text-slate-500">Given</div>
-                        <div className="font-semibold text-rose-800 dark:text-rose-300">{formatCurrency(given)}</div>
-                        <div className="text-slate-500">{p.givenCount || 0} time{(p.givenCount || 0) === 1 ? '' : 's'}</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2 py-1.5">
-                        <div className="text-slate-500">Total</div>
-                        <div className="font-semibold">{formatCurrency(received + given)}</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2 py-1.5">
-                        <div className="text-slate-500">Net</div>
-                        <div className="font-semibold">{formatCurrency(Math.abs(balance))}</div>
-                        <div className="text-slate-500">{balance === 0 ? 'Settled' : balance > 0 ? 'Received more' : 'Gave more'}</div>
-                      </div>
+                      {side.kind ? (
+                        <div className="text-slate-500">{side.count} time{side.count === 1 ? '' : 's'}</div>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Button size="sm" onClick={() => openMoney('RECEIVING', String(p.id))}>
@@ -462,12 +445,6 @@ export default function ArhatRegisterPage() {
                       </Button>
                       <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
                         <HandCoins className="h-3.5 w-3.5" /> Give
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => {
-                        setFullForm({ partyId: String(p.id), received: '', given: '', notes: '' })
-                        setFullOpen(true)
-                      }}>
-                        Add full amount
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setCalcPartyId(String(p.id))}>
                         Totals
@@ -487,7 +464,7 @@ export default function ArhatRegisterPage() {
       <div className="card-3d overflow-hidden">
         <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-[#C5A059]" />
-          {section === 'PEOPLE' ? 'Recent receive & give' : 'History'}
+          History
         </div>
         {loading ? (
           <div className="p-4"><TableSkeleton rows={4} /></div>
@@ -553,7 +530,7 @@ export default function ArhatRegisterPage() {
       <Modal open={personOpen} onClose={() => setPersonOpen(false)} title="Add person">
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            One person is used for both receiving and giving. If the name already exists, that same account is reused.
+            If the name already exists, that same account is reused.
           </p>
           <Input label="Name *" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} />
           <Input label="Address (optional)" value={person.address} onChange={(e) => setPerson({ ...person, address: e.target.value })} />
@@ -572,22 +549,6 @@ export default function ArhatRegisterPage() {
               ? 'Owner received this money from the selected person. You can receive more later — the total updates.'
               : 'Owner gave this money to the selected person. You can give more later — the total updates.'}
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={money.kind === 'RECEIVING' ? 'primary' : 'secondary'}
-              onClick={() => setMoney({ ...money, kind: 'RECEIVING' })}
-            >
-              Receive
-            </Button>
-            <Button
-              size="sm"
-              variant={money.kind === 'GIVING' ? 'primary' : 'secondary'}
-              onClick={() => setMoney({ ...money, kind: 'GIVING' })}
-            >
-              Give
-            </Button>
-          </div>
           <PartyCombobox
             label="Name"
             required
@@ -595,7 +556,7 @@ export default function ArhatRegisterPage() {
               id: String(p.id),
               name: p.name,
               address: p.address,
-              notes: `Received ${formatCurrency(p.receivedTotal || 0)} · Given ${formatCurrency(p.givenTotal || 0)}`,
+              notes: sideNote(p, money.kind),
             }))}
             value={money.partyId}
             onChange={(id) => setMoney({ ...money, partyId: id })}
@@ -604,7 +565,9 @@ export default function ArhatRegisterPage() {
           />
           {selectedParty && (
             <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
-              Current total for {selectedParty.name}: received {formatCurrency(selectedParty.receivedTotal || 0)} · given {formatCurrency(selectedParty.givenTotal || 0)} · {netCopy(selectedParty.balance ?? 0)}
+              Current {money.kind === 'RECEIVING' ? 'received' : 'given'} for {selectedParty.name}: {formatCurrency(
+                money.kind === 'RECEIVING' ? (selectedParty.receivedTotal || 0) : (selectedParty.givenTotal || 0),
+              )}
             </div>
           )}
           <Input
@@ -618,53 +581,6 @@ export default function ArhatRegisterPage() {
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setGiveOpen(false)}>Cancel</Button>
             <Button onClick={() => void saveMoney()} loading={saving} disabled={!parties.length}>Save</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={fullOpen} onClose={() => setFullOpen(false)} title="Add full amount">
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Record how much we received from this person and how much we gave them in one save. Leave a box empty if that side is zero.
-          </p>
-          <PartyCombobox
-            label="Person"
-            required
-            items={parties.map((p) => ({
-              id: String(p.id),
-              name: p.name,
-              address: p.address,
-              notes: `Received ${formatCurrency(p.receivedTotal || 0)} · Given ${formatCurrency(p.givenTotal || 0)}`,
-            }))}
-            value={fullForm.partyId}
-            onChange={(id) => setFullForm({ ...fullForm, partyId: id })}
-            placeholder="Type a name, then pick the person"
-            emptyLabel="Add a person first"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Amount received from them (PKR)"
-              type="number"
-              min="0"
-              value={fullForm.received}
-              onChange={(e) => setFullForm({ ...fullForm, received: e.target.value })}
-            />
-            <Input
-              label="Amount given to them (PKR)"
-              type="number"
-              min="0"
-              value={fullForm.given}
-              onChange={(e) => setFullForm({ ...fullForm, given: e.target.value })}
-            />
-          </div>
-          <Input
-            label="Note (optional)"
-            value={fullForm.notes}
-            onChange={(e) => setFullForm({ ...fullForm, notes: e.target.value })}
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => setFullOpen(false)}>Cancel</Button>
-            <Button onClick={() => void saveFullAmount()} loading={saving} disabled={!parties.length}>Save both</Button>
           </div>
         </div>
       </Modal>
