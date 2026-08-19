@@ -1038,66 +1038,83 @@ async function renderRegisterLedgerBill(
 ) {
   const urdu = lang === 'ur'
   const net = ledger.balance
-  const netLabel =
-    net > 0
+  const receivedTotal = ledger.receivedTotal || 0
+  const givenTotal = ledger.givenTotal || 0
+  const showReceived = net > 0
+  const showGiven = net < 0
+  const netLabel = showReceived
+    ? urdu
+      ? 'وصول'
+      : 'Received'
+    : showGiven
       ? urdu
-        ? 'مالک نے زیادہ وصول کی'
-        : 'Owner received more'
-      : net < 0
-        ? urdu
-          ? 'مالک نے زیادہ دی'
-          : 'Owner gave more'
-        : urdu
-          ? 'حساب برابر'
-          : 'Settled'
+        ? 'دی گئی'
+        : 'Given'
+      : urdu
+        ? 'حساب برابر'
+        : 'Settled'
+  const sideAmount = showReceived ? receivedTotal : showGiven ? givenTotal : 0
+  const sideHeader = showReceived
+    ? urdu
+      ? 'وصول شدہ'
+      : 'Received from them'
+    : showGiven
+      ? urdu
+        ? 'دی گئی'
+        : 'Given to them'
+      : urdu
+        ? 'حساب برابر'
+        : 'Settled'
   const partyHtml = `<div class="party-card">
     <h3 class="${urdu ? 'urdu' : ''}">${escape(ledger.name)}</h3>
     <div class="party-grid">
-      <div><span class="label">${urdu ? 'وصول شدہ' : 'Received from them'}</span><div class="value">PKR ${money(ledger.receivedTotal)}</div></div>
-      <div><span class="label">${urdu ? 'دی گئی' : 'Given to them'}</span><div class="value">PKR ${money(ledger.givenTotal)}</div></div>
-      <div><span class="label">${urdu ? 'بقایا' : 'Net'}</span><div class="value">PKR ${money(Math.abs(net))} · ${escape(netLabel)}</div></div>
+      <div><span class="label">${sideHeader}</span><div class="value">PKR ${money(sideAmount)}</div></div>
       ${ledger.address ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(ledger.address)}</div></div>` : ''}
       ${ledger.notes ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'نوٹ' : 'Note'}</span><div class="value">${dash(ledger.notes)}</div></div>` : ''}
     </div>
   </div>`
-  const lines = [...(ledger.entries || [])].reverse()
+  const lines = [...(ledger.entries || [])].reverse().filter((row) => {
+    if (showReceived) return row.kind === 'RECEIVING'
+    if (showGiven) return row.kind === 'GIVING'
+    return false
+  })
+  const typeLabel = showReceived
+    ? urdu
+      ? 'وصول'
+      : 'Received'
+    : urdu
+      ? 'دی گئی'
+      : 'Given'
   const rows = lines.length
     ? lines.map((row) => [
         row.day,
         row.date,
         row.time,
-        row.kind === 'RECEIVING' ? (urdu ? 'وصول' : 'Received') : urdu ? 'دی گئی' : 'Given',
+        typeLabel,
         money(row.amount),
         row.notes || '—',
       ])
     : [[urdu ? 'کوئی اندراج نہیں' : 'No entries yet', '', '', '', '0', '—']]
-  rows.push([
-    '',
-    '',
-    '',
-    urdu ? 'کل وصول' : 'Total received',
-    money(ledger.receivedTotal),
-    '',
-  ])
-  rows.push([
-    '',
-    '',
-    '',
-    urdu ? 'کل دی گئی' : 'Total given',
-    money(ledger.givenTotal),
-    '',
-  ])
+  const totalLabel = showReceived
+    ? urdu
+      ? 'کل وصول'
+      : 'Total received'
+    : showGiven
+      ? urdu
+        ? 'کل دی گئی'
+        : 'Total given'
+      : netLabel
   const body = table(
     urdu
       ? ['دن', 'تاریخ', 'وقت', 'قسم', 'رقم', 'نوٹ']
       : ['Day', 'Date', 'Time', 'Type', 'Amount (PKR)', 'Note'],
     rows,
     [
-      urdu ? 'بقایا' : 'Net',
+      totalLabel,
       '',
       '',
-      netLabel,
-      money(Math.abs(net)),
+      '',
+      money(sideAmount),
       '',
     ],
     { compactCols: [0, 1, 2], moneyCols: [4] },
