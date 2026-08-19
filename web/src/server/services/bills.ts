@@ -155,14 +155,14 @@ table{
   border-collapse:separate;
   border-spacing:0;
   margin-top:6px;
-  font-size:6.5px;
+  font-size:7.5px;
   table-layout:fixed;
   border:1px solid #475569;
 }
 th,td{
   border:1px solid #64748b;
   padding:2px 1px;
-  text-align:left;
+  text-align:center;
   vertical-align:middle;
   overflow:hidden;
   max-width:0;
@@ -173,7 +173,7 @@ th{
   background:var(--navy);
   color:#fff;
   font-weight:700;
-  font-size:5.4px;
+  font-size:6.4px;
   letter-spacing:0;
   line-height:1.15;
   white-space:nowrap;
@@ -188,19 +188,19 @@ td{
 }
 th.num,th.compact,th.money{text-align:center;white-space:nowrap;overflow:hidden}
 td.num,tfoot td.num{
-  text-align:right;
+  text-align:center;
   white-space:nowrap;
   word-break:keep-all;
   overflow-wrap:normal;
   overflow:hidden;
   font-variant-numeric:tabular-nums;
 }
-td.money,tfoot td.money{font-weight:600;font-size:6.2px;overflow:hidden;padding:2px 2px}
+td.money,tfoot td.money{font-weight:600;font-size:7.2px;overflow:hidden;padding:2px 2px}
 td.compact,tfoot td.compact{padding:2px 1px}
-th.name{text-align:left;white-space:nowrap;overflow:hidden}
-td.name,tfoot td.name{white-space:nowrap;overflow:hidden;font-weight:600;padding:2px 1px}
-.farmer-grid{font-size:6.2px}
-.farmer-grid th{font-size:5.3px;white-space:nowrap;overflow:hidden}
+th.name{text-align:center;white-space:nowrap;overflow:hidden}
+td.name,tfoot td.name{text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;padding:2px 1px}
+.farmer-grid{font-size:7.2px}
+.farmer-grid th{font-size:6.3px;white-space:nowrap;overflow:hidden}
 tr.product-over th{
   max-width:none;
   overflow:hidden;
