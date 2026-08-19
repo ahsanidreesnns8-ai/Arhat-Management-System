@@ -645,7 +645,6 @@ export async function addProcess(
     secret?: unknown
     variety?: unknown
     riceVariety?: unknown
-    partyName?: unknown
     bags?: unknown
     notes?: unknown
   },
@@ -653,35 +652,42 @@ export async function addProcess(
   const book = await requireBook(bookId, userId, input.secret)
   const variety = String(input.variety ?? '').trim()
   if (!variety) throw new Error('Choose a variety')
-  const partyName = String(input.partyName ?? '').trim()
-  if (!partyName) throw new Error('Enter name of party')
-  const riceVariety = String(input.riceVariety ?? '').trim()
-  if (!riceVariety) throw new Error('Enter variety of rice')
+  const riceVariety = String(input.riceVariety ?? '').trim() || variety
   const bags = parseCount(input.bags, 'number of bags')
   const snapshot = await getBook(book.id, userId, input.secret)
   const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
   if (!frame) throw new Error('This variety has no purchased stock')
   if (bags > frame.remainingBags) {
-    throw new Error(`Only ${frame.remainingBags} bags of ${frame.variety} left to process`)
+    throw new Error(`Only ${frame.remainingBags} bags of ${frame.variety} are left to process`)
   }
-  const row = await prisma.paddyKhataProcess.create({
-    data: {
-      bookId: book.id,
-      variety: frame.variety,
-      riceVariety,
-      partyName,
-      bags,
-      status: 'PROCESSING',
-      notes: parseOptionalText(input.notes),
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.paddyKhataProcess.create({
+      data: {
+        bookId: book.id,
+        variety: frame.variety,
+        riceVariety,
+        partyName: '',
+        bags,
+        status: 'COMPLETE',
+        notes: parseOptionalText(input.notes),
+      },
+    })
+    await tx.paddyKhataRice.create({
+      data: {
+        bookId: book.id,
+        variety: riceVariety,
+        bags,
+        notes: parseOptionalText(input.notes) || `Processed from ${frame.variety}`,
+      },
+    })
+    return row
   })
   return {
-    id: Number(row.id),
-    variety: row.variety,
-    riceVariety: row.riceVariety,
-    bags: row.bags,
-    partyName: row.partyName,
-    status: row.status,
+    id: Number(created.id),
+    variety: created.variety,
+    riceVariety: created.riceVariety,
+    bags: created.bags,
+    status: created.status,
   }
 }
 
@@ -710,7 +716,7 @@ export async function completeProcess(
           bookId: book.id,
           variety: riceVariety,
           bags: job.bags,
-          notes: `Ready from ${job.partyName}`,
+          notes: `Processed from ${frame.variety}`,
         },
       })
       await tx.paddyKhataProcess.update({
@@ -805,7 +811,9 @@ export async function addSale(
   const riceFrame = snapshot.riceVarieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
   const riceLeft = riceFrame ? riceFrame.remainingBags : 0
   if (preview.bags > riceLeft) {
-    throw new Error(`Only ${riceLeft} bags of ${variety} rice in stock`)
+    throw new Error(
+      `Only ${riceLeft} bags of ${riceFrame?.variety || variety} are ready to sell. Process that variety first.`,
+    )
   }
   const row = await prisma.paddyKhataSale.create({
     data: {

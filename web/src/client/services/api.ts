@@ -337,7 +337,7 @@ export const paddyKhataApi = {
     api.post(`/paddy-khata/${id}/purchases`, data),
   addCash: (id: number, data: { secret: string; partyId: number; kind: 'GIVE' | 'RECEIVE'; amount: number; notes?: string }) =>
     api.post(`/paddy-khata/${id}/cash`, data),
-  addProcess: (id: number, data: { secret: string; variety: string; partyName: string; riceVariety: string; bags: number; notes?: string }) =>
+  addProcess: (id: number, data: { secret: string; variety: string; riceVariety: string; bags: number; notes?: string }) =>
     api.post(`/paddy-khata/${id}/process`, data),
   completeProcess: (id: number, data: { secret: string; variety: string }) =>
     api.post(`/paddy-khata/${id}/process/complete`, data),

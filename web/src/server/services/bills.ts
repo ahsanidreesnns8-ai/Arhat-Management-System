@@ -1418,16 +1418,16 @@ function paddyVarietySlip(book: PaddyBook, urdu: boolean): BillSlip {
 
 function paddyProcessSlip(book: PaddyBook, urdu: boolean): BillSlip {
   const rows = book.processes.length
-    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.riceVariety, row.partyName, String(row.bags), row.status === 'PROCESSING' ? (urdu ? 'پروسیس' : 'Processing') : (urdu ? 'مکمل' : 'Ready')])
-    : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '', '0', '—']]
+    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.riceVariety, String(row.bags), row.status === 'PROCESSING' ? (urdu ? 'پروسیس' : 'Processing') : (urdu ? 'تیار' : 'Ready')])
+    : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '0', '—']]
   return {
     title: '',
     partyHtml: paddyHead(book, urdu, urdu ? 'پروسیس' : 'Processing'),
     body: table(
-      urdu ? ['تاریخ', 'ورائٹی', 'چاول', 'پارٹی', 'بوریاں', 'حالت'] : ['Date', 'Variety', 'Rice', 'Party', 'Bags', 'Status'],
+      urdu ? ['تاریخ', 'ورائٹی', 'چاول', 'بوریاں', 'حالت'] : ['Date', 'Variety', 'Rice', 'Bags', 'Status'],
       rows,
       undefined,
-      { compactCols: [4] },
+      { compactCols: [3] },
     ),
   }
 }
