@@ -14,6 +14,14 @@ import { formatDateTime } from '../utils/format'
 const PASSWORD_HINT =
   'At least 10 characters, with letters and numbers. Do not reuse a leaked password.'
 
+type ShopStorage = {
+  databaseBytes: number
+  databaseSize: string
+  neonFreeCap: string
+  measuredAt: string
+  counts: Record<string, number>
+}
+
 function isSystemAccount(username: string) {
   const value = username.trim().toLowerCase()
   return value === 'owner' || value === 'staff'
@@ -34,11 +42,16 @@ export default function OwnerPage() {
   const [deleteUserRow, setDeleteUserRow] = useState<SystemUser | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [storage, setStorage] = useState<ShopStorage | null>(null)
+  const [wipeOpen, setWipeOpen] = useState(false)
+  const [wipeConfirm, setWipeConfirm] = useState('')
+  const [wiping, setWiping] = useState(false)
 
   const load = () => {
     userApi.getAll().then((res) => setUsers(res.data.data || [])).catch(() => toast.error('Failed to load users'))
     auditApi.getRecent().then((res) => setLogs(res.data.data || [])).catch(() => {})
     userApi.staffUsage().then((res) => setStaffUsage(res.data.data || null)).catch(() => {})
+    backupApi.usage().then((res) => setStorage(res.data.data || null)).catch(() => {})
   }
 
   useEffect(() => { load() }, [])
@@ -182,6 +195,27 @@ export default function OwnerPage() {
       toast.success('JSON backup downloaded')
     } catch {
       toast.error('JSON backup failed')
+    }
+  }
+
+  const confirmWipe = async () => {
+    if (wipeConfirm.trim().toUpperCase() !== 'START NEW') {
+      toast.error('Type START NEW to wipe shop data')
+      return
+    }
+    setWiping(true)
+    try {
+      const res = await backupApi.wipe()
+      setStorage(res.data.data || null)
+      setWipeOpen(false)
+      setWipeConfirm('')
+      toast.success('Shop is empty. Owner and staff logins still work.')
+      load()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Wipe failed')
+    } finally {
+      setWiping(false)
     }
   }
 
@@ -377,12 +411,31 @@ export default function OwnerPage() {
           Database
         </h3>
         <p className="text-[11px] text-gray-500">
-          Use JSON for restore. ZIP is archive only.
+          Use JSON for restore. ZIP is archive only. Neon free storage cap is {storage?.neonFreeCap || '0.5 GB'}. Compute hours are on the Neon dashboard.
         </p>
+        {storage && (
+          <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] space-y-1">
+            <p><span className="font-semibold">{storage.databaseSize}</span> stored now</p>
+            <p className="text-[11px] text-gray-500">
+              Farmers {storage.counts.farmers ?? 0} · Buyers {storage.counts.buyers ?? 0} · Dheris {storage.counts.dheris ?? 0} · Sales {storage.counts.sales ?? 0} · Payments {storage.counts.payments ?? 0}
+            </p>
+            <p className="text-[10px] text-gray-500">Measured {formatDateTime(storage.measuredAt)}</p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={doBackup}>ZIP</Button>
           <Button size="sm" variant="secondary" onClick={doBackupJson}>JSON</Button>
           <Button size="sm" variant="secondary" onClick={doRestore}>Restore</Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => {
+              setWipeConfirm('')
+              setWipeOpen(true)
+            }}
+          >
+            Start brand new shop
+          </Button>
         </div>
       </div>
 
@@ -467,6 +520,24 @@ export default function OwnerPage() {
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="secondary" onClick={() => setDeleteUserRow(null)}>Cancel</Button>
             <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete user</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={wipeOpen} onClose={() => setWipeOpen(false)} title="Start brand new shop">
+        <div className="space-y-2.5">
+          <p className="text-[12px] text-slate-500">
+            This permanently deletes farmers, buyers, dheris, sales, payments, Wheat Khata, Arhat Register, and extra users. Owner and staff logins stay. Products and company settings stay. Type START NEW to confirm.
+          </p>
+          <Input
+            label='Type START NEW *'
+            value={wipeConfirm}
+            onChange={(e) => setWipeConfirm(e.target.value)}
+            autoComplete="off"
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setWipeOpen(false)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmWipe} loading={wiping}>Wipe shop data</Button>
           </div>
         </div>
       </Modal>
