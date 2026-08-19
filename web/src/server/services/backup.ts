@@ -212,6 +212,7 @@ export async function getShopStorage() {
     trucks,
     registerParties,
     wheatParties,
+    paddyBooks,
     arhatLines,
   ] = await Promise.all([
     basePrisma.farmer.count(),
@@ -222,6 +223,7 @@ export async function getShopStorage() {
     basePrisma.truck.count(),
     basePrisma.registerParty.count(),
     basePrisma.wheatKhataParty.count(),
+    basePrisma.paddyKhataBook.count(),
     basePrisma.arhatAmountEntry.count(),
   ])
   return {
@@ -238,6 +240,7 @@ export async function getShopStorage() {
       trucks,
       registerPeople: registerParties,
       wheatKhataParties: wheatParties,
+      paddyKhataBooks: paddyBooks,
       arhatAmountLines: arhatLines,
     },
   }
@@ -252,6 +255,11 @@ export async function wipeShopData(userId?: bigint) {
       register_entries,
       wheat_khata_products,
       wheat_khata_payments,
+      paddy_khata_cash,
+      paddy_khata_sales,
+      paddy_khata_rice,
+      paddy_khata_processes,
+      paddy_khata_purchases,
       stock_transactions,
       stock_lots,
       dheris,
@@ -259,6 +267,9 @@ export async function wipeShopData(userId?: bigint) {
       register_parties,
       wheat_khata_parties,
       wheat_khata_money,
+      paddy_khata_parties,
+      paddy_khata_amounts,
+      paddy_khata_books,
       arhat_amount_entries,
       login_sessions,
       audit_logs,

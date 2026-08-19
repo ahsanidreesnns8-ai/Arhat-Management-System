@@ -4,6 +4,7 @@ import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger } from '@/server/services/register'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
+import { getBook as getPaddyKhataBook } from '@/server/services/paddy-khata'
 import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
 
 function escape(value: unknown) {
@@ -68,7 +69,7 @@ type BillSlip = {
 }
 
 function slipCss() {
-  return `@page{size:3.5in 6.5in;margin:0.14in}
+  return `@page{size:5in 8in;margin:0.16in}
 :root{--navy:#002D62;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
 *{box-sizing:border-box}
 html,body{margin:0;background:#e8edf3}
@@ -83,10 +84,10 @@ body{
 }
 .urdu{font-family:"Noto Nastaliq Urdu","Source Sans 3",serif}
 .slip{
-  width:3.5in;
-  min-height:6.5in;
+  width:5in;
+  min-height:8in;
   margin:0 auto 14px;
-  padding:0.14in;
+  padding:0.16in;
   background:#fff;
   display:flex;
   flex-direction:column;
@@ -109,7 +110,7 @@ body{
 .company{
   margin:0;
   font-family:"Cormorant Garamond",Georgia,serif;
-  font-size:13px;
+  font-size:15px;
   font-weight:700;
   color:var(--navy);
   line-height:1.15;
@@ -269,7 +270,7 @@ th.product-over-rest{background:var(--navy)}
 }
 @media print{
   html,body{background:#fff;padding:0}
-  .slip{box-shadow:none;margin:0;width:auto;min-height:calc(6.5in - 0.28in)}
+  .slip{box-shadow:none;margin:0;width:auto;min-height:calc(8in - 0.32in)}
   a{color:inherit;text-decoration:none}
 }`
 }
@@ -1331,4 +1332,238 @@ export async function arhatAmountMergeBillHtml(lang = 'en') {
       { compactCols: [1], moneyCols: [3] },
     )}`
   return page('', partyHtml, summary + history, urdu)
+}
+
+type PaddyBook = Awaited<ReturnType<typeof getPaddyKhataBook>>
+
+function paddyHead(book: PaddyBook, urdu: boolean, extra?: string) {
+  return `<div class="party-card">
+    <h3>${escape(book.name)}</h3>
+    <div class="party-grid">
+      <div><span class="label">ID</span><div class="value">${escape(book.publicId)}</div></div>
+      <div><span class="label">${urdu ? 'کل رقم' : 'Total'}</span><div class="value">PKR ${money(book.totals.totalAmount)}</div></div>
+      <div><span class="label">${urdu ? 'وصول' : 'Receiving'}</span><div class="value">PKR ${money(book.totals.receivingAmount)}</div></div>
+      <div><span class="label">${urdu ? 'دی گئی' : 'Giving'}</span><div class="value">PKR ${money(book.totals.givingAmount)}</div></div>
+      ${extra ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'ماڈیول' : 'Module'}</span><div class="value">${escape(extra)}</div></div>` : ''}
+    </div>
+  </div>`
+}
+
+function paddyAmountSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.amounts.length
+    ? book.amounts.map((row) => [`${row.date} ${row.time}`, row.notes || '—', money(row.amount)])
+    : [[urdu ? 'کوئی رقم نہیں' : 'No amount yet', '—', '0']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'جمع رقم' : 'Add Amount'),
+    body: table(
+      urdu ? ['تاریخ', 'نوٹ', 'رقم'] : ['Date', 'Note', 'Amount'],
+      rows,
+      [urdu ? 'کل' : 'Total', '', money(book.totals.moneyIn)],
+      { moneyCols: [2] },
+    ),
+  }
+}
+
+function paddyPurchaseSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.purchases.length
+    ? book.purchases.map((row) => [
+        `${row.date} ${row.time}`,
+        row.partyName,
+        row.variety,
+        String(row.bags),
+        money(row.totalPrice),
+      ])
+    : [[urdu ? 'کوئی خرید نہیں' : 'No purchase yet', '', '', '0', '0']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'خرید اسٹاک' : 'Purchase Stock'),
+    body: table(
+      urdu ? ['تاریخ', 'پارٹی', 'ورائٹی', 'بوریاں', 'رقم'] : ['Date', 'Party', 'Variety', 'Bags', 'Amount'],
+      rows,
+      [urdu ? 'کل' : 'Total', '', '', String(book.totals.paddyBags), money(book.totals.purchaseTotal)],
+      { compactCols: [3], moneyCols: [4] },
+    ),
+  }
+}
+
+function paddyVarietySlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.varieties.length
+    ? book.varieties.map((row) => [
+        row.variety,
+        String(row.bags),
+        String(row.processedBags),
+        String(row.remainingBags),
+        money(row.totalPrice),
+      ])
+    : [[urdu ? 'کوئی ورائٹی نہیں' : 'No variety yet', '0', '0', '0', '0']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'ورائٹی' : 'Variety'),
+    body: table(
+      urdu ? ['ورائٹی', 'بوریاں', 'پروسیس', 'باقی', 'رقم'] : ['Variety', 'Bags', 'Processed', 'Left', 'Amount'],
+      rows,
+      undefined,
+      { compactCols: [1, 2, 3], moneyCols: [4] },
+    ),
+  }
+}
+
+function paddyProcessSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.processes.length
+    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.partyName, String(row.bags), row.notes || '—'])
+    : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '0', '—']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'پروسیس' : 'Processing'),
+    body: table(
+      urdu ? ['تاریخ', 'ورائٹی', 'پارٹی', 'بوریاں', 'نوٹ'] : ['Date', 'Variety', 'Party', 'Bags', 'Note'],
+      rows,
+      undefined,
+      { compactCols: [3] },
+    ),
+  }
+}
+
+function paddyRiceSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.riceLots.length
+    ? book.riceLots.map((row) => [`${row.date} ${row.time}`, String(row.bags), row.notes || '—'])
+    : [[urdu ? 'کوئی چاول نہیں' : 'No rice yet', '0', '—']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'چاول' : 'Add Rice'),
+    body: table(
+      urdu ? ['تاریخ', 'بوریاں', 'نوٹ'] : ['Date', 'Bags', 'Note'],
+      rows,
+      [urdu ? 'کل' : 'Total', String(book.totals.riceBags), ''],
+      { compactCols: [1] },
+    ),
+  }
+}
+
+function paddySellSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const rows = book.sales.length
+    ? book.sales.map((row) => [`${row.date} ${row.time}`, row.partyName, String(row.bags), money(row.totalPrice)])
+    : [[urdu ? 'کوئی فروخت نہیں' : 'No rice sold yet', '', '0', '0']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'چاول فروخت' : 'Sell Rice'),
+    body: table(
+      urdu ? ['تاریخ', 'پارٹی', 'بوریاں', 'رقم'] : ['Date', 'Party', 'Bags', 'Amount'],
+      rows,
+      [urdu ? 'کل' : 'Total', '', String(book.totals.soldBags), money(book.totals.saleTotal)],
+      { compactCols: [2], moneyCols: [3] },
+    ),
+  }
+}
+
+function paddyReceiveSlip(book: PaddyBook, urdu: boolean): BillSlip {
+  const received = book.payments.filter((row) => row.kind === 'RECEIVE')
+  const rows = received.length
+    ? received.map((row) => [`${row.date} ${row.time}`, row.partyName, row.notes || '—', money(row.amount)])
+    : [[urdu ? 'کوئی وصولی نہیں' : 'No amount received yet', '', '—', '0']]
+  return {
+    title: '',
+    partyHtml: paddyHead(book, urdu, urdu ? 'وصول رقم' : 'Receive Amount'),
+    body: table(
+      urdu ? ['تاریخ', 'پارٹی', 'نوٹ', 'رقم'] : ['Date', 'Party', 'Note', 'Amount'],
+      rows,
+      [urdu ? 'کل' : 'Total', '', '', money(book.totals.receivedCash)],
+      { moneyCols: [3] },
+    ),
+  }
+}
+
+function paddyPartySlip(
+  book: PaddyBook,
+  partyId: number,
+  urdu: boolean,
+): BillSlip {
+  const purchase = book.purchaseParties.find((row) => row.id === partyId)
+  const sale = book.saleParties.find((row) => row.id === partyId)
+  const party = purchase || sale
+  if (!party) throw new Error('Party not found')
+  const productRows = purchase
+    ? purchase.purchases.map((row) => [
+        `${row.date} ${row.time}`,
+        `${row.variety} · ${row.bags} bags`,
+        money(row.totalPrice),
+      ])
+    : (sale?.sales || []).map((row) => [
+        `${row.date} ${row.time}`,
+        `${row.bags} bags · ${row.bagWeightKg} kg`,
+        money(row.totalPrice),
+      ])
+  const cashRows = (party.payments || []).map((row) => [
+    `${row.date} ${row.time}`,
+    row.kind === 'GIVE' ? (urdu ? 'دی گئی' : 'Given') : (urdu ? 'وصول' : 'Received'),
+    money(row.amount),
+  ])
+  const partyHtml = `<div class="party-card">
+    <h3>${escape(party.name)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(party.address)}</div></div>
+      <div><span class="label">${urdu ? 'باقی' : 'Remaining'}</span><div class="value">PKR ${money(party.remaining)}</div></div>
+    </div>
+  </div>`
+  const body =
+    table(
+      urdu ? ['تاریخ', 'تفصیل', 'رقم'] : ['Date', 'Detail', 'Amount'],
+      productRows.length ? productRows : [[urdu ? 'کوئی مال نہیں' : 'No product yet', '', '0']],
+      [urdu ? 'کل مال' : 'Product', '', money(party.productTotal)],
+      { moneyCols: [2] },
+    ) +
+    table(
+      urdu ? ['تاریخ', 'قسم', 'رقم'] : ['Date', 'Type', 'Amount'],
+      cashRows.length ? cashRows : [[urdu ? 'کوئی رقم نہیں' : 'No cash yet', '', '0']],
+      [urdu ? 'کل رقم' : 'Cash', '', money(party.cashTotal)],
+      { moneyCols: [2] },
+    )
+  return { title: '', partyHtml, body }
+}
+
+function paddyModuleSlips(book: PaddyBook, urdu: boolean, module?: string | null): BillSlip[] {
+  const key = String(module ?? 'all').toLowerCase()
+  if (key === 'amounts' || key === 'amount') return [paddyAmountSlip(book, urdu)]
+  if (key === 'purchase') return [paddyPurchaseSlip(book, urdu)]
+  if (key === 'variety') return [paddyVarietySlip(book, urdu)]
+  if (key === 'process' || key === 'processing') return [paddyProcessSlip(book, urdu)]
+  if (key === 'rice') return [paddyRiceSlip(book, urdu)]
+  if (key === 'sell') return [paddySellSlip(book, urdu)]
+  if (key === 'receive') return [paddyReceiveSlip(book, urdu)]
+  return [
+    paddyAmountSlip(book, urdu),
+    paddyPurchaseSlip(book, urdu),
+    paddyVarietySlip(book, urdu),
+    paddyProcessSlip(book, urdu),
+    paddyRiceSlip(book, urdu),
+    paddySellSlip(book, urdu),
+    paddyReceiveSlip(book, urdu),
+    ...book.purchaseParties.map((party) => paddyPartySlip(book, party.id, urdu)),
+    ...book.saleParties.map((party) => paddyPartySlip(book, party.id, urdu)),
+  ]
+}
+
+export async function paddyKhataBillHtml(
+  bookId: number | bigint,
+  userId: bigint,
+  secret: unknown,
+  lang = 'en',
+  module?: string | null,
+) {
+  const book = await getPaddyKhataBook(bookId, userId, secret)
+  const urdu = lang === 'ur'
+  return documentFromSlips('', urdu, paddyModuleSlips(book, urdu, module))
+}
+
+export async function paddyKhataPartyBillHtml(
+  bookId: number | bigint,
+  partyId: number | bigint,
+  userId: bigint,
+  secret: unknown,
+  lang = 'en',
+) {
+  const book = await getPaddyKhataBook(bookId, userId, secret)
+  const urdu = lang === 'ur'
+  return documentFromSlips('', urdu, [paddyPartySlip(book, Number(partyId), urdu)])
 }

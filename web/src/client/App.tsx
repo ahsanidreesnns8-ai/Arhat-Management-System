@@ -40,6 +40,7 @@ import SettingsPage from './pages/SettingsPage'
 import OwnerPage from './pages/OwnerPage'
 import ArhatRegisterPage from './pages/ArhatRegisterPage'
 import WheatKhataPage from './pages/WheatKhataPage'
+import PaddyKhataPage from './pages/PaddyKhataPage'
 import ArhatAmountPage from './pages/ArhatAmountPage'
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
@@ -103,6 +104,7 @@ function AppRoutes() {
           element={isOwner ? <ArhatRegisterPage /> : <Navigate to="/dashboard" replace />}
         />
         <Route path="wheat-khata" element={<WheatKhataPage />} />
+        <Route path="paddy-khata" element={<PaddyKhataPage />} />
         <Route path="arhat-amount" element={<ArhatAmountPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route
