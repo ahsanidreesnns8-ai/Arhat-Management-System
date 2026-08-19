@@ -638,3 +638,153 @@ model ArhatAmountEntry {
   @@index([workspace, kind, createdAt])
   @@map("arhat_amount_entries")
 }
+
+model PaddyKhataBook {
+  id          BigInt   @id @default(autoincrement())
+  workspace   String   @default("live") @db.VarChar(20)
+  publicId    String   @map("public_id") @db.VarChar(40)
+  name        String   @db.VarChar(255)
+  secretHash  String   @map("secret_hash") @db.VarChar(255)
+  createdById BigInt   @map("created_by_id")
+  deleted     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  amounts     PaddyKhataAmount[]
+  parties     PaddyKhataParty[]
+  purchases   PaddyKhataPurchase[]
+  processes   PaddyKhataProcess[]
+  riceLots    PaddyKhataRice[]
+  sales       PaddyKhataSale[]
+  payments    PaddyKhataCash[]
+
+  @@unique([workspace, publicId])
+  @@index([workspace, createdById])
+  @@map("paddy_khata_books")
+}
+
+model PaddyKhataAmount {
+  id        BigInt         @id @default(autoincrement())
+  workspace String         @default("live") @db.VarChar(20)
+  bookId    BigInt         @map("book_id")
+  amount    Decimal        @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  book      PaddyKhataBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([workspace, bookId, createdAt])
+  @@map("paddy_khata_amounts")
+}
+
+model PaddyKhataParty {
+  id        BigInt               @id @default(autoincrement())
+  workspace String               @default("live") @db.VarChar(20)
+  bookId    BigInt               @map("book_id")
+  kind      String               @db.VarChar(20)
+  name      String               @db.VarChar(255)
+  address   String?
+  notes     String?
+  deleted   Boolean              @default(false)
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+  book      PaddyKhataBook       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  purchases PaddyKhataPurchase[]
+  sales     PaddyKhataSale[]
+  payments  PaddyKhataCash[]
+
+  @@index([workspace, bookId, kind])
+  @@map("paddy_khata_parties")
+}
+
+model PaddyKhataPurchase {
+  id            BigInt          @id @default(autoincrement())
+  workspace     String          @default("live") @db.VarChar(20)
+  bookId        BigInt          @map("book_id")
+  partyId       BigInt          @map("party_id")
+  bags          Int
+  bagWeightKg   Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
+  extraWeightKg Decimal         @default(0.00) @map("extra_weight_kg") @db.Decimal(10, 2)
+  ratePer40Kg   Decimal         @map("rate_per_40_kg") @db.Decimal(12, 2)
+  variety       String          @db.VarChar(120)
+  bagPrice      Decimal         @default(0.00) @map("bag_price") @db.Decimal(12, 2)
+  labourPrice   Decimal         @default(0.00) @map("labour_price") @db.Decimal(12, 2)
+  grainAmount   Decimal         @map("grain_amount") @db.Decimal(15, 2)
+  bagAmount     Decimal         @default(0.00) @map("bag_amount") @db.Decimal(15, 2)
+  labourAmount  Decimal         @default(0.00) @map("labour_amount") @db.Decimal(15, 2)
+  totalPrice    Decimal         @map("total_price") @db.Decimal(15, 2)
+  notes         String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  book          PaddyKhataBook  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  party         PaddyKhataParty @relation(fields: [partyId], references: [id])
+
+  @@index([workspace, bookId, createdAt])
+  @@map("paddy_khata_purchases")
+}
+
+model PaddyKhataProcess {
+  id        BigInt         @id @default(autoincrement())
+  workspace String         @default("live") @db.VarChar(20)
+  bookId    BigInt         @map("book_id")
+  variety   String         @db.VarChar(120)
+  partyName String         @map("party_name") @db.VarChar(255)
+  bags      Int
+  notes     String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  book      PaddyKhataBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([workspace, bookId, variety])
+  @@map("paddy_khata_processes")
+}
+
+model PaddyKhataRice {
+  id        BigInt         @id @default(autoincrement())
+  workspace String         @default("live") @db.VarChar(20)
+  bookId    BigInt         @map("book_id")
+  bags      Int
+  notes     String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  book      PaddyKhataBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([workspace, bookId, createdAt])
+  @@map("paddy_khata_rice")
+}
+
+model PaddyKhataSale {
+  id           BigInt          @id @default(autoincrement())
+  workspace    String          @default("live") @db.VarChar(20)
+  bookId       BigInt          @map("book_id")
+  partyId      BigInt          @map("party_id")
+  bags         Int
+  bagWeightKg  Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
+  ratePer40Kg  Decimal         @map("rate_per_40_kg") @db.Decimal(12, 2)
+  grainAmount  Decimal         @map("grain_amount") @db.Decimal(15, 2)
+  totalPrice   Decimal         @map("total_price") @db.Decimal(15, 2)
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  book         PaddyKhataBook  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  party        PaddyKhataParty @relation(fields: [partyId], references: [id])
+
+  @@index([workspace, bookId, createdAt])
+  @@map("paddy_khata_sales")
+}
+
+model PaddyKhataCash {
+  id        BigInt          @id @default(autoincrement())
+  workspace String          @default("live") @db.VarChar(20)
+  bookId    BigInt          @map("book_id")
+  partyId   BigInt          @map("party_id")
+  kind      String          @db.VarChar(20)
+  amount    Decimal         @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  book      PaddyKhataBook  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  party     PaddyKhataParty @relation(fields: [partyId], references: [id])
+
+  @@index([workspace, bookId, partyId, createdAt])
+  @@map("paddy_khata_cash")
+}

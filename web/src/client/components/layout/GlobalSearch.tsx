@@ -28,6 +28,7 @@ const MODULE_SHORTCUTS: {
   { id: 'daily-trade', to: '/daily-trade', labelKey: 'dailyTrade', keywords: ['daily trade', 'stock sell', 'extra kg', 'روزانہ'] },
   { id: 'arhat-register', to: '/arhat-register', labelKey: 'arhatRegister', keywords: ['arhat register', 'giving', 'zakat', 'advance', 'رجسٹر'], ownerOnly: true },
   { id: 'wheat-khata', to: '/wheat-khata', labelKey: 'wheatKhata', keywords: ['wheat khata', 'wheat', 'khata', 'گندم', 'کھاتہ'] },
+  { id: 'paddy-khata', to: '/paddy-khata', labelKey: 'paddyKhata', keywords: ['paddy khata', 'paddy', 'dhan', 'rice', 'دھان', 'کھاتہ'] },
   { id: 'arhat-amount', to: '/arhat-amount', labelKey: 'arhatAmount', keywords: ['arhat amount', 'merge all amount', 'آرھٹ رقم'] },
   { id: 'queue', to: '/queue', labelKey: 'queue', keywords: ['queue', 'قطار'] },
   { id: 'sales', to: '/sales', labelKey: 'sales', keywords: ['sales', 'invoice', 'فروخت', 'انوائس'] },

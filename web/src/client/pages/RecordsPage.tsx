@@ -18,6 +18,7 @@ import {
   Wallet,
   Warehouse,
   Wheat,
+  Leaf,
   Coins,
 } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
@@ -52,6 +53,12 @@ const sections: Array<{
     icon: Wheat,
     title: 'Wheat Khata',
     description: 'Give product to companies and receive money; receive product from parties and give money',
+  },
+  {
+    to: '/paddy-khata',
+    icon: Leaf,
+    title: 'Paddy Khata',
+    description: 'Secret Paddy Khata IDs for cash, purchase, variety, processing, rice, and receive amount',
   },
   {
     to: '/arhat-amount',

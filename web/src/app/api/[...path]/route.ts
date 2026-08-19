@@ -32,6 +32,7 @@ import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
 import * as register from '@/server/services/register'
 import * as wheatKhata from '@/server/services/wheat-khata'
+import * as paddyKhata from '@/server/services/paddy-khata'
 import * as arhatAmount from '@/server/services/arhat-amount'
 import { isOwnerFinanceRole } from '@/lib/roles'
 
@@ -692,6 +693,46 @@ async function dispatch(
     }
   }
 
+  if (path[0] === 'paddy-khata') {
+    const userId = user!.id
+    if (path.length === 1 && method === 'GET') {
+      return result(await paddyKhata.listBooks(userId))
+    }
+    if (path.length === 1 && method === 'POST') {
+      return result(await paddyKhata.createBook(userId, payload), 'Paddy Khata ID created', 201)
+    }
+    if (path[1] === 'preview' && method === 'POST') {
+      return result(paddyKhata.previewPurchase(payload))
+    }
+    const id = numericId(path[1])
+    const secret = payload.secret ?? url.searchParams.get('secret')
+    if (secret != null && String(secret).length) payload.secret = secret
+    if (path.length === 2 && method === 'GET') {
+      return result(await paddyKhata.getBook(id, userId, secret))
+    }
+    if (path[2] === 'amounts' && method === 'POST') {
+      return result(await paddyKhata.addAmount(id, userId, payload), 'Amount added', 201)
+    }
+    if (path[2] === 'parties' && method === 'POST') {
+      return result(await paddyKhata.createParty(id, userId, payload), 'Party saved', 201)
+    }
+    if (path[2] === 'purchases' && method === 'POST') {
+      return result(await paddyKhata.addPurchase(id, userId, payload), 'Purchase saved', 201)
+    }
+    if (path[2] === 'cash' && method === 'POST') {
+      return result(await paddyKhata.addCash(id, userId, payload), 'Amount saved', 201)
+    }
+    if (path[2] === 'process' && method === 'POST') {
+      return result(await paddyKhata.addProcess(id, userId, payload), 'Processing saved', 201)
+    }
+    if (path[2] === 'rice' && method === 'POST') {
+      return result(await paddyKhata.addRice(id, userId, payload), 'Rice bags added', 201)
+    }
+    if (path[2] === 'sales' && method === 'POST') {
+      return result(await paddyKhata.addSale(id, userId, payload), 'Rice sold', 201)
+    }
+  }
+
   if (path[0] === 'register') {
     if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
     if (path[1] === 'parties' && path.length === 3 && method === 'GET') {
@@ -739,6 +780,39 @@ async function dispatch(
     }
     if (path[1] === 'wheat-khata' && path.length === 3) {
       return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang))
+    }
+    if (path[1] === 'paddy-khata' && path[3] === 'all' && path.length === 4) {
+      return html(
+        await bills.paddyKhataBillHtml(
+          numericId(path[2]),
+          user!.id,
+          url.searchParams.get('secret'),
+          lang,
+          'all',
+        ),
+      )
+    }
+    if (path[1] === 'paddy-khata' && path[3] === 'party' && path.length === 5) {
+      return html(
+        await bills.paddyKhataPartyBillHtml(
+          numericId(path[2]),
+          numericId(path[4]),
+          user!.id,
+          url.searchParams.get('secret'),
+          lang,
+        ),
+      )
+    }
+    if (path[1] === 'paddy-khata' && path.length === 3) {
+      return html(
+        await bills.paddyKhataBillHtml(
+          numericId(path[2]),
+          user!.id,
+          url.searchParams.get('secret'),
+          lang,
+          url.searchParams.get('module'),
+        ),
+      )
     }
     if (path[1] === 'register' && path[2] === 'party' && path.length === 4) {
       return html(await bills.registerPartyBill(numericId(path[3]), lang))

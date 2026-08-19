@@ -541,6 +541,149 @@ export interface WheatKhataBook {
   companies: WheatKhataParty[]
 }
 
+export interface PaddyKhataBookSummary {
+  id: number
+  publicId: string
+  name: string
+  createdAt: string
+}
+
+export interface PaddyKhataMoneyLine {
+  id: number
+  amount: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface PaddyKhataPurchase {
+  id: number
+  partyId: number
+  partyName: string
+  partyAddress?: string | null
+  bags: number
+  bagWeightKg: number
+  extraWeightKg: number
+  ratePer40Kg: number
+  variety: string
+  bagPrice: number
+  labourPrice: number
+  grainAmount: number
+  bagAmount: number
+  labourAmount: number
+  totalPrice: number
+  totalWeightKg: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface PaddyKhataSaleLine {
+  id: number
+  partyId: number
+  partyName: string
+  partyAddress?: string | null
+  bags: number
+  bagWeightKg: number
+  ratePer40Kg: number
+  grainAmount: number
+  totalPrice: number
+  totalWeightKg: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface PaddyKhataCashLine {
+  id: number
+  partyId: number
+  partyName: string
+  partyKind: string
+  kind: string
+  amount: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface PaddyKhataParty {
+  id: number
+  kind: string
+  name: string
+  address?: string | null
+  notes?: string | null
+  createdAt: string
+  productTotal: number
+  cashTotal: number
+  remaining: number
+  totalBags: number
+  purchases?: PaddyKhataPurchase[]
+  sales?: PaddyKhataSaleLine[]
+  payments?: PaddyKhataCashLine[]
+}
+
+export interface PaddyKhataBook extends PaddyKhataBookSummary {
+  totals: {
+    moneyIn: number
+    purchaseTotal: number
+    givenCash: number
+    receivedCash: number
+    saleTotal: number
+    givingAmount: number
+    receivingAmount: number
+    totalAmount: number
+    paddyBags: number
+    processedBags: number
+    riceBags: number
+    soldBags: number
+    riceInStock: number
+  }
+  amounts: PaddyKhataMoneyLine[]
+  purchaseParties: PaddyKhataParty[]
+  saleParties: PaddyKhataParty[]
+  purchases: PaddyKhataPurchase[]
+  processes: Array<{
+    id: number
+    variety: string
+    partyName: string
+    bags: number
+    notes?: string | null
+    createdAt: string
+    day: string
+    date: string
+    time: string
+  }>
+  riceLots: Array<{
+    id: number
+    bags: number
+    notes?: string | null
+    createdAt: string
+    day: string
+    date: string
+    time: string
+  }>
+  sales: PaddyKhataSaleLine[]
+  payments: PaddyKhataCashLine[]
+  varieties: Array<{
+    variety: string
+    bags: number
+    extraWeightKg: number
+    totalWeightKg: number
+    totalPrice: number
+    processedBags: number
+    remainingBags: number
+    lines: PaddyKhataPurchase[]
+  }>
+}
+
 export interface ArhatAmountLine {
   id: string
   book: 'ARHAT' | 'WHEAT_KHATA' | string

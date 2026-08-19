@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
-  Calculator, PackagePlus, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield, Scale, BookOpen, Wheat, Coins
+  Calculator, PackagePlus, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield, Scale, BookOpen, Wheat, Leaf, Coins
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -24,6 +24,7 @@ const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: Translatio
   { to: '/daily-trade', icon: Scale, labelKey: 'dailyTrade' },
   { to: '/arhat-register', icon: BookOpen, labelKey: 'arhatRegister', ownerOnly: true },
   { to: '/wheat-khata', icon: Wheat, labelKey: 'wheatKhata' },
+  { to: '/paddy-khata', icon: Leaf, labelKey: 'paddyKhata' },
   { to: '/arhat-amount', icon: Coins, labelKey: 'arhatAmount' },
   { to: '/queue', icon: ListOrdered, labelKey: 'queue' },
   { to: '/sales', icon: Receipt, labelKey: 'sales' },
