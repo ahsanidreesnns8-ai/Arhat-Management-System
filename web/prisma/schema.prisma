@@ -742,6 +742,7 @@ model PaddyKhataRice {
   id        BigInt         @id @default(autoincrement())
   workspace String         @default("live") @db.VarChar(20)
   bookId    BigInt         @map("book_id")
+  variety   String         @default("") @db.VarChar(120)
   bags      Int
   notes     String?
   createdAt DateTime       @default(now()) @map("created_at")
@@ -757,6 +758,7 @@ model PaddyKhataSale {
   workspace    String          @default("live") @db.VarChar(20)
   bookId       BigInt          @map("book_id")
   partyId      BigInt          @map("party_id")
+  variety      String          @default("") @db.VarChar(120)
   bags         Int
   bagWeightKg  Decimal         @default(40.00) @map("bag_weight_kg") @db.Decimal(10, 2)
   ratePer40Kg  Decimal         @map("rate_per_40_kg") @db.Decimal(12, 2)

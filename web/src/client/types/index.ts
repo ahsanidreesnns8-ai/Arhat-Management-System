@@ -587,6 +587,7 @@ export interface PaddyKhataSaleLine {
   partyId: number
   partyName: string
   partyAddress?: string | null
+  variety: string
   bags: number
   bagWeightKg: number
   ratePer40Kg: number
@@ -663,6 +664,7 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
   }>
   riceLots: Array<{
     id: number
+    variety: string
     bags: number
     notes?: string | null
     createdAt: string
@@ -681,6 +683,22 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     processedBags: number
     remainingBags: number
     lines: PaddyKhataPurchase[]
+  }>
+  riceVarieties: Array<{
+    variety: string
+    bags: number
+    soldBags: number
+    remainingBags: number
+    lines: Array<{
+      id: number
+      variety: string
+      bags: number
+      notes?: string | null
+      createdAt: string
+      day: string
+      date: string
+      time: string
+    }>
   }>
 }
 

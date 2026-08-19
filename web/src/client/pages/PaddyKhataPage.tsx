@@ -21,7 +21,6 @@ type Section =
   | 'VARIETY'
   | 'RICE'
   | 'SELL'
-  | 'RECEIVE'
 
 const emptyPurchase = {
   partyId: '',
@@ -71,8 +70,8 @@ export default function PaddyKhataPage() {
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase)
   const [giveForm, setGiveForm] = useState({ partyId: '', amount: '', notes: '' })
   const [processForm, setProcessForm] = useState({ partyName: '', bags: '', notes: '' })
-  const [riceForm, setRiceForm] = useState({ bags: '', notes: '' })
-  const [sellForm, setSellForm] = useState({ partyId: '', bags: '', bagWeightKg: '40', ratePer40Kg: '', notes: '' })
+  const [riceForm, setRiceForm] = useState({ bags: '', variety: '', notes: '' })
+  const [sellForm, setSellForm] = useState({ partyId: '', variety: '', bags: '', bagWeightKg: '40', ratePer40Kg: '', notes: '' })
   const [receiveForm, setReceiveForm] = useState({ partyId: '', amount: '', notes: '' })
   const [purchasePreview, setPurchasePreview] = useState<{
     bags: number
@@ -267,7 +266,7 @@ export default function PaddyKhataPage() {
         labourPrice: purchaseForm.labourPrice ? Number(purchaseForm.labourPrice) : 0,
         notes: purchaseForm.notes.trim() || undefined,
       })
-      toast.success('Purchase saved to this party and deducted from total amount')
+      toast.success('Purchase saved to this party. Give Amount deducts from total.')
       setPurchaseOpen(false)
       setPurchaseForm(emptyPurchase)
       setPurchasePreview(null)
@@ -330,11 +329,12 @@ export default function PaddyKhataPage() {
       await paddyKhataApi.addRice(book.id, {
         secret,
         bags: Number(riceForm.bags),
+        variety: riceForm.variety.trim(),
         notes: riceForm.notes.trim() || undefined,
       })
-      toast.success('Rice bags added from processed stock')
+      toast.success('Rice bags saved for this variety')
       setRiceOpen(false)
-      setRiceForm({ bags: '', notes: '' })
+      setRiceForm({ bags: '', variety: '', notes: '' })
       refresh()
     } catch (err) {
       toast.error(apiMessage(err, 'Could not add rice'))
@@ -350,6 +350,7 @@ export default function PaddyKhataPage() {
       await paddyKhataApi.addSale(book.id, {
         secret,
         partyId: Number(sellForm.partyId),
+        variety: sellForm.variety.trim(),
         bags: Number(sellForm.bags),
         bagWeightKg: Number(sellForm.bagWeightKg || 40),
         ratePer40Kg: Number(sellForm.ratePer40Kg),
@@ -357,7 +358,7 @@ export default function PaddyKhataPage() {
       })
       toast.success('Rice sold')
       setSellOpen(false)
-      setSellForm({ partyId: '', bags: '', bagWeightKg: '40', ratePer40Kg: '', notes: '' })
+      setSellForm({ partyId: '', variety: '', bags: '', bagWeightKg: '40', ratePer40Kg: '', notes: '' })
       refresh()
     } catch (err) {
       toast.error(apiMessage(err, 'Could not sell rice'))
@@ -472,7 +473,7 @@ export default function PaddyKhataPage() {
           <p className="text-xs uppercase tracking-wide text-slate-500">Total amount</p>
           <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(totals.totalAmount)}</p>
         </button>
-        <button type="button" onClick={() => setSection('RECEIVE')} className="card-3d p-5 text-left">
+        <button type="button" onClick={() => setSection('SELL')} className="card-3d p-5 text-left">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingAmount)}</p>
         </button>
@@ -489,7 +490,6 @@ export default function PaddyKhataPage() {
           { id: 'VARIETY' as const, label: 'Variety', icon: Package },
           { id: 'RICE' as const, label: 'Add Rice', icon: Leaf },
           { id: 'SELL' as const, label: 'Sell Rice', icon: ShoppingBag },
-          { id: 'RECEIVE' as const, label: 'Receive Amount', icon: Wallet },
         ]).map((item) => (
           <button
             key={item.id}
@@ -548,9 +548,10 @@ export default function PaddyKhataPage() {
           </div>
           <PartyCards
             parties={book.purchaseParties}
-            empty=""
+            mode="PURCHASE"
+            empty="Add a party, then purchase product. Each party keeps its own record."
             onBill={(p) => void openBill(undefined, p.id)}
-            onCash={(p) => { setGiveForm({ partyId: String(p.id), amount: '', notes: '' }); setGiveOpen(true) }}
+            onCash={(p) => { setGiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setGiveOpen(true) }}
             cashLabel="Give Amount"
           />
           <Panel title="History">
@@ -633,14 +634,27 @@ export default function PaddyKhataPage() {
       )}
 
       {section === 'RICE' && (
-        <Panel title="Add Rice" action={<Button onClick={() => setRiceOpen(true)}><Plus className="h-4 w-4" /> Add Rice bags</Button>}>
-          <p className="px-5 pt-3 text-xs text-slate-500">Processed {formatNumber(totals.processedBags, 0)} · rice {formatNumber(totals.riceBags, 0)} · in stock {formatNumber(totals.riceInStock, 0)}</p>
-          <MoneyTable
-            rows={book.riceLots.map((row) => ({ ...row, amount: row.bags }))}
-            empty="Process a variety first, then add rice bags."
-            amountLabel="Bags"
-          />
-        </Panel>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => { setRiceForm({ bags: '', variety: '', notes: '' }); setRiceOpen(true) }}><Plus className="h-4 w-4" /> Add Rice bags</Button>
+          </div>
+          <p className="text-sm text-slate-500">Processed {formatNumber(totals.processedBags, 0)} · rice {formatNumber(totals.riceBags, 0)} · in stock {formatNumber(totals.riceInStock, 0)}</p>
+          {!book.riceVarieties.length ? (
+            <p className="text-sm text-slate-500">Process paddy first, then add rice bags with the variety name.</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {book.riceVarieties.map((item) => (
+                <div key={item.variety} className="card-3d p-5 space-y-2">
+                  <p className="text-lg font-semibold">{item.variety}</p>
+                  <p className="text-sm">Rice bags {formatNumber(item.bags, 0)} · sold {formatNumber(item.soldBags, 0)} · left {formatNumber(item.remainingBags, 0)}</p>
+                  {item.lines.map((row) => (
+                    <p key={row.id} className="text-xs text-slate-500">{row.day} · {row.date} · {formatNumber(row.bags, 0)} bags{row.notes ? ` · ${row.notes}` : ''}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {section === 'SELL' && (
@@ -648,20 +662,15 @@ export default function PaddyKhataPage() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
             <Button onClick={() => setSellOpen(true)}><ShoppingBag className="h-4 w-4" /> Sell Rice</Button>
+            <Button variant="secondary" onClick={() => { setReceiveForm({ partyId: '', amount: '', notes: '' }); setReceiveOpen(true) }}><Wallet className="h-4 w-4" /> Receive Amount</Button>
           </div>
-          <PartyCards parties={book.saleParties} onBill={(p) => void openBill(undefined, p.id)} empty="Add a rice party, then sell rice." />
-        </div>
-      )}
-
-      {section === 'RECEIVE' && (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500">Receive party by party. You can take less now and the rest later. Received cash is added to this Paddy Khata total.</p>
           <PartyCards
             parties={book.saleParties}
+            mode="SALE"
+            empty="Add a rice party, then sell rice. Receive Amount is inside this screen, party by party."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setReceiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setReceiveOpen(true) }}
             cashLabel="Receive Amount"
-            empty="Sell rice first, then receive party by party."
           />
         </div>
       )}
@@ -716,7 +725,7 @@ export default function PaddyKhataPage() {
 
       <Modal open={giveOpen} onClose={() => setGiveOpen(false)} title="Give Amount">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Purchase Product already deducts from total amount. Use this for extra cash given to a purchase party.</p>
+          <p className="text-sm text-slate-500">Purchase Product only saves the lot. The amount you type here is deducted from total amount.</p>
           <select className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-transparent px-3 py-2.5" value={giveForm.partyId} onChange={(e) => setGiveForm((s) => ({ ...s, partyId: e.target.value }))}>
             <option value="">Choose party</option>
             {book.purchaseParties.map((p) => <option key={p.id} value={p.id}>{p.name} · remaining {formatCurrency(p.remaining)}</option>)}
@@ -738,7 +747,8 @@ export default function PaddyKhataPage() {
 
       <Modal open={riceOpen} onClose={() => setRiceOpen(false)} title="Add Rice bags">
         <div className="space-y-3">
-          <Input label="Add Rice bags" type="number" value={riceForm.bags} onChange={(e) => setRiceForm((s) => ({ ...s, bags: e.target.value }))} />
+          <Input label="No. of bags" type="number" value={riceForm.bags} onChange={(e) => setRiceForm((s) => ({ ...s, bags: e.target.value }))} />
+          <Input label="Variety name of rice" value={riceForm.variety} onChange={(e) => setRiceForm((s) => ({ ...s, variety: e.target.value }))} />
           <Input label="Note (optional)" value={riceForm.notes} onChange={(e) => setRiceForm((s) => ({ ...s, notes: e.target.value }))} />
           <Button className="w-full" loading={saving} onClick={() => void saveRice()}>Save</Button>
         </div>
@@ -753,6 +763,15 @@ export default function PaddyKhataPage() {
           {selectedSellParty && (
             <p className="text-sm text-slate-500">Address: {selectedSellParty.address || '—'}</p>
           )}
+          <label className="space-y-1.5">
+            <span className="block text-sm font-medium">Variety name of rice</span>
+            <select className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-transparent px-3 py-2.5" value={sellForm.variety} onChange={(e) => setSellForm((s) => ({ ...s, variety: e.target.value }))}>
+              <option value="">Choose rice variety</option>
+              {book.riceVarieties.filter((item) => item.remainingBags > 0).map((item) => (
+                <option key={item.variety} value={item.variety}>{item.variety} · {formatNumber(item.remainingBags, 0)} bags</option>
+              ))}
+            </select>
+          </label>
           <Input label="No. of bags" type="number" value={sellForm.bags} onChange={(e) => setSellForm((s) => ({ ...s, bags: e.target.value }))} />
           <Input label="Weight of one bag" type="number" value={sellForm.bagWeightKg} onChange={(e) => setSellForm((s) => ({ ...s, bagWeightKg: e.target.value }))} />
           <Input label="Rate per 40 KG" type="number" value={sellForm.ratePer40Kg} onChange={(e) => setSellForm((s) => ({ ...s, ratePer40Kg: e.target.value }))} />
@@ -830,33 +849,64 @@ function MoneyTable({
 function PartyCards({
   parties,
   empty,
+  mode,
   onBill,
   onCash,
   cashLabel,
 }: {
   parties: PaddyKhataParty[]
   empty: string
+  mode: 'PURCHASE' | 'SALE'
   onBill: (party: PaddyKhataParty) => void
   onCash?: (party: PaddyKhataParty) => void
   cashLabel?: string
 }) {
   if (!parties.length) return empty ? <p className="text-sm text-slate-500">{empty}</p> : null
+  const cashWord = mode === 'PURCHASE' ? 'Amount given' : 'Amount received'
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {parties.map((party) => (
-        <div key={party.id} className="card-3d p-5 space-y-1">
-          <p className="font-semibold">{party.name}</p>
-          <p className="text-xs text-slate-500">{party.address || 'No address'}</p>
-          <p className="text-sm">Product {formatCurrency(party.productTotal)} · cash {formatCurrency(party.cashTotal)}</p>
-          <p className="text-sm font-medium">Remaining {formatCurrency(party.remaining)}</p>
-          <div className="flex flex-wrap gap-2 pt-2">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {parties.map((party) => {
+        const lines = mode === 'PURCHASE' ? (party.purchases || []) : (party.sales || [])
+        return (
+          <div key={party.id} className="card-3d p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{party.name}</p>
+                <p className="text-xs text-slate-500">{party.address || 'No address'}</p>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => onBill(party)}>Bill</Button>
+            </div>
+            {lines.length ? (
+              <div className="space-y-1">
+                {lines.map((row) => (
+                  <p key={row.id} className="text-xs text-slate-500">
+                    {row.date} · {row.variety} · {formatNumber(row.bags, 0)} bags · {formatCurrency(row.totalPrice)}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">No product yet</p>
+            )}
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Total amount</p>
+                <p className="font-semibold">{formatCurrency(party.productTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">{cashWord}</p>
+                <p className="font-semibold">{formatCurrency(party.cashTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Remaining</p>
+                <p className="font-semibold">{formatCurrency(party.remaining)}</p>
+              </div>
+            </div>
             {onCash && (
               <Button size="sm" onClick={() => onCash(party)}>{cashLabel || 'Amount'}</Button>
             )}
-            <Button size="sm" variant="secondary" onClick={() => onBill(party)}>Bill</Button>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

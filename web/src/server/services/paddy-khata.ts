@@ -260,6 +260,7 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   }))
   const riceRows = riceLots.map((row) => ({
     id: Number(row.id),
+    variety: row.variety.trim() || 'Unnamed',
     bags: row.bags,
     notes: row.notes,
     ...stampDto(row.createdAt),
@@ -271,6 +272,7 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       partyId: Number(row.partyId),
       partyName: row.party.name,
       partyAddress: row.party.address,
+      variety: row.variety.trim() || 'Unnamed',
       bags: row.bags,
       bagWeightKg: row.bagWeightKg.toNumber(),
       ratePer40Kg: row.ratePer40Kg.toNumber(),
@@ -370,6 +372,30 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
     remainingBags: Math.max(0, row.bags - row.processedBags),
   }))
 
+  const riceMap = new Map<string, {
+    variety: string
+    bags: number
+    soldBags: number
+    lines: typeof riceRows
+  }>()
+  for (const row of riceRows) {
+    const key = row.variety.trim() || 'Unnamed'
+    const current = riceMap.get(key) ?? { variety: key, bags: 0, soldBags: 0, lines: [] }
+    current.bags += row.bags
+    current.lines.push(row)
+    riceMap.set(key, current)
+  }
+  for (const row of saleRows) {
+    const key = row.variety.trim() || 'Unnamed'
+    const current = riceMap.get(key) ?? { variety: key, bags: 0, soldBags: 0, lines: [] }
+    current.soldBags += row.bags
+    riceMap.set(key, current)
+  }
+  const riceVarieties = [...riceMap.values()].map((row) => ({
+    ...row,
+    remainingBags: Math.max(0, row.bags - row.soldBags),
+  }))
+
   const moneyIn = amountRows.reduce((sum, row) => sum + row.amount, 0)
   const purchaseTotal = purchaseRows.reduce((sum, row) => sum + row.totalPrice, 0)
   const givenCash = cashRows.filter((row) => row.kind === 'GIVE').reduce((sum, row) => sum + row.amount, 0)
@@ -388,9 +414,9 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       givenCash,
       receivedCash,
       saleTotal,
-      givingAmount: purchaseTotal + givenCash,
+      givingAmount: givenCash,
       receivingAmount: receivedCash,
-      totalAmount: moneyIn + receivedCash - purchaseTotal - givenCash,
+      totalAmount: moneyIn + receivedCash - givenCash,
       paddyBags,
       processedBags,
       riceBags,
@@ -406,6 +432,7 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
     sales: saleRows,
     payments: cashRows,
     varieties,
+    riceVarieties,
   }
 }
 
@@ -489,12 +516,6 @@ export async function addPurchase(
   const variety = String(input.variety ?? '').trim()
   if (!variety) throw new Error('Enter variety of product')
   const preview = previewPurchase(input)
-  const snapshot = await getBook(book.id, userId, input.secret)
-  if (preview.totalPrice > snapshot.totals.totalAmount) {
-    throw new Error(
-      `Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}, this purchase is ${preview.totalPrice}`,
-    )
-  }
   const row = await prisma.paddyKhataPurchase.create({
     data: {
       bookId: book.id,
@@ -531,8 +552,15 @@ export async function addCash(
   const kind = cashKind(party.kind, String(input.kind ?? '').trim().toUpperCase())
   const amount = parseAmount(input.amount)
   const snapshot = await getBook(book.id, userId, input.secret)
-  if (kind === 'GIVE' && amount > snapshot.totals.totalAmount) {
-    throw new Error(`Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}`)
+  if (kind === 'GIVE') {
+    if (amount > snapshot.totals.totalAmount) {
+      throw new Error(`Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}`)
+    }
+    const partySnap = snapshot.purchaseParties.find((row) => row.id === Number(party.id))
+    const remaining = partySnap ? partySnap.remaining : 0
+    if (amount > remaining) {
+      throw new Error(`This party remaining is ${remaining}. Give that or less.`)
+    }
   }
   if (kind === 'RECEIVE') {
     const partySnap = snapshot.saleParties.find((row) => row.id === Number(party.id))
@@ -585,19 +613,21 @@ export async function addProcess(
 export async function addRice(
   bookId: number | bigint,
   userId: bigint,
-  input: { secret?: unknown; bags?: unknown; notes?: unknown },
+  input: { secret?: unknown; bags?: unknown; variety?: unknown; notes?: unknown },
 ) {
   const book = await requireBook(bookId, userId, input.secret)
   const bags = parseCount(input.bags, 'rice bags')
+  const variety = String(input.variety ?? '').trim()
+  if (!variety) throw new Error('Enter variety name of rice')
   const snapshot = await getBook(book.id, userId, input.secret)
   const remainingProcess = snapshot.totals.processedBags - snapshot.totals.riceBags
   if (bags > remainingProcess) {
     throw new Error(`Process paddy first. ${Math.max(0, remainingProcess)} processed bags are ready for rice`)
   }
   const row = await prisma.paddyKhataRice.create({
-    data: { bookId: book.id, bags, notes: parseOptionalText(input.notes) },
+    data: { bookId: book.id, variety, bags, notes: parseOptionalText(input.notes) },
   })
-  return { id: Number(row.id), bags: row.bags }
+  return { id: Number(row.id), bags: row.bags, variety: row.variety }
 }
 
 export async function addSale(
@@ -606,6 +636,7 @@ export async function addSale(
   input: {
     secret?: unknown
     partyId?: unknown
+    variety?: unknown
     bags?: unknown
     bagWeightKg?: unknown
     ratePer40Kg?: unknown
@@ -619,15 +650,20 @@ export async function addSale(
     where: { id: BigInt(partyId), bookId: book.id, deleted: false, kind: 'SALE' },
   })
   if (!party) throw new Error('Sell party not found')
+  const variety = String(input.variety ?? '').trim()
+  if (!variety) throw new Error('Enter variety name of rice')
   const preview = previewSale(input)
   const snapshot = await getBook(book.id, userId, input.secret)
-  if (preview.bags > snapshot.totals.riceInStock) {
-    throw new Error(`Only ${snapshot.totals.riceInStock} rice bags in stock`)
+  const riceFrame = snapshot.riceVarieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
+  const riceLeft = riceFrame ? riceFrame.remainingBags : 0
+  if (preview.bags > riceLeft) {
+    throw new Error(`Only ${riceLeft} bags of ${variety} rice in stock`)
   }
   const row = await prisma.paddyKhataSale.create({
     data: {
       bookId: book.id,
       partyId: party.id,
+      variety: riceFrame?.variety || variety,
       bags: preview.bags,
       bagWeightKg: preview.bagWeightKg,
       ratePer40Kg: preview.ratePer40Kg,
