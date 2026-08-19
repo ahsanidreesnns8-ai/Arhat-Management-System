@@ -726,7 +726,7 @@ async function dispatch(
       return result(await paddyKhata.completeProcess(id, userId, payload), 'Process complete. Rice is ready to sell.')
     }
     if (path[2] === 'process' && method === 'POST') {
-      return result(await paddyKhata.addProcess(id, userId, payload), 'Processing saved', 201)
+      return result(await paddyKhata.addProcess(id, userId, payload), 'Processed. Those bags are ready in Sell Rice.', 201)
     }
     if (path[2] === 'expenses' && method === 'POST') {
       return result(await paddyKhata.addExpense(id, userId, payload), 'Bill paid', 201)

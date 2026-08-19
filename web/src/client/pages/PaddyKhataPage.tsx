@@ -69,7 +69,7 @@ export default function PaddyKhataPage() {
   const [partyForm, setPartyForm] = useState({ name: '', address: '', notes: '' })
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase)
   const [giveForm, setGiveForm] = useState({ partyId: '', amount: '', notes: '' })
-  const [processForm, setProcessForm] = useState({ partyName: '', riceVariety: '', bags: '', notes: '' })
+  const [processForm, setProcessForm] = useState({ riceVariety: '', bags: '', notes: '' })
   const [expenseForm, setExpenseForm] = useState({ amount: '', reason: '' })
   const [sellForm, setSellForm] = useState({ partyId: '', variety: '', bags: '', bagWeightKg: '40', ratePer40Kg: '', notes: '' })
   const [receiveForm, setReceiveForm] = useState({ partyId: '', amount: '', notes: '' })
@@ -123,6 +123,11 @@ export default function PaddyKhataPage() {
     () => book?.saleParties.find((p) => String(p.id) === receiveForm.partyId) || null,
     [book, receiveForm.partyId],
   )
+  const selectedRiceStock = useMemo(
+    () => book?.riceVarieties.find((item) => item.variety.toLowerCase() === sellForm.variety.trim().toLowerCase()) || null,
+    [book, sellForm.variety],
+  )
+  const riceReady = selectedRiceStock ? selectedRiceStock.remainingBags : 0
 
   const refresh = () => {
     if (book) void loadBook(book.id, secret, true)
@@ -307,14 +312,13 @@ export default function PaddyKhataPage() {
       await paddyKhataApi.addProcess(book.id, {
         secret,
         variety: processOpen,
-        partyName: processForm.partyName.trim(),
-        riceVariety: processForm.riceVariety.trim(),
+        riceVariety: processForm.riceVariety.trim() || processOpen,
         bags: Number(processForm.bags),
         notes: processForm.notes.trim() || undefined,
       })
-      toast.success('This variety is processing. Tap Process Complete when the mill returns the rice.')
+      toast.success(`${processForm.bags} bags are ready in Sell Rice`)
       setProcessOpen(null)
-      setProcessForm({ partyName: '', riceVariety: '', bags: '', notes: '' })
+      setProcessForm({ riceVariety: '', bags: '', notes: '' })
       refresh()
     } catch (err) {
       toast.error(apiMessage(err, 'Could not process'))
@@ -373,6 +377,19 @@ export default function PaddyKhataPage() {
 
   const saveSell = async () => {
     if (!book) return
+    const bags = Number(sellForm.bags)
+    if (!sellForm.variety.trim()) {
+      toast.error('Choose a rice variety first')
+      return
+    }
+    if (!Number.isInteger(bags) || bags <= 0) {
+      toast.error('Enter number of bags')
+      return
+    }
+    if (bags > riceReady) {
+      toast.error(`Only ${formatNumber(riceReady, 0)} bags of ${selectedRiceStock?.variety || sellForm.variety} are ready to sell`)
+      return
+    }
     setSaving(true)
     try {
       await paddyKhataApi.addSale(book.id, {
@@ -518,7 +535,7 @@ export default function PaddyKhataPage() {
       >
         <p className="text-xs uppercase tracking-wide text-slate-500">Rice</p>
         <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatNumber(totals.riceInStock, 0)} bags ready</p>
-        <p className="text-xs text-slate-500 mt-1">Tap for every rice variety that is ready to sell. Processing {formatNumber(totals.processingBags, 0)} bags.</p>
+        <p className="text-xs text-slate-500 mt-1">Tap for every rice variety that is ready to sell from Process. You cannot sell more bags than are ready.</p>
       </button>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -641,11 +658,11 @@ export default function PaddyKhataPage() {
                   <div>
                     <p className="text-lg font-semibold">{item.variety}</p>
                     <p className="text-xs text-slate-500">
-                      {item.processingBags > 0 ? `Processing ${formatNumber(item.processingBags, 0)} bags` : 'Not processing'}
+                      Processed bags go to Sell Rice. You can sell only the bags ready for this variety.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => { setProcessOpen(item.variety); setProcessForm({ partyName: '', riceVariety: item.variety, bags: String(item.remainingBags || ''), notes: '' }) }}>Process</Button>
+                    <Button size="sm" onClick={() => { setProcessOpen(item.variety); setProcessForm({ riceVariety: item.variety, bags: String(item.remainingBags || ''), notes: '' }) }}>Process</Button>
                     {item.processingBags > 0 && (
                       <Button size="sm" variant="secondary" loading={saving} onClick={() => void saveComplete(item.variety)}>Process Complete</Button>
                     )}
@@ -666,7 +683,7 @@ export default function PaddyKhataPage() {
                   ))}
                   {book.processes.filter((row) => row.variety === item.variety).map((row) => (
                     <p key={row.id} className={`text-xs ${row.status === 'PROCESSING' ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                      {row.status === 'PROCESSING' ? 'Processing' : 'Complete'} {formatNumber(row.bags, 0)} bags to {row.partyName} as {row.riceVariety} · {row.date}
+                      {row.status === 'PROCESSING' ? 'Processing' : 'Ready to sell'} {formatNumber(row.bags, 0)} bags as {row.riceVariety} · {row.date}
                     </p>
                   ))}
                   {item.expenses.map((row) => (
@@ -683,7 +700,7 @@ export default function PaddyKhataPage() {
 
       {section === 'RICE' && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Ready rice {formatNumber(totals.riceInStock, 0)} bags · sold {formatNumber(totals.soldBags, 0)}. Finish Process Complete on a variety to add rice here.</p>
+          <p className="text-sm text-slate-500">Ready rice {formatNumber(totals.riceInStock, 0)} bags · sold {formatNumber(totals.soldBags, 0)}. Process a variety to send bags here, then sell them in Sell Rice. You cannot sell more than the bags ready for that variety.</p>
           {!book.riceVarieties.length ? (
             <p className="text-sm text-slate-500">No rice is ready yet.</p>
           ) : (
@@ -783,14 +800,9 @@ export default function PaddyKhataPage() {
 
       <Modal open={!!processOpen} onClose={() => setProcessOpen(null)} title={`Process ${processOpen || ''}`}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Give this variety to a mill party. After they return rice, tap Process Complete. Those bags become ready rice.</p>
-          <Input label="Which party is this variety given to" value={processForm.partyName} onChange={(e) => setProcessForm((s) => ({ ...s, partyName: e.target.value }))} list="paddy-mill-parties" />
-          <datalist id="paddy-mill-parties">
-            {book.purchaseParties.map((p) => <option key={p.id} value={p.name} />)}
-            {book.processes.map((row) => <option key={`m-${row.id}`} value={row.partyName} />)}
-          </datalist>
+          <p className="text-sm text-slate-500">These bags become ready rice and can be sold in Sell Rice. You cannot sell more bags than you process for this variety.</p>
           <Input label="Variety of rice" value={processForm.riceVariety} onChange={(e) => setProcessForm((s) => ({ ...s, riceVariety: e.target.value }))} />
-          <Input label="No. of bags" type="number" value={processForm.bags} onChange={(e) => setProcessForm((s) => ({ ...s, bags: e.target.value }))} />
+          <Input label="No. of bags" type="number" min="1" value={processForm.bags} onChange={(e) => setProcessForm((s) => ({ ...s, bags: e.target.value }))} />
           <Input label="Note (optional)" value={processForm.notes} onChange={(e) => setProcessForm((s) => ({ ...s, notes: e.target.value }))} />
           <Button className="w-full" loading={saving} onClick={() => void saveProcess()}>Process</Button>
         </div>
@@ -834,7 +846,17 @@ export default function PaddyKhataPage() {
               </p>
             )}
           </label>
-          <Input label="No. of bags" type="number" value={sellForm.bags} onChange={(e) => setSellForm((s) => ({ ...s, bags: e.target.value }))} />
+          <Input
+            label={selectedRiceStock ? `No. of bags (max ${formatNumber(riceReady, 0)})` : 'No. of bags'}
+            type="number"
+            min="1"
+            max={riceReady || undefined}
+            value={sellForm.bags}
+            onChange={(e) => setSellForm((s) => ({ ...s, bags: e.target.value }))}
+          />
+          {selectedRiceStock && (
+            <p className="text-sm text-slate-500">Ready to sell: {formatNumber(riceReady, 0)} bags of {selectedRiceStock.variety}. You cannot sell more than this.</p>
+          )}
           <Input label="Weight of one bag" type="number" value={sellForm.bagWeightKg} onChange={(e) => setSellForm((s) => ({ ...s, bagWeightKg: e.target.value }))} />
           <Input label="Rate per 40 KG" type="number" value={sellForm.ratePer40Kg} onChange={(e) => setSellForm((s) => ({ ...s, ratePer40Kg: e.target.value }))} />
           <Input label="Note (optional)" value={sellForm.notes} onChange={(e) => setSellForm((s) => ({ ...s, notes: e.target.value }))} />
