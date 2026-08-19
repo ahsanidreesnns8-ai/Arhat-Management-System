@@ -1427,32 +1427,32 @@ function paddyProcessSlip(book: PaddyBook, urdu: boolean): BillSlip {
 
 function paddyRiceSlip(book: PaddyBook, urdu: boolean): BillSlip {
   const rows = book.riceLots.length
-    ? book.riceLots.map((row) => [`${row.date} ${row.time}`, String(row.bags), row.notes || '—'])
-    : [[urdu ? 'کوئی چاول نہیں' : 'No rice yet', '0', '—']]
+    ? book.riceLots.map((row) => [`${row.date} ${row.time}`, row.variety, String(row.bags), row.notes || '—'])
+    : [[urdu ? 'کوئی چاول نہیں' : 'No rice yet', '', '0', '—']]
   return {
     title: '',
     partyHtml: paddyHead(book, urdu, urdu ? 'چاول' : 'Add Rice'),
     body: table(
-      urdu ? ['تاریخ', 'بوریاں', 'نوٹ'] : ['Date', 'Bags', 'Note'],
+      urdu ? ['تاریخ', 'ورائٹی', 'بوریاں', 'نوٹ'] : ['Date', 'Variety', 'Bags', 'Note'],
       rows,
-      [urdu ? 'کل' : 'Total', String(book.totals.riceBags), ''],
-      { compactCols: [1] },
+      [urdu ? 'کل' : 'Total', '', String(book.totals.riceBags), ''],
+      { compactCols: [2] },
     ),
   }
 }
 
 function paddySellSlip(book: PaddyBook, urdu: boolean): BillSlip {
   const rows = book.sales.length
-    ? book.sales.map((row) => [`${row.date} ${row.time}`, row.partyName, String(row.bags), money(row.totalPrice)])
-    : [[urdu ? 'کوئی فروخت نہیں' : 'No rice sold yet', '', '0', '0']]
+    ? book.sales.map((row) => [`${row.date} ${row.time}`, row.partyName, row.variety, String(row.bags), money(row.totalPrice)])
+    : [[urdu ? 'کوئی فروخت نہیں' : 'No rice sold yet', '', '', '0', '0']]
   return {
     title: '',
     partyHtml: paddyHead(book, urdu, urdu ? 'چاول فروخت' : 'Sell Rice'),
     body: table(
-      urdu ? ['تاریخ', 'پارٹی', 'بوریاں', 'رقم'] : ['Date', 'Party', 'Bags', 'Amount'],
+      urdu ? ['تاریخ', 'پارٹی', 'ورائٹی', 'بوریاں', 'رقم'] : ['Date', 'Party', 'Variety', 'Bags', 'Amount'],
       rows,
-      [urdu ? 'کل' : 'Total', '', String(book.totals.soldBags), money(book.totals.saleTotal)],
-      { compactCols: [2], moneyCols: [3] },
+      [urdu ? 'کل' : 'Total', '', '', String(book.totals.soldBags), money(book.totals.saleTotal)],
+      { compactCols: [3], moneyCols: [4] },
     ),
   }
 }
@@ -1491,7 +1491,7 @@ function paddyPartySlip(
       ])
     : (sale?.sales || []).map((row) => [
         `${row.date} ${row.time}`,
-        `${row.bags} bags · ${row.bagWeightKg} kg`,
+        `${row.variety} · ${row.bags} bags · ${row.bagWeightKg} kg`,
         money(row.totalPrice),
       ])
   const cashRows = (party.payments || []).map((row) => [
@@ -1529,8 +1529,7 @@ function paddyModuleSlips(book: PaddyBook, urdu: boolean, module?: string | null
   if (key === 'variety') return [paddyVarietySlip(book, urdu)]
   if (key === 'process' || key === 'processing') return [paddyProcessSlip(book, urdu)]
   if (key === 'rice') return [paddyRiceSlip(book, urdu)]
-  if (key === 'sell') return [paddySellSlip(book, urdu)]
-  if (key === 'receive') return [paddyReceiveSlip(book, urdu)]
+  if (key === 'sell' || key === 'receive') return [paddySellSlip(book, urdu), paddyReceiveSlip(book, urdu)]
   return [
     paddyAmountSlip(book, urdu),
     paddyPurchaseSlip(book, urdu),
