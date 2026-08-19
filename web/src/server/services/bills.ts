@@ -150,36 +150,56 @@ body{
 .party-grid .value{font-size:8.5px;font-weight:600;color:var(--ink);margin-top:1px;word-break:break-word}
 .party-grid .product-name{color:var(--navy);font-weight:700;font-size:9px}
 .slip-body{flex:1}
-table{width:100%;border-collapse:collapse;margin-top:6px;font-size:7.5px;table-layout:fixed;border:1px solid #475569}
-th,td{border:1px solid #64748b;padding:3px 2px;text-align:left;vertical-align:middle}
+table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  margin-top:6px;
+  font-size:6.5px;
+  table-layout:fixed;
+  border:1px solid #475569;
+}
+th,td{
+  border:1px solid #64748b;
+  padding:2px 1px;
+  text-align:left;
+  vertical-align:middle;
+  overflow:hidden;
+  max-width:0;
+  box-sizing:border-box;
+}
 th{
   background:var(--navy);
   color:#fff;
   font-weight:700;
-  font-size:6.3px;
+  font-size:5.4px;
   letter-spacing:0;
   line-height:1.15;
   white-space:nowrap;
-  overflow:visible;
+  text-align:center;
   word-break:keep-all;
   overflow-wrap:normal;
   hyphens:none;
 }
-td{word-break:normal;overflow-wrap:anywhere}
-th.num,th.compact,th.money{text-align:center;white-space:nowrap;overflow:visible}
+td{
+  word-break:keep-all;
+  overflow-wrap:normal;
+}
+th.num,th.compact,th.money{text-align:center;white-space:nowrap;overflow:hidden}
 td.num,tfoot td.num{
   text-align:right;
   white-space:nowrap;
   word-break:keep-all;
   overflow-wrap:normal;
+  overflow:hidden;
   font-variant-numeric:tabular-nums;
 }
-td.money,tfoot td.money{font-weight:600;font-size:7.2px;overflow:visible;padding:3px 4px}
-td.compact,tfoot td.compact{padding:3px 1px}
-th.name{text-align:left;white-space:normal;overflow:visible}
-td.name,tfoot td.name{white-space:nowrap;overflow:visible;font-weight:600;padding:3px 2px}
-.farmer-grid{font-size:7.2px}
-.farmer-grid th{font-size:6.2px;white-space:nowrap}
+td.money,tfoot td.money{font-weight:600;font-size:6.2px;overflow:hidden;padding:2px 2px}
+td.compact,tfoot td.compact{padding:2px 1px}
+th.name{text-align:left;white-space:nowrap;overflow:hidden}
+td.name,tfoot td.name{white-space:nowrap;overflow:hidden;font-weight:600;padding:2px 1px}
+.farmer-grid{font-size:6.2px}
+.farmer-grid th{font-size:5.3px;white-space:nowrap;overflow:hidden}
 .totals{font-weight:700;background:#f1f5f9}
 .note{margin-top:8px;padding:6px 8px;background:var(--soft);border:1px solid var(--line);font-size:8px;line-height:1.4}
 .note strong{color:var(--navy)}
@@ -401,19 +421,19 @@ function extraStyle(value: DecimalInput | number | string, minWidth: number, max
 }
 
 const FARMER_COL_WIDTHS = [
-  '4.4ch',
-  '5.2ch',
-  '11.6ch',
-  '5.2ch',
-  '3.8ch',
-  '7.6ch',
-  '4.6ch',
-  '',
-  '',
-  '',
+  '7%',
+  '8%',
+  '15%',
+  '8%',
+  '6%',
+  '10%',
+  '7%',
+  '13%',
+  '14%',
+  '12%',
 ]
-const BUYER_COL_WIDTHS = ['5.6em', '4.4ch', '5.2ch', '11.6ch', '5.2ch', '4.6ch', '']
-const SALE_COL_WIDTHS = ['6.2em', '4.4ch', '5.2ch', '11.6ch', '5.2ch', '4.6ch', '']
+const BUYER_COL_WIDTHS = ['16%', '8%', '9%', '16%', '10%', '9%', '22%']
+const SALE_COL_WIDTHS = ['16%', '8%', '9%', '16%', '10%', '9%', '22%']
 
 function autoColWidths(
   headers: string[],
