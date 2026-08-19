@@ -722,8 +722,14 @@ async function dispatch(
     if (path[2] === 'cash' && method === 'POST') {
       return result(await paddyKhata.addCash(id, userId, payload), 'Amount saved', 201)
     }
+    if (path[2] === 'process' && path[3] === 'complete' && method === 'POST') {
+      return result(await paddyKhata.completeProcess(id, userId, payload), 'Process complete. Rice is ready to sell.')
+    }
     if (path[2] === 'process' && method === 'POST') {
       return result(await paddyKhata.addProcess(id, userId, payload), 'Processing saved', 201)
+    }
+    if (path[2] === 'expenses' && method === 'POST') {
+      return result(await paddyKhata.addExpense(id, userId, payload), 'Bill paid', 201)
     }
     if (path[2] === 'rice' && method === 'POST') {
       return result(await paddyKhata.addRice(id, userId, payload), 'Rice bags added', 201)

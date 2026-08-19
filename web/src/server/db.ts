@@ -46,6 +46,7 @@ const SCOPED_MODELS = new Set<Prisma.ModelName>([
   'PaddyKhataParty',
   'PaddyKhataPurchase',
   'PaddyKhataProcess',
+  'PaddyKhataExpense',
   'PaddyKhataRice',
   'PaddyKhataSale',
   'PaddyKhataCash',

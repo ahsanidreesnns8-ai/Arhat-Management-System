@@ -642,10 +642,12 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     receivingAmount: number
     totalAmount: number
     paddyBags: number
+    processingBags: number
     processedBags: number
     riceBags: number
     soldBags: number
     riceInStock: number
+    expenseTotal: number
   }
   amounts: PaddyKhataMoneyLine[]
   purchaseParties: PaddyKhataParty[]
@@ -654,9 +656,21 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
   processes: Array<{
     id: number
     variety: string
+    riceVariety: string
     partyName: string
     bags: number
+    status: 'PROCESSING' | 'COMPLETE' | string
     notes?: string | null
+    createdAt: string
+    day: string
+    date: string
+    time: string
+  }>
+  expenses: Array<{
+    id: number
+    variety: string
+    amount: number
+    reason: string
     createdAt: string
     day: string
     date: string
@@ -682,7 +696,21 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     totalPrice: number
     processedBags: number
     remainingBags: number
+    processingBags: number
+    completedBags: number
+    expenseTotal: number
+    runningAmount: number
     lines: PaddyKhataPurchase[]
+    expenses: Array<{
+      id: number
+      variety: string
+      amount: number
+      reason: string
+      createdAt: string
+      day: string
+      date: string
+      time: string
+    }>
   }>
   riceVarieties: Array<{
     variety: string

@@ -199,7 +199,7 @@ function cashKind(partyKind: string, cashKind: string) {
 
 export async function getBook(bookId: number | bigint, userId: bigint, secret: unknown) {
   const book = await requireBook(bookId, userId, secret)
-  const [amounts, parties, purchases, processes, riceLots, sales, payments] = await Promise.all([
+  const [amounts, parties, purchases, processes, expenses, riceLots, sales, payments] = await Promise.all([
     prisma.paddyKhataAmount.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
     prisma.paddyKhataParty.findMany({ where: { bookId: book.id, deleted: false }, orderBy: { name: 'asc' } }),
     prisma.paddyKhataPurchase.findMany({
@@ -208,6 +208,7 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       orderBy: { createdAt: 'desc' },
     }),
     prisma.paddyKhataProcess.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
+    prisma.paddyKhataExpense.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
     prisma.paddyKhataRice.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
     prisma.paddyKhataSale.findMany({
       where: { bookId: book.id },
@@ -253,9 +254,18 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   const processRows = processes.map((row) => ({
     id: Number(row.id),
     variety: row.variety,
+    riceVariety: row.riceVariety.trim() || row.variety,
     partyName: row.partyName,
     bags: row.bags,
+    status: row.status === 'PROCESSING' ? 'PROCESSING' : 'COMPLETE',
     notes: row.notes,
+    ...stampDto(row.createdAt),
+  }))
+  const expenseRows = expenses.map((row) => ({
+    id: Number(row.id),
+    variety: row.variety.trim() || 'Unnamed',
+    amount: row.amount.toNumber(),
+    reason: row.reason,
     ...stampDto(row.createdAt),
   }))
   const riceRows = riceLots.map((row) => ({
@@ -341,8 +351,11 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
     extraWeightKg: number
     totalWeightKg: number
     totalPrice: number
-    processedBags: number
+    processingBags: number
+    completedBags: number
+    expenseTotal: number
     lines: typeof purchaseRows
+    expenses: typeof expenseRows
   }>()
   for (const row of purchaseRows) {
     const key = row.variety.trim() || 'Unnamed'
@@ -352,8 +365,11 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       extraWeightKg: 0,
       totalWeightKg: 0,
       totalPrice: 0,
-      processedBags: 0,
+      processingBags: 0,
+      completedBags: 0,
+      expenseTotal: 0,
       lines: [],
+      expenses: [],
     }
     current.bags += row.bags
     current.extraWeightKg += row.extraWeightKg
@@ -364,13 +380,49 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   }
   for (const row of processRows) {
     const key = row.variety.trim() || 'Unnamed'
-    const current = varietyMap.get(key)
-    if (current) current.processedBags += row.bags
+    const current = varietyMap.get(key) ?? {
+      variety: key,
+      bags: 0,
+      extraWeightKg: 0,
+      totalWeightKg: 0,
+      totalPrice: 0,
+      processingBags: 0,
+      completedBags: 0,
+      expenseTotal: 0,
+      lines: [],
+      expenses: [],
+    }
+    if (row.status === 'PROCESSING') current.processingBags += row.bags
+    else current.completedBags += row.bags
+    varietyMap.set(key, current)
   }
-  const varieties = [...varietyMap.values()].map((row) => ({
-    ...row,
-    remainingBags: Math.max(0, row.bags - row.processedBags),
-  }))
+  for (const row of expenseRows) {
+    const key = row.variety.trim() || 'Unnamed'
+    const current = varietyMap.get(key) ?? {
+      variety: key,
+      bags: 0,
+      extraWeightKg: 0,
+      totalWeightKg: 0,
+      totalPrice: 0,
+      processingBags: 0,
+      completedBags: 0,
+      expenseTotal: 0,
+      lines: [],
+      expenses: [],
+    }
+    current.expenseTotal += row.amount
+    current.expenses.push(row)
+    varietyMap.set(key, current)
+  }
+  const varieties = [...varietyMap.values()].map((row) => {
+    const processedBags = row.processingBags + row.completedBags
+    return {
+      ...row,
+      processedBags,
+      remainingBags: Math.max(0, row.bags - processedBags),
+      runningAmount: row.totalPrice + row.expenseTotal,
+    }
+  })
 
   const riceMap = new Map<string, {
     variety: string
@@ -400,8 +452,10 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   const purchaseTotal = purchaseRows.reduce((sum, row) => sum + row.totalPrice, 0)
   const givenCash = cashRows.filter((row) => row.kind === 'GIVE').reduce((sum, row) => sum + row.amount, 0)
   const receivedCash = cashRows.filter((row) => row.kind === 'RECEIVE').reduce((sum, row) => sum + row.amount, 0)
+  const expenseTotal = expenseRows.reduce((sum, row) => sum + row.amount, 0)
   const saleTotal = saleRows.reduce((sum, row) => sum + row.totalPrice, 0)
   const paddyBags = purchaseRows.reduce((sum, row) => sum + row.bags, 0)
+  const processingBags = processRows.filter((row) => row.status === 'PROCESSING').reduce((sum, row) => sum + row.bags, 0)
   const processedBags = processRows.reduce((sum, row) => sum + row.bags, 0)
   const riceBags = riceRows.reduce((sum, row) => sum + row.bags, 0)
   const soldBags = saleRows.reduce((sum, row) => sum + row.bags, 0)
@@ -413,21 +467,24 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       purchaseTotal,
       givenCash,
       receivedCash,
+      expenseTotal,
       saleTotal,
-      givingAmount: givenCash,
+      givingAmount: givenCash + expenseTotal,
       receivingAmount: receivedCash,
-      totalAmount: moneyIn + receivedCash - givenCash,
+      totalAmount: moneyIn + receivedCash - givenCash - expenseTotal,
       paddyBags,
+      processingBags,
       processedBags,
       riceBags,
       soldBags,
-      riceInStock: riceBags - soldBags,
+      riceInStock: Math.max(0, riceBags - soldBags),
     },
     amounts: amountRows,
     purchaseParties,
     saleParties,
     purchases: purchaseRows,
     processes: processRows,
+    expenses: expenseRows,
     riceLots: riceRows,
     sales: saleRows,
     payments: cashRows,
@@ -584,13 +641,22 @@ export async function addCash(
 export async function addProcess(
   bookId: number | bigint,
   userId: bigint,
-  input: { secret?: unknown; variety?: unknown; partyName?: unknown; bags?: unknown; notes?: unknown },
+  input: {
+    secret?: unknown
+    variety?: unknown
+    riceVariety?: unknown
+    partyName?: unknown
+    bags?: unknown
+    notes?: unknown
+  },
 ) {
   const book = await requireBook(bookId, userId, input.secret)
   const variety = String(input.variety ?? '').trim()
   if (!variety) throw new Error('Choose a variety')
   const partyName = String(input.partyName ?? '').trim()
   if (!partyName) throw new Error('Enter name of party')
+  const riceVariety = String(input.riceVariety ?? '').trim()
+  if (!riceVariety) throw new Error('Enter variety of rice')
   const bags = parseCount(input.bags, 'number of bags')
   const snapshot = await getBook(book.id, userId, input.secret)
   const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
@@ -602,12 +668,94 @@ export async function addProcess(
     data: {
       bookId: book.id,
       variety: frame.variety,
+      riceVariety,
       partyName,
       bags,
+      status: 'PROCESSING',
       notes: parseOptionalText(input.notes),
     },
   })
-  return { id: Number(row.id), variety: row.variety, bags: row.bags, partyName: row.partyName }
+  return {
+    id: Number(row.id),
+    variety: row.variety,
+    riceVariety: row.riceVariety,
+    bags: row.bags,
+    partyName: row.partyName,
+    status: row.status,
+  }
+}
+
+export async function completeProcess(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; variety?: unknown },
+) {
+  const book = await requireBook(bookId, userId, input.secret)
+  const variety = String(input.variety ?? '').trim()
+  if (!variety) throw new Error('Choose a variety')
+  const snapshot = await getBook(book.id, userId, input.secret)
+  const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
+  if (!frame) throw new Error('This variety has no purchased stock')
+  const open = await prisma.paddyKhataProcess.findMany({
+    where: { bookId: book.id, variety: frame.variety, status: 'PROCESSING' },
+    orderBy: { createdAt: 'asc' },
+  })
+  if (!open.length) throw new Error('Nothing is processing for this variety')
+  const created = await prisma.$transaction(async (tx) => {
+    const lots = []
+    for (const job of open) {
+      const riceVariety = job.riceVariety.trim() || frame.variety
+      await tx.paddyKhataRice.create({
+        data: {
+          bookId: book.id,
+          variety: riceVariety,
+          bags: job.bags,
+          notes: `Ready from ${job.partyName}`,
+        },
+      })
+      await tx.paddyKhataProcess.update({
+        where: { id: job.id },
+        data: { status: 'COMPLETE', riceVariety },
+      })
+      lots.push({ riceVariety, bags: job.bags, partyName: job.partyName })
+    }
+    return lots
+  })
+  return { variety: frame.variety, lots: created }
+}
+
+export async function addExpense(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; variety?: unknown; amount?: unknown; reason?: unknown },
+) {
+  const book = await requireBook(bookId, userId, input.secret)
+  const variety = String(input.variety ?? '').trim()
+  if (!variety) throw new Error('Choose a variety')
+  const reason = String(input.reason ?? '').trim()
+  if (!reason) throw new Error('Enter bill reason')
+  const amount = parseAmount(input.amount)
+  const snapshot = await getBook(book.id, userId, input.secret)
+  const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
+  if (!frame) throw new Error('This variety has no purchased stock')
+  if (amount > snapshot.totals.totalAmount) {
+    throw new Error(`Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}`)
+  }
+  const row = await prisma.paddyKhataExpense.create({
+    data: {
+      bookId: book.id,
+      variety: frame.variety,
+      amount,
+      reason,
+    },
+  })
+  return {
+    id: Number(row.id),
+    variety: row.variety,
+    amount: row.amount.toNumber(),
+    reason: row.reason,
+    ...stampDto(row.createdAt),
+  }
 }
 
 export async function addRice(
@@ -620,7 +768,7 @@ export async function addRice(
   const variety = String(input.variety ?? '').trim()
   if (!variety) throw new Error('Enter variety name of rice')
   const snapshot = await getBook(book.id, userId, input.secret)
-  const remainingProcess = snapshot.totals.processedBags - snapshot.totals.riceBags
+  const remainingProcess = snapshot.totals.processedBags - snapshot.totals.processingBags - snapshot.totals.riceBags
   if (bags > remainingProcess) {
     throw new Error(`Process paddy first. ${Math.max(0, remainingProcess)} processed bags are ready for rice`)
   }

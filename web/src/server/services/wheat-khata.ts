@@ -62,7 +62,7 @@ function resolveBagsAndTrucks(input: { bags?: unknown; trucks?: unknown }) {
   const extraBags = parseCount(input.bags, 'bags')
   const trucks = parseCount(input.trucks, 'trucks')
   const bags = trucks * BAGS_PER_TRUCK + extraBags
-  if (bags <= 0) throw new Error('Enter number of bags, or trucks (1 truck = 600 bags)')
+  if (bags <= 0) throw new Error('Enter number of bags')
   return { bags, trucks, extraBags }
 }
 
