@@ -117,6 +117,9 @@ async function main() {
       assert(!html.includes('W Wheat'), 'farmer bill still shows W/P product key')
       assert(!html.includes('Qty of<br>'), 'farmer bill headings must stay on one line')
       assert(html.includes('#64748b'), 'farmer bill table lines should be darker')
+      assert(html.includes('overflow:hidden'), 'farmer bill cells must stay inside their columns')
+      assert(html.includes('font-size:6.5px') || html.includes('font-size:6.2px'), 'farmer bill table font should be one size smaller')
+      assert(!html.includes('overflow:visible'), 'farmer bill cells still overflow into other columns')
       assert(html.includes('010'), 'farmer bill bags should use 3 digits')
       assert(html.includes('0400'), 'farmer bill rate should use 4 digits')
 
