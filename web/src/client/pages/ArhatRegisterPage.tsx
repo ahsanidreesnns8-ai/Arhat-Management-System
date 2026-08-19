@@ -242,11 +242,11 @@ export default function ArhatRegisterPage() {
     try {
       if (row.partyId) {
         const res = await billApi.registerParty(row.partyId, 'en')
-        openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'RTC Register Bill')
+        openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
         return
       }
       const res = await billApi.register(row.id, 'en')
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'RTC Register Bill')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
     }
@@ -255,7 +255,7 @@ export default function ArhatRegisterPage() {
   const openPartyBill = async (id: number) => {
     try {
       const res = await billApi.registerParty(id, 'en')
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'RTC Register Bill')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
     }

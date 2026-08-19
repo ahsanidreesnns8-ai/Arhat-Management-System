@@ -96,7 +96,7 @@ export default function ArhatAmountPage() {
     setBilling(true)
     try {
       const res = await billApi.arhatAmount()
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Arhat Amount bill')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
     } finally {
@@ -122,7 +122,7 @@ export default function ArhatAmountPage() {
     setBilling(true)
     try {
       const res = await billApi.arhatAmountMerge()
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Merge all amount')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate merge bill'))
     } finally {

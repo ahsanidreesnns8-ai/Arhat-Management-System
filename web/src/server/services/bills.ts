@@ -594,7 +594,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   </div>`
 
   return page(
-    urdu ? 'خریدار بل / ادائیگی رسید' : 'Buyer Bill / Payment Receipt',
+    '',
     partyDetailsCard({
       title: buyer.name,
       codeLabel: urdu ? 'خریدار کوڈ' : 'Buyer ID',
@@ -672,15 +672,13 @@ export async function buyerBillSelected(
     const bags = sum(chunk.map((x) => x.numberOfBags))
     const weight = sum(chunk.map((x) => x.totalWeight.toNumber()))
     const amount = sum(chunk.map((x) => x.amount.toNumber()))
-    const title =
+    const partHeading =
       chunks.length > 1
-        ? urdu
-          ? `خریدار بل — حصہ ${index + 1} از ${chunks.length}`
-          : `Buyer Bill — Part ${index + 1} of ${chunks.length}`
-        : urdu
-          ? 'خریدار بل / منتخب قطاریں'
-          : 'Buyer Bill / Selected Lines'
-    return `<h3 class="section-title" style="margin-top:0">${escape(title)}</h3>
+        ? `<h3 class="section-title" style="margin-top:0">${
+            urdu ? `حصہ ${index + 1} از ${chunks.length}` : `Part ${index + 1} of ${chunks.length}`
+          }</h3>`
+        : ''
+    return `${partHeading}
       ${table(
         w.buyerCols,
         rows,
@@ -689,7 +687,7 @@ export async function buyerBillSelected(
   })
 
   return page(
-    urdu ? 'خریدار بل' : 'Buyer Bill',
+    '',
     partyDetailsCard({
       title: buyer.name,
       codeLabel: urdu ? 'خریدار کوڈ' : 'Buyer ID',
@@ -743,13 +741,7 @@ export async function saleBill(
       : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div></div></div>`
 
   return page(
-    party === 'farmer'
-      ? urdu
-        ? 'کسان فروخت بل'
-        : 'Farmer Sale Bill'
-      : urdu
-        ? 'خریدار فروخت بل'
-        : 'Buyer Sale Bill',
+    '',
     partyHtml,
     table(
       w.saleCols,
@@ -810,7 +802,7 @@ export async function registerEntryBill(id: number | bigint, lang = 'en') {
     [[title, money(entry.amount)]],
     [urdu ? 'کل' : 'Total', money(entry.amount)],
   )
-  return page(title, partyHtml, body, urdu)
+  return page('', partyHtml, body, urdu)
 }
 
 function karachiStamp(date: Date) {
@@ -837,7 +829,6 @@ async function renderRegisterLedgerBill(
   lang: string,
 ) {
   const urdu = lang === 'ur'
-  const title = urdu ? 'آرہٹ کھاتہ' : 'Arhat Register Statement'
   const net = ledger.balance
   const netLabel =
     net > 0
@@ -902,7 +893,7 @@ async function renderRegisterLedgerBill(
       '',
     ],
   )
-  return page(title, partyHtml, body, urdu)
+  return page('', partyHtml, body, urdu)
 }
 
 type WheatKhataBillParty = Awaited<ReturnType<typeof getParty>>
@@ -949,29 +940,13 @@ function wheatProductDetail(
 
 function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSlip {
   const isCompany = party.kind === 'GIVING'
-  const title = urdu
-    ? isCompany
-      ? 'گندم کھاتہ · کمپنی'
-      : 'گندم کھاتہ · پارٹی'
-    : isCompany
-      ? 'Wheat Khata · Company'
-      : 'Wheat Khata · Party'
   const partyHtml = `<div class="party-card">
     <h3 class="${urdu ? 'urdu' : ''}">${escape(party.name)}</h3>
     <div class="party-grid">
-      <div><span class="label">${urdu ? 'قسم' : 'Type'}</span><div class="value">${
-        isCompany
-          ? urdu
-            ? 'کمپنی'
-            : 'Company'
-          : urdu
-            ? 'پارٹی'
-            : 'Party'
-      }</div></div>
       <div><span class="label">${urdu ? 'بوریاں' : 'Bags'}</span><div class="value">${party.totalBags}</div></div>
       ${
         party.address
-          ? `<div style="grid-column:1/-1"><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(party.address)}</div></div>`
+          ? `<div><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">${dash(party.address)}</div></div>`
           : ''
       }
     </div>
@@ -1034,21 +1009,13 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSli
   const net = party.remaining
   const netLabel =
     net > 0
-      ? isCompany
-        ? urdu
-          ? 'کمپنی پر باقی'
-          : 'Due from company'
-        : urdu
-          ? 'پارٹی کو باقی'
-          : 'Due to party'
+      ? urdu
+        ? 'باقی رقم'
+        : 'Amount due'
       : net < 0
-        ? isCompany
-          ? urdu
-            ? 'زیادہ وصول'
-            : 'Received extra'
-          : urdu
-            ? 'زیادہ دی'
-            : 'Given extra'
+        ? urdu
+          ? 'کریڈٹ'
+          : 'Credit'
         : urdu
           ? 'حساب برابر'
           : 'Settled'
@@ -1059,7 +1026,7 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSli
     <div style="grid-column:1/-1"><div class="label">${urdu ? 'بقایا' : 'Balance'}</div><div class="value">PKR ${money(Math.abs(net))} · ${escape(netLabel)}</div></div>
   </div>`
 
-  return { title, partyHtml, body: productTable + paymentTable + summary }
+  return { title: '', partyHtml, body: productTable + paymentTable + summary }
 }
 
 export async function wheatKhataBillHtml(id: number | bigint, lang = 'en') {
@@ -1078,14 +1045,7 @@ export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en') {
     throw new Error(kind === 'GIVING' ? 'No company bills yet' : 'No party bills yet')
   }
   const slips = list.map((party) => wheatKhataSlipParts(party, urdu))
-  const title = urdu
-    ? kind === 'GIVING'
-      ? 'گندم کھاتہ · تمام کمپنی بل'
-      : 'گندم کھاتہ · تمام پارٹی بل'
-    : kind === 'GIVING'
-      ? 'Wheat Khata · All company bills'
-      : 'Wheat Khata · All party bills'
-  return documentFromSlips(title, urdu, slips)
+  return documentFromSlips('', urdu, slips)
 }
 
 function arhatLineRows(
@@ -1097,16 +1057,12 @@ function arhatLineRows(
     RECEIVING: urdu ? 'وصول' : 'Received',
     GIVING: urdu ? 'دی گئی' : 'Given',
   }
-  const bookLabel: Record<string, string> = {
-    ARHAT: urdu ? 'آرھٹ' : 'Arhat',
-    WHEAT_KHATA: urdu ? 'گندم' : 'Wheat',
-  }
   if (!history.length) {
     return [[urdu ? 'کوئی اندراج نہیں' : 'No entries yet', '', '', '0']]
   }
   return history.map((row) => [
     `${row.day} ${row.date} ${row.time}`,
-    `${row.book ? `${bookLabel[row.book] || row.book} · ` : ''}${kindLabel[row.kind] || row.kind}`,
+    kindLabel[row.kind] || row.kind,
     row.reason,
     money(row.amount),
   ])
@@ -1115,9 +1071,7 @@ function arhatLineRows(
 export async function arhatAmountBillHtml(lang = 'en') {
   const book = await getArhatAmountBook()
   const urdu = lang === 'ur'
-  const title = urdu ? 'آرھٹ رقم' : 'Arhat Amount'
   const partyHtml = `<div class="party-card">
-    <h3 class="${urdu ? 'urdu' : ''}">${escape(title)}</h3>
     <div class="party-grid">
       <div><span class="label">${urdu ? 'کل رقم' : 'Total'}</span><div class="value">PKR ${money(book.totals.totalAmount)}</div></div>
       <div><span class="label">${urdu ? 'جمع' : 'Added'}</span><div class="value">PKR ${money(book.totals.added)}</div></div>
@@ -1132,15 +1086,13 @@ export async function arhatAmountBillHtml(lang = 'en') {
       urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
       arhatLineRows(book.history, urdu),
     )
-  return page(title, partyHtml, body, urdu)
+  return page('', partyHtml, body, urdu)
 }
 
 export async function arhatAmountMergeBillHtml(lang = 'en') {
   const report = await getMergeReport()
   const urdu = lang === 'ur'
-  const title = urdu ? 'تمام رقم — آرھٹ + گندم کھاتہ' : 'Merge all amount · Arhat + Wheat Khata'
   const partyHtml = `<div class="party-card">
-    <h3 class="${urdu ? 'urdu' : ''}">${escape(title)}</h3>
     <div class="party-grid">
       <div><span class="label">${urdu ? 'آرھٹ رقم' : 'Arhat Amount'}</span><div class="value">PKR ${money(report.arhat.totalAmount)}</div></div>
       <div><span class="label">${urdu ? 'گندم کھاتہ' : 'Wheat Khata'}</span><div class="value">PKR ${money(report.wheatKhata.totalAmount)}</div></div>
@@ -1163,5 +1115,5 @@ export async function arhatAmountMergeBillHtml(lang = 'en') {
       urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
       arhatLineRows(report.history, urdu),
     )}`
-  return page(title, partyHtml, summary + history, urdu)
+  return page('', partyHtml, summary + history, urdu)
 }
