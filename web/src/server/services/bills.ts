@@ -148,7 +148,6 @@ body{
   font-weight:600;
 }
 .party-grid .value{font-size:8.5px;font-weight:600;color:var(--ink);margin-top:1px;word-break:break-word}
-.party-grid .product-name{color:var(--navy);font-weight:700;font-size:9px}
 .slip-body{flex:1}
 table{
   width:100%;
@@ -168,6 +167,7 @@ th,td{
   max-width:0;
   box-sizing:border-box;
 }
+th[colspan],td[colspan]{max-width:none}
 th{
   background:var(--navy);
   color:#fff;
@@ -200,6 +200,22 @@ th.name{text-align:left;white-space:nowrap;overflow:hidden}
 td.name,tfoot td.name{white-space:nowrap;overflow:hidden;font-weight:600;padding:2px 1px}
 .farmer-grid{font-size:6.2px}
 .farmer-grid th{font-size:5.3px;white-space:nowrap;overflow:hidden}
+tr.product-over th{
+  max-width:none;
+  overflow:hidden;
+  padding:3px 4px;
+  border-bottom:1px solid #475569;
+}
+th.product-over-cell{
+  text-align:center;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.05em;
+  color:#fff;
+  background:var(--navy);
+  white-space:nowrap;
+}
+th.product-over-rest{background:var(--navy)}
 .totals{font-weight:700;background:#f1f5f9}
 .note{margin-top:8px;padding:6px 8px;background:var(--soft);border:1px solid var(--line);font-size:8px;line-height:1.4}
 .note strong{color:var(--navy)}
@@ -334,36 +350,14 @@ function bagWord(urdu: boolean) {
     totals: urdu ? 'کل' : 'Totals',
     farmerTitle: '',
     farmerCols: urdu
-      ? [
-          'بوریاں',
-          'اضافی',
-          'بوری کلو',
-          'کل وزن',
-          'من',
-          'اضافی کلو',
-          'ریٹ',
-          'مجموعی',
-          'کمیشن',
-          'ادائیگی',
-        ]
-      : [
-          'Bags',
-          'Extra',
-          'Qty of one bag',
-          'Total',
-          'Man',
-          'Extra KG',
-          'Rate',
-          'Gross',
-          'Commission',
-          'Payable',
-        ],
+      ? ['بوریاں', 'اض', 'ق', 'کل وزن', 'من', 'کلو', 'ریٹ', 'مجموعی', 'کمیشن', 'ادائیگی']
+      : ['Bags', 'Ext', 'Q', 'Total', 'Man', 'KGs', 'Rate', 'Gross', 'Commission', 'Payable'],
     buyerCols: urdu
-      ? ['انوائس', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Invoice', 'Bags', 'Extra', 'Qty of one bag', 'Total', 'Rate', 'Amount'],
+      ? ['انوائس', 'بوریاں', 'اض', 'ق', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Invoice', 'Bags', 'Ext', 'Q', 'Total', 'Rate', 'Amount'],
     saleCols: urdu
-      ? ['پارٹی', 'بوریاں', 'اضافی', 'بوری کلو', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Party', 'Bags', 'Extra', 'Qty of one bag', 'Total', 'Rate', 'Amount'],
+      ? ['پارٹی', 'بوریاں', 'اض', 'ق', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Party', 'Bags', 'Ext', 'Q', 'Total', 'Rate', 'Amount'],
   }
 }
 
@@ -421,19 +415,19 @@ function extraStyle(value: DecimalInput | number | string, minWidth: number, max
 }
 
 const FARMER_COL_WIDTHS = [
-  '7%',
-  '8%',
-  '15%',
   '8%',
   '6%',
-  '10%',
+  '5%',
+  '8%',
+  '6%',
+  '6%',
   '7%',
-  '13%',
-  '14%',
-  '12%',
+  '18%',
+  '20%',
+  '16%',
 ]
-const BUYER_COL_WIDTHS = ['16%', '8%', '9%', '16%', '10%', '9%', '22%']
-const SALE_COL_WIDTHS = ['16%', '8%', '9%', '16%', '10%', '9%', '22%']
+const BUYER_COL_WIDTHS = ['18%', '8%', '6%', '5%', '10%', '8%', '45%']
+const SALE_COL_WIDTHS = ['18%', '8%', '6%', '5%', '10%', '8%', '45%']
 
 function autoColWidths(
   headers: string[],
@@ -484,6 +478,7 @@ function table(
     compactCols?: number[]
     nameCols?: number[]
     colWidths?: string[]
+    overlabel?: { text: string; span?: number }
   },
 ) {
   const moneyCols = options?.moneyCols ?? []
@@ -501,6 +496,14 @@ function table(
         .join('')}</colgroup>`
     : ''
   const cls = (index: number) => cellClass(index, moneyCols, compactCols, nameCols)
+  const label = String(options?.overlabel?.text ?? '').trim()
+  const span = Math.min(Math.max(options?.overlabel?.span ?? 2, 1), headers.length)
+  const rest = headers.length - span
+  const over = label
+    ? `<tr class="product-over"><th class="product-over-cell" colspan="${span}">${escape(label)}</th>${
+        rest > 0 ? `<th class="product-over-rest" colspan="${rest}"></th>` : ''
+      }</tr>`
+    : ''
   const head = headers.map((item, index) => `<th class="${cls(index)}">${headerHtml(item)}</th>`).join('')
   const body = rows
     .map(
@@ -513,7 +516,7 @@ function table(
         .map((item, index) => `<td class="${cls(index)}">${escape(item)}</td>`)
         .join('')}</tr></tfoot>`
     : ''
-  return `<table${className}>${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>`
+  return `<table${className}>${colgroup}<thead>${over}<tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>`
 }
 
 function uniqueProductNames(names: Array<string | null | undefined>) {
@@ -538,7 +541,6 @@ function partyDetailsCard(opts: {
   fatherName?: string | null
   city?: string | null
   address?: string | null
-  product?: string | null
   urdu?: boolean
 }) {
   const u = !!opts.urdu
@@ -548,7 +550,6 @@ function partyDetailsCard(opts: {
       <div><span class="label">${opts.codeLabel}</span><div class="value">${dash(opts.code)}</div></div>
       <div><span class="label">${u ? 'ولدیت' : 'Father name'}</span><div class="value">${dash(opts.fatherName)}</div></div>
       <div><span class="label">${u ? 'پتہ' : 'Address'}</span><div class="value">${dash(opts.address)}</div></div>
-      <div><span class="label">${u ? 'جنس' : 'Product'}</span><div class="value product-name">${dash(opts.product)}</div></div>
       <div><span class="label">${u ? 'شہر' : 'City'}</span><div class="value">${dash(opts.city)}</div></div>
     </div>
   </div>`
@@ -673,7 +674,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     fatherName: farmer.fatherName,
     city: farmer.city,
     address: farmer.address,
-    product: uniqueProductNames(lines.map((item) => item.product)),
     urdu,
   })
 
@@ -700,6 +700,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         compactCols: [0, 1, 2, 3, 4, 5, 6],
         moneyCols: [7, 8, 9],
         colWidths: FARMER_COL_WIDTHS,
+        overlabel: { text: uniqueProductNames(lines.map((item) => item.product)), span: 2 },
       },
     ) + paymentBox,
     urdu,
@@ -784,7 +785,6 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
       fatherName: buyer.fatherName,
       city: buyer.city,
       address: buyer.address,
-      product: uniqueProductNames(flat.map((item) => item.product)),
       urdu,
     }),
     table(
@@ -807,6 +807,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         compactCols: [1, 2, 3, 5],
         moneyCols: [4, 6],
         colWidths: BUYER_COL_WIDTHS,
+        overlabel: { text: uniqueProductNames(flat.map((item) => item.product)), span: 2 },
       },
     ) + paymentBox,
     urdu,
@@ -879,6 +880,7 @@ export async function buyerBillSelected(
           compactCols: [1, 2, 3, 5],
           moneyCols: [4, 6],
           colWidths: BUYER_COL_WIDTHS,
+          overlabel: { text: uniqueProductNames(chunk.map((item) => item.product.name)), span: 2 },
         },
       )}`
   })
@@ -893,7 +895,6 @@ export async function buyerBillSelected(
       fatherName: buyer.fatherName,
       city: buyer.city,
       address: buyer.address,
-      product: uniqueProductNames(items.map((item) => item.product.name)),
       urdu,
     }),
     sheets,
@@ -935,10 +936,9 @@ export async function saleBill(
           fatherName: sale.buyer.fatherName,
           city: sale.buyer.city,
           address: sale.buyer.address,
-          product: uniqueProductNames(items.map((item) => item.product.name)),
           urdu,
         })
-      : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div><div><span class="label">${urdu ? 'پتہ' : 'Address'}</span><div class="value">—</div></div><div><span class="label">${urdu ? 'جنس' : 'Product'}</span><div class="value product-name">${dash(uniqueProductNames(items.map((item) => item.product.name)))}</div></div></div></div>`
+      : `<div class="party-card"><h3>${escape(sale.invoiceNumber)}</h3><div class="party-grid"><div><span class="label">Invoice</span><div class="value">${escape(sale.invoiceNumber)}</div></div><div><span class="label">Sale date</span><div class="value">${escape(sale.saleDate.toISOString().slice(0, 10))}</div></div></div></div>`
 
   return page(
     '',
@@ -959,6 +959,7 @@ export async function saleBill(
         compactCols: [1, 2, 3, 5],
         moneyCols: [4, 6],
         colWidths: SALE_COL_WIDTHS,
+        overlabel: { text: uniqueProductNames(items.map((item) => item.product.name)), span: 2 },
       },
     ),
     urdu,
