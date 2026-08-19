@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Banknote, Building2, FileText, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -10,6 +11,8 @@ import PartyCombobox from '../components/forms/PartyCombobox'
 import { billApi, wheatKhataApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
+import { useAuth } from '../context/AuthContext'
+import { isOwnerFinanceRole } from '../../lib/roles'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import type { WheatKhataBook, WheatKhataParty } from '../types'
@@ -109,6 +112,8 @@ function productPreview(
 }
 
 export default function WheatKhataPage() {
+  const { user } = useAuth()
+  const isOwner = isOwnerFinanceRole(user?.role)
   const [section, setSection] = useState<Section>('MONEY')
   const [book, setBook] = useState<WheatKhataBook>(emptyBook)
   const [loading, setLoading] = useState(true)
@@ -395,8 +400,21 @@ export default function WheatKhataPage() {
     <div className="space-y-6">
       <PageHeader
         title="Wheat Khata"
-        description="Give product to a company and receive money from it. Receive product from a party and give money to it."
+        description="Separate wheat book: receive bags from a party and give money; give bags to a company and receive money. It never mixes with Arhat Amount unless the owner taps Merge all amount."
+        action={
+          isOwner ? (
+            <Link to="/arhat-amount">
+              <Button variant="secondary">
+                <FileText className="h-4 w-4" /> Merge on Arhat Amount
+              </Button>
+            </Link>
+          ) : undefined
+        }
       />
+
+      <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+        Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="card-3d p-5">

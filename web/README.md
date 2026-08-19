@@ -8,14 +8,14 @@
 4. Set the Vercel **Production Branch** to `main` so the site does not depend on Cursor agent branches.
 5. Deploy → copy your permanent `https://….vercel.app` URL.
 
-Login accounts:
+Login accounts (change these in Owner Panel after first login — the old password is then deleted):
 
 | Username | Password |
 |----------|----------|
-| `owner` | `owner123` |
-| `staff` | `staff123` |
+| `owner` | `Nankana#Shop9472Rtc` |
+| `staff` | `Nankana#Desk5831Rtc` |
 
-Every deploy restores these two shop logins (active, unlocked). Extra users can still be added in the Owner Panel.
+Leaked passwords `owner123` / `staff123` are no longer accepted. Extra users can be added, suspended, or deleted in the Owner Panel. Only the owner can change passwords.
 
 
 ---
@@ -46,14 +46,14 @@ npm run dev
 App: http://localhost:3000  
 API: http://localhost:3000/api  
 
-Shop logins (restored on every seed/deploy):
+Shop logins (created if missing; leaked passwords are upgraded once, then left alone):
 
 | Username | Password |
 |----------|----------|
-| `owner` | `owner123` |
-| `staff` | `staff123` |
+| `owner` | `Nankana#Shop9472Rtc` |
+| `staff` | `Nankana#Desk5831Rtc` |
 
-The owner can add more users in Owner Panel. Extra users cannot reuse these shop passwords.
+The owner can change either password in Owner Panel. Extra users cannot reuse leaked passwords.
 
 
 ## AI Assistant (Gemini)

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
-import { hash } from 'bcryptjs'
-import { DEFAULT_SHOP_LOGINS } from '../src/server/shop-login-defaults'
+import { hash, compare } from 'bcryptjs'
+import { DEFAULT_SHOP_LOGINS, legacyLeakedShopPassword } from '../src/server/shop-login-defaults'
 
 const prisma = new PrismaClient()
 
@@ -63,21 +63,29 @@ async function ensureSync(id: number, workspace: 'live' | 'demo') {
 }
 
 async function upsertShopLogin(input: (typeof DEFAULT_SHOP_LOGINS)[number]) {
-  const passwordHash = await hash(input.password, 12)
   const existing = await prisma.user.findUnique({ where: { username: input.username } })
   if (existing) {
+    const leaked = legacyLeakedShopPassword(input.username)
+    let stillLeaked = false
+    if (leaked) {
+      try {
+        stillLeaked = await compare(leaked, existing.password)
+      } catch {
+        stillLeaked = false
+      }
+    }
     return prisma.user.update({
       where: { id: existing.id },
       data: {
-        email: input.email,
-        password: passwordHash,
+        email: existing.email || input.email,
         fullName: existing.fullName || input.fullName,
         role: input.role,
         workspace: 'live',
-        active: true,
         deleted: false,
         failedLoginAttempts: 0,
         lockedUntil: null,
+        ...(input.username === 'owner' ? { active: true } : {}),
+        ...(stillLeaked ? { password: await hash(input.password, 12) } : {}),
       },
     })
   }
@@ -85,7 +93,7 @@ async function upsertShopLogin(input: (typeof DEFAULT_SHOP_LOGINS)[number]) {
     data: {
       username: input.username,
       email: input.email,
-      password: passwordHash,
+      password: await hash(input.password, 12),
       fullName: input.fullName,
       role: input.role,
       workspace: 'live',

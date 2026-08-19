@@ -11,6 +11,7 @@ import { createFarmer } from '../src/server/services/farmers'
 import {
   createParty,
   createEntry,
+  addPersonAmounts,
   listEntries,
   listParties,
   getPartyLedger,
@@ -98,6 +99,16 @@ async function main() {
       assert(statement.includes('Total received'), 'statement missing received total')
       assert(statement.includes('Total given'), 'statement missing given total')
       assert(statement.includes('Owner gave more'), 'statement missing net label')
+
+      const both = await addPersonAmounts({
+        partyId: person.id,
+        receivedAmount: 50,
+        givenAmount: 25,
+        notes: 'full amount',
+      })
+      ids.entryIds.push(...both.entries.map((row) => BigInt(row.id)))
+      assert(both.person.receivedTotal === 1050, `full receive expected 1050 got ${both.person.receivedTotal}`)
+      assert(both.person.givenTotal === 1525, `full give expected 1525 got ${both.person.givenTotal}`)
 
       const receivedParty = await createParty({ kind: 'RECEIVING', name: `Recv ${stamp}` })
       const received = await createEntry({

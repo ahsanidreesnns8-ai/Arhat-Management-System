@@ -1,7 +1,6 @@
 import type { ThemePreference } from '@prisma/client'
 import { prisma, getLiveSettingsCompanyName, basePrisma } from '@/server/db'
 import {
-  hashPassword,
   signToken,
   updateTheme as persistTheme,
   verifyPassword,
@@ -17,7 +16,7 @@ import {
   startLoginSession,
   touchLoginSession,
 } from '@/server/services/login-sessions'
-import { canonicalShopPassword, ensureShopLogins } from '@/server/shop-logins'
+import { ensureShopLogins } from '@/server/shop-logins'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -61,39 +60,6 @@ export async function login(
   }
 
   let valid = !!user && (await verifyPassword(password, user.password).catch(() => false))
-  const canonical = canonicalShopPassword(normalized)
-
-  // Shop terminals always accept the printed passwords, even if a past deploy
-  // rehashed them to an unknown value.
-  if (!valid && sharedShopLogin && canonical && password === canonical) {
-    const passwordHash = await hashPassword(canonical)
-    if (user) {
-      user = await basePrisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: passwordHash,
-          active: true,
-          deleted: false,
-          failedLoginAttempts: 0,
-          lockedUntil: null,
-        },
-      })
-    } else {
-      user = await basePrisma.user.create({
-        data: {
-          username: normalized,
-          email: `${normalized}@rehmanitrading.com`,
-          password: passwordHash,
-          fullName: normalized === 'owner' ? 'Owner' : 'Staff',
-          role: normalized === 'owner' ? 'OWNER' : 'OPERATOR',
-          workspace: 'live',
-          active: true,
-          deleted: false,
-        },
-      })
-    }
-    valid = true
-  }
 
   if (!valid) {
     if (user && sharedShopLogin) {

@@ -293,6 +293,44 @@ export async function createEntry(
   return entryDto(row)
 }
 
+export async function addPersonAmounts(input: {
+  partyId?: number | null
+  receivedAmount?: number | string | null
+  givenAmount?: number | string | null
+  notes?: string | null
+}, userId?: bigint) {
+  if (input.partyId == null) throw new Error('Choose a person')
+  const received = input.receivedAmount == null || String(input.receivedAmount).trim() === ''
+    ? 0
+    : round2(input.receivedAmount).toNumber()
+  const given = input.givenAmount == null || String(input.givenAmount).trim() === ''
+    ? 0
+    : round2(input.givenAmount).toNumber()
+  if (received <= 0 && given <= 0) {
+    throw new Error('Enter how much you received, how much you gave, or both')
+  }
+  const notes = String(input.notes ?? '').trim() || null
+  const saved = []
+  if (received > 0) {
+    saved.push(await createEntry({
+      kind: 'RECEIVING',
+      partyId: input.partyId,
+      amount: received,
+      notes,
+    }, userId))
+  }
+  if (given > 0) {
+    saved.push(await createEntry({
+      kind: 'GIVING',
+      partyId: input.partyId,
+      amount: given,
+      notes,
+    }, userId))
+  }
+  const ledger = await getPartyLedger(input.partyId)
+  return { entries: saved, person: ledger }
+}
+
 export async function zakatSummary() {
   const rows = await prisma.registerEntry.findMany({
     where: { kind: 'ZAKAT' },
