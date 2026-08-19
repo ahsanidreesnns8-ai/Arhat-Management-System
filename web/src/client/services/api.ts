@@ -507,6 +507,20 @@ export const backupApi = {
   export: () => api.get('/backup/export', { responseType: 'blob' }),
   exportJson: () => api.get<ApiResponse<unknown>>('/backup/export/json'),
   restore: (data: unknown) => api.post<ApiResponse<void>>('/backup/restore', data),
+  usage: () => api.get<ApiResponse<{
+    databaseBytes: number
+    databaseSize: string
+    neonFreeCap: string
+    measuredAt: string
+    counts: Record<string, number>
+  }>>('/backup/usage'),
+  wipe: () => api.post<ApiResponse<{
+    databaseBytes: number
+    databaseSize: string
+    neonFreeCap: string
+    measuredAt: string
+    counts: Record<string, number>
+  }>>('/backup/wipe', { confirm: 'START NEW' }),
 }
 
 export default api

@@ -792,6 +792,17 @@ async function dispatch(
       await backup.restoreBackup(payload)
       return result(null, 'Backup restored')
     }
+    if (path[1] === 'usage' && method === 'GET') {
+      return result(await backup.getShopStorage())
+    }
+    if (path[1] === 'wipe' && method === 'POST') {
+      if (user?.role !== 'OWNER') throw new Error('Only the owner can wipe shop data')
+      const confirm = String(payload.confirm ?? '').trim().toUpperCase()
+      if (confirm !== 'START NEW') {
+        throw new Error('Type START NEW to wipe all shop records')
+      }
+      return result(await backup.wipeShopData(user.id), 'Shop data wiped — starting empty')
+    }
   }
 
   throw new Error(`API route not found: ${method} /${path.join('/')}`)

@@ -1,4 +1,5 @@
-import { prisma } from '@/server/db'
+import { prisma, basePrisma } from '@/server/db'
+import { logAudit } from '@/server/services/audit'
 
 type BackupMap = Record<string, unknown>
 
@@ -187,4 +188,99 @@ export async function restoreBackup(data: Record<string, unknown>) {
 
 export function unavailableArchive() {
   throw new Error('ZIP export is not available on Vercel serverless')
+}
+
+function prettyBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
+  if (bytes < 1024) return `${Math.round(bytes)} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+export async function getShopStorage() {
+  const sizeRows = await basePrisma.$queryRaw<Array<{ size: bigint }>>`
+    SELECT pg_database_size(current_database()) AS size
+  `
+  const bytes = Number(sizeRows[0]?.size ?? 0)
+  const [
+    farmers,
+    buyers,
+    dheris,
+    sales,
+    payments,
+    trucks,
+    registerParties,
+    wheatParties,
+    arhatLines,
+  ] = await Promise.all([
+    basePrisma.farmer.count(),
+    basePrisma.buyer.count(),
+    basePrisma.dheri.count(),
+    basePrisma.sale.count(),
+    basePrisma.payment.count(),
+    basePrisma.truck.count(),
+    basePrisma.registerParty.count(),
+    basePrisma.wheatKhataParty.count(),
+    basePrisma.arhatAmountEntry.count(),
+  ])
+  return {
+    databaseBytes: bytes,
+    databaseSize: prettyBytes(bytes),
+    neonFreeCap: '0.5 GB',
+    measuredAt: new Date().toISOString(),
+    counts: {
+      farmers,
+      buyers,
+      dheris,
+      sales,
+      payments,
+      trucks,
+      registerPeople: registerParties,
+      wheatKhataParties: wheatParties,
+      arhatAmountLines: arhatLines,
+    },
+  }
+}
+
+export async function wipeShopData(userId?: bigint) {
+  await basePrisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      sale_items,
+      queue_entries,
+      payments,
+      register_entries,
+      wheat_khata_products,
+      wheat_khata_payments,
+      stock_transactions,
+      stock_lots,
+      dheris,
+      sales,
+      register_parties,
+      wheat_khata_parties,
+      wheat_khata_money,
+      arhat_amount_entries,
+      login_sessions,
+      audit_logs,
+      daily_trade_sessions,
+      day_batches,
+      trucks,
+      farmers,
+      buyers
+    RESTART IDENTITY CASCADE
+  `)
+  await basePrisma.stock.updateMany({ data: { quantity: 0 } })
+  await basePrisma.user.deleteMany({
+    where: { username: { notIn: ['owner', 'staff'] } },
+  })
+  await basePrisma.syncState.updateMany({ data: { revision: 1 } })
+  if (userId) {
+    await logAudit({
+      userId,
+      action: 'WIPE_SHOP',
+      entityType: 'database',
+      newValue: { emptiedAt: new Date().toISOString() },
+    })
+  }
+  return getShopStorage()
 }
