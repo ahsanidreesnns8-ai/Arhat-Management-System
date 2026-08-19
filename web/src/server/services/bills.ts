@@ -350,14 +350,14 @@ function bagWord(urdu: boolean) {
     totals: urdu ? 'کل' : 'Totals',
     farmerTitle: '',
     farmerCols: urdu
-      ? ['بوریاں', 'اض', 'ق', 'کل وزن', 'من', 'کلو', 'ریٹ', 'مجموعی', 'کمیشن', 'ادائیگی']
-      : ['Bags', 'Ext', 'Q', 'Total', 'Man', 'KGs', 'Rate', 'Gross', 'Commission', 'Payable'],
+      ? ['بوریاں', 'کلو', 'ق.ٹ', 'کل وزن', 'من', 'کلو', 'ریٹ', 'مجموعی', 'کمیشن', 'ادائیگی']
+      : ['Bags', 'KGs', 'Qt.', 'Total', 'Man', 'KGs', 'Rate', 'Gross', 'Commission', 'Payable'],
     buyerCols: urdu
-      ? ['انوائس', 'بوریاں', 'اض', 'ق', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Invoice', 'Bags', 'Ext', 'Q', 'Total', 'Rate', 'Amount'],
+      ? ['انوائس', 'بوریاں', 'کلو', 'ق.ٹ', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Invoice', 'Bags', 'KGs', 'Qt.', 'Total', 'Rate', 'Amount'],
     saleCols: urdu
-      ? ['پارٹی', 'بوریاں', 'اض', 'ق', 'کل وزن', 'ریٹ', 'رقم']
-      : ['Party', 'Bags', 'Ext', 'Q', 'Total', 'Rate', 'Amount'],
+      ? ['پارٹی', 'بوریاں', 'کلو', 'ق.ٹ', 'کل وزن', 'ریٹ', 'رقم']
+      : ['Party', 'Bags', 'KGs', 'Qt.', 'Total', 'Rate', 'Amount'],
   }
 }
 
@@ -417,17 +417,17 @@ function extraStyle(value: DecimalInput | number | string, minWidth: number, max
 const FARMER_COL_WIDTHS = [
   '8%',
   '6%',
-  '5%',
+  '6%',
   '8%',
   '6%',
   '6%',
   '7%',
-  '18%',
-  '20%',
-  '16%',
+  '21%',
+  '13%',
+  '19%',
 ]
-const BUYER_COL_WIDTHS = ['18%', '8%', '6%', '5%', '10%', '8%', '45%']
-const SALE_COL_WIDTHS = ['18%', '8%', '6%', '5%', '10%', '8%', '45%']
+const BUYER_COL_WIDTHS = ['18%', '8%', '6%', '6%', '10%', '8%', '44%']
+const SALE_COL_WIDTHS = ['18%', '8%', '6%', '6%', '10%', '8%', '44%']
 
 function autoColWidths(
   headers: string[],
