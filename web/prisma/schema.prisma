@@ -653,6 +653,7 @@ model PaddyKhataBook {
   parties     PaddyKhataParty[]
   purchases   PaddyKhataPurchase[]
   processes   PaddyKhataProcess[]
+  expenses    PaddyKhataExpense[]
   riceLots    PaddyKhataRice[]
   sales       PaddyKhataSale[]
   payments    PaddyKhataCash[]
@@ -723,19 +724,36 @@ model PaddyKhataPurchase {
 }
 
 model PaddyKhataProcess {
+  id          BigInt         @id @default(autoincrement())
+  workspace   String         @default("live") @db.VarChar(20)
+  bookId      BigInt         @map("book_id")
+  variety     String         @db.VarChar(120)
+  riceVariety String         @default("") @map("rice_variety") @db.VarChar(120)
+  partyName   String         @map("party_name") @db.VarChar(255)
+  bags        Int
+  status      String         @default("COMPLETE") @db.VarChar(20)
+  notes       String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  book        PaddyKhataBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([workspace, bookId, variety, status])
+  @@map("paddy_khata_processes")
+}
+
+model PaddyKhataExpense {
   id        BigInt         @id @default(autoincrement())
   workspace String         @default("live") @db.VarChar(20)
   bookId    BigInt         @map("book_id")
   variety   String         @db.VarChar(120)
-  partyName String         @map("party_name") @db.VarChar(255)
-  bags      Int
-  notes     String?
+  amount    Decimal        @db.Decimal(15, 2)
+  reason    String         @db.VarChar(255)
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
   book      PaddyKhataBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([workspace, bookId, variety])
-  @@map("paddy_khata_processes")
+  @@map("paddy_khata_expenses")
 }
 
 model PaddyKhataRice {

@@ -258,6 +258,7 @@ export async function wipeShopData(userId?: bigint) {
       paddy_khata_cash,
       paddy_khata_sales,
       paddy_khata_rice,
+      paddy_khata_expenses,
       paddy_khata_processes,
       paddy_khata_purchases,
       stock_transactions,

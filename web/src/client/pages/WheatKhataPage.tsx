@@ -306,7 +306,7 @@ export default function WheatKhataPage() {
       productForm.trucks,
     )
     if (!preview) {
-      toast.error(section === 'COMPANY' ? 'Enter trucks or bags, and rate of one bag' : 'Enter bags and rate of one bag first')
+      toast.error(section === 'COMPANY' ? 'Enter number of bags and rate of one bag' : 'Enter bags and rate of one bag first')
       return
     }
     setCalculated(preview)
@@ -329,7 +329,7 @@ export default function WheatKhataPage() {
       productForm.trucks,
     )
     if (!preview) {
-      toast.error(section === 'COMPANY' ? 'Enter trucks or bags, and rate of one bag' : 'Enter bags and rate of one bag')
+      toast.error(section === 'COMPANY' ? 'Enter number of bags and rate of one bag' : 'Enter bags and rate of one bag')
       return
     }
     setSaving(true)
@@ -445,7 +445,7 @@ export default function WheatKhataPage() {
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Bags sold to companies</p>
           <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatNumber(totals.bagsGiven, 0)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">{bagsLabel(totals.bagsGiven, totals.bagsPerTruck)} · 1 truck = {totals.bagsPerTruck} bags</p>
+          <p className="text-[11px] text-slate-500 mt-1">{bagsLabel(totals.bagsGiven, totals.bagsPerTruck)} · bags you enter equal that truck load</p>
         </div>
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Bags in stock</p>
@@ -545,7 +545,7 @@ export default function WheatKhataPage() {
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
             <p className="text-[11px] text-slate-500">
               {isCompany
-                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money. Bill lists every truck/bag sale and cash received.'
+                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money. Bill lists every bag sale and cash received.'
                 : 'Owner receives wheat from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
             </p>
           </div>
@@ -678,7 +678,7 @@ export default function WheatKhataPage() {
           <p className="text-sm text-slate-500">
             Type a few letters of the name (for example ahs) to autofill name and address.
             {isCompany
-              ? ' Enter trucks (1 truck = 600 bags) and/or extra bags. Those bags are deducted from stock.'
+              ? ' Enter number of bags. Those bags are the truck load you are giving and are deducted from stock.'
               : ' Enter bags received. They add to the total bags from all parties.'}
           </p>
           <PartyCombobox
@@ -703,21 +703,11 @@ export default function WheatKhataPage() {
           )}
           {isCompany && (
             <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 text-[12px]">
-              Bags in stock: {bagsLabel(totals.bagsInStock, totals.bagsPerTruck)}. Selling deducts from this total. 1 truck = {totals.bagsPerTruck} bags.
+              Bags in stock: {bagsLabel(totals.bagsInStock, totals.bagsPerTruck)}. Selling deducts from this total. Bags you enter equal this truck load.
             </div>
           )}
-          {isCompany && (
-            <Input
-              label={`Trucks (1 truck = ${BAGS_PER_TRUCK} bags)`}
-              type="number"
-              min="0"
-              step="1"
-              value={productForm.trucks}
-              onChange={(e) => { setProductForm({ ...productForm, trucks: e.target.value }); setCalculated(null) }}
-            />
-          )}
           <Input
-            label={isCompany ? 'Extra bags (besides trucks)' : 'Bags *'}
+            label={isCompany ? 'No. of bags *' : 'Bags *'}
             type="number"
             min="0"
             step="1"
@@ -759,7 +749,7 @@ export default function WheatKhataPage() {
           />
           {preview && (
             <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm space-y-0.5">
-              <div className="font-medium">{preview.bags} bags{preview.trucks ? ` (${preview.trucks} truck${preview.trucks === 1 ? '' : 's'}${preview.extraBags ? ` + ${preview.extraBags} bags` : ''})` : ''}</div>
+              <div className="font-medium">{preview.bags} bags{isCompany ? ' (this truck load)' : preview.trucks ? ` (${preview.trucks} truck${preview.trucks === 1 ? '' : 's'}${preview.extraBags ? ` + ${preview.extraBags} bags` : ''})` : ''}</div>
               <div>Wheat: {preview.bags} × {formatCurrency(preview.ratePerBag)} = {formatCurrency(preview.wheatAmount)}</div>
               <div>Bag price: {preview.bags} × {formatCurrency(preview.bagPricePerBag)} = {formatCurrency(preview.bagAmount)}</div>
               <div>Labour: {preview.bags} × {formatCurrency(preview.labourPerBag)} = {formatCurrency(preview.labourAmount)}</div>

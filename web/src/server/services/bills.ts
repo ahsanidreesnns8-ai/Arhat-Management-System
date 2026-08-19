@@ -1392,35 +1392,42 @@ function paddyVarietySlip(book: PaddyBook, urdu: boolean): BillSlip {
     ? book.varieties.map((row) => [
         row.variety,
         String(row.bags),
-        String(row.processedBags),
+        String(row.processingBags),
         String(row.remainingBags),
-        money(row.totalPrice),
+        money(row.runningAmount),
       ])
     : [[urdu ? 'کوئی ورائٹی نہیں' : 'No variety yet', '0', '0', '0', '0']]
   return {
     title: '',
     partyHtml: paddyHead(book, urdu, urdu ? 'ورائٹی' : 'Variety'),
     body: table(
-      urdu ? ['ورائٹی', 'بوریاں', 'پروسیس', 'باقی', 'رقم'] : ['Variety', 'Bags', 'Processed', 'Left', 'Amount'],
+      urdu ? ['ورائٹی', 'بوریاں', 'پروسیس', 'باقی', 'رقم'] : ['Variety', 'Bags', 'Processing', 'Left', 'Amount'],
       rows,
       undefined,
       { compactCols: [1, 2, 3], moneyCols: [4] },
-    ),
+    ) + (book.expenses?.length
+      ? table(
+          urdu ? ['تاریخ', 'ورائٹی', 'وجہ', 'رقم'] : ['Date', 'Variety', 'Reason', 'Amount'],
+          book.expenses.map((row) => [`${row.date} ${row.time}`, row.variety, row.reason, money(row.amount)]),
+          [urdu ? 'کل بل' : 'Bills', '', '', money(book.totals.expenseTotal)],
+          { moneyCols: [3] },
+        )
+      : ''),
   }
 }
 
 function paddyProcessSlip(book: PaddyBook, urdu: boolean): BillSlip {
   const rows = book.processes.length
-    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.partyName, String(row.bags), row.notes || '—'])
-    : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '0', '—']]
+    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.riceVariety, row.partyName, String(row.bags), row.status === 'PROCESSING' ? (urdu ? 'پروسیس' : 'Processing') : (urdu ? 'مکمل' : 'Ready')])
+    : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '', '0', '—']]
   return {
     title: '',
     partyHtml: paddyHead(book, urdu, urdu ? 'پروسیس' : 'Processing'),
     body: table(
-      urdu ? ['تاریخ', 'ورائٹی', 'پارٹی', 'بوریاں', 'نوٹ'] : ['Date', 'Variety', 'Party', 'Bags', 'Note'],
+      urdu ? ['تاریخ', 'ورائٹی', 'چاول', 'پارٹی', 'بوریاں', 'حالت'] : ['Date', 'Variety', 'Rice', 'Party', 'Bags', 'Status'],
       rows,
       undefined,
-      { compactCols: [3] },
+      { compactCols: [4] },
     ),
   }
 }
