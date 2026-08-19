@@ -150,8 +150,22 @@ body{
 .party-grid .value{font-size:8.5px;font-weight:600;color:var(--ink);margin-top:1px;word-break:break-word}
 .slip-body{flex:1}
 table{width:100%;border-collapse:collapse;margin-top:6px;font-size:7.5px;table-layout:fixed}
-th,td{border:1px solid #cbd5e1;padding:3px 4px;text-align:left;vertical-align:top;word-break:break-word}
-th{background:var(--navy);color:#fff;font-weight:600;font-size:7px;letter-spacing:.02em}
+th,td{border:1px solid #cbd5e1;padding:2px 3px;text-align:left;vertical-align:middle}
+th{background:var(--navy);color:#fff;font-weight:600;font-size:6.4px;letter-spacing:0;line-height:1.15;white-space:normal;hyphens:auto}
+td{word-break:normal;overflow-wrap:anywhere}
+td.num,th.num,tfoot td.num{
+  text-align:right;
+  white-space:nowrap;
+  word-break:keep-all;
+  overflow-wrap:normal;
+  font-variant-numeric:tabular-nums;
+}
+td.money,th.money,tfoot td.money{font-weight:600;font-size:7.2px;overflow:visible}
+td.compact,th.compact,tfoot td.compact{padding:2px 1px}
+td.mark,th.mark,tfoot td.mark{text-align:center;font-weight:700;white-space:nowrap;padding:2px 1px}
+.farmer-grid{font-size:7px}
+.farmer-grid th{font-size:6.1px}
+.product-key{margin:3px 0 0;font-size:6.5px;color:var(--muted);letter-spacing:.02em}
 .totals{font-weight:700;background:#f1f5f9}
 .note{margin-top:8px;padding:6px 8px;background:var(--soft);border:1px solid var(--line);font-size:8px;line-height:1.4}
 .note strong{color:var(--navy)}
@@ -287,37 +301,37 @@ function bagWord(urdu: boolean) {
     farmerTitle: '',
     farmerCols: urdu
       ? [
-          'پروڈکٹ',
+          '',
           'بوریاں',
-          'اضافی کلو',
-          'ایک بوری مقدار',
-          'کل وزن',
+          'اضافی',
+          'بوری',
+          'وزن',
           'من',
           'کلو',
-          'ریٹ/40کلو',
+          'ریٹ',
           'مجموعی',
           'کمیشن',
-          'قابل ادائیگی',
+          'ادائیگی',
         ]
       : [
-          'Product',
+          '',
           'Bags',
-          'Extra kg',
-          'Qty of one bag',
-          'Total kg',
+          'Extra',
+          'Bag',
+          'Tot',
           'Man',
           'Kg',
-          'Rate/40kg',
+          'Rate',
           'Gross',
-          'Commission',
+          'Comm',
           'Payable',
         ],
     buyerCols: urdu
-      ? ['انوائس', 'پروڈکٹ', 'بوریاں', 'ایک بوری مقدار', 'وزن', 'ریٹ/40کلو', 'رقم']
-      : ['Invoice', 'Product', 'Bags', 'Qty of one bag', 'Weight', 'Rate/40kg', 'Amount'],
+      ? ['انوائس', '', 'بوریاں', 'بوری', 'وزن', 'ریٹ', 'رقم']
+      : ['Invoice', '', 'Bags', 'Bag', 'Weight', 'Rate', 'Amount'],
     saleCols: urdu
-      ? ['پارٹی', 'پروڈکٹ', 'بوریاں', 'ایک بوری مقدار', 'وزن', 'ریٹ/40کلو', 'رقم']
-      : ['Party', 'Product', 'Bags', 'Qty of one bag', 'Weight', 'Rate/40kg', 'Amount'],
+      ? ['پارٹی', '', 'بوریاں', 'بوری', 'وزن', 'ریٹ', 'رقم']
+      : ['Party', '', 'Bags', 'Bag', 'Weight', 'Rate', 'Amount'],
   }
 }
 
@@ -357,8 +371,101 @@ export function formatMann(bagsKg: number, extraKg: number) {
   return `${split.man.toFixed(0)}.${extraDigits}`
 }
 
-function table(headers: string[], rows: string[][], footer?: string[]) {
-  return `<table><thead><tr>${headers.map((item) => `<th>${escape(item)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((item) => `<td>${escape(item)}</td>`).join('')}</tr>`).join('')}</tbody>${footer ? `<tfoot><tr class="totals">${footer.map((item) => `<td>${escape(item)}</td>`).join('')}</tr></tfoot>` : ''}</table>`
+function productMark(name: string) {
+  const value = String(name ?? '').trim()
+  const lower = value.toLowerCase()
+  if (!value) return '—'
+  if (lower.includes('wheat') || value.includes('گندم')) return 'W'
+  if (
+    lower.includes('paddy') ||
+    lower.includes('rice') ||
+    value.includes('دھان') ||
+    value.includes('چاول')
+  ) {
+    return 'P'
+  }
+  if (lower.includes('maize') || lower.includes('corn') || value.includes('مکئی')) return 'M'
+  if (lower.includes('barley') || value === 'جو' || lower.startsWith('جو')) return 'B'
+  const letter = value.match(/[A-Za-z]/)
+  return letter ? letter[0].toUpperCase() : value.slice(0, 1)
+}
+
+function productKey(urdu: boolean) {
+  return `<p class="product-key">${
+    urdu
+      ? 'W گندم · P دھان · M مکئی · B جو'
+      : 'W Wheat · P Paddy · M Maize · B Barley'
+  }</p>`
+}
+
+function autoColWidths(
+  headers: string[],
+  rows: string[][],
+  footer: string[] | undefined,
+  moneyCols: number[],
+  compactCols: number[],
+  markCols: number[],
+) {
+  const money = new Set(moneyCols)
+  const compact = new Set(compactCols)
+  const mark = new Set(markCols)
+  const samples = [...rows, ...(footer ? [footer] : [])]
+  const weights = headers.map((header, index) => {
+    let digits = 1
+    for (const row of samples) {
+      digits = Math.max(digits, String(row[index] ?? '').replace(/,/g, '').length)
+    }
+    const head = Math.min(String(header).length, money.has(index) ? 6 : 4)
+    let weight = Math.max(digits, head * 0.35)
+    if (mark.has(index)) weight = Math.max(digits + 0.2, 1.7)
+    else if (compact.has(index)) weight = Math.max(digits + 0.25, 2.1)
+    if (money.has(index)) weight = Math.max(digits + 3.4, 8.4)
+    return weight
+  })
+  const total = weights.reduce((sum, value) => sum + value, 0)
+  return weights.map((weight) => `${((weight / total) * 100).toFixed(2)}%`)
+}
+
+function cellClass(index: number, moneyCols: number[], compactCols: number[], markCols: number[]) {
+  if (markCols.includes(index)) return 'mark'
+  if (moneyCols.includes(index)) return 'num money'
+  if (compactCols.includes(index)) return 'num compact'
+  return ''
+}
+
+function table(
+  headers: string[],
+  rows: string[][],
+  footer?: string[],
+  options?: { className?: string; moneyCols?: number[]; compactCols?: number[]; markCols?: number[] },
+) {
+  const moneyCols = options?.moneyCols ?? []
+  const compactCols = options?.compactCols ?? []
+  const markCols = options?.markCols ?? []
+  const className = options?.className ? ` class="${options.className}"` : ''
+  const sized = moneyCols.length > 0 || compactCols.length > 0 || markCols.length > 0
+  const colgroup = sized
+    ? `<colgroup>${autoColWidths(headers, rows, footer, moneyCols, compactCols, markCols)
+        .map((width) => `<col style="width:${width}">`)
+        .join('')}</colgroup>`
+    : ''
+  const head = headers
+    .map((item, index) => `<th class="${cellClass(index, moneyCols, compactCols, markCols)}">${escape(item)}</th>`)
+    .join('')
+  const body = rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map((item, index) => `<td class="${cellClass(index, moneyCols, compactCols, markCols)}">${escape(item)}</td>`)
+          .join('')}</tr>`,
+    )
+    .join('')
+  const foot = footer
+    ? `<tfoot><tr class="totals">${footer
+        .map((item, index) => `<td class="${cellClass(index, moneyCols, compactCols, markCols)}">${escape(item)}</td>`)
+        .join('')}</tr></tfoot>`
+    : ''
+  return `<table${className}>${colgroup}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table>`
 }
 
 function partyDetailsCard(opts: {
@@ -413,7 +520,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     const totalKg = bagsWeight.add(extraKg)
     const mann = splitMann(totalKg)
     return {
-      product: item.product.name,
+      product: productMark(item.product.name),
       bags: item.numberOfBags,
       bagQty,
       extraKg,
@@ -479,6 +586,8 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
                 ? ['تاریخ', 'رقم', 'طریقہ', 'حوالہ', 'نوٹ']
                 : ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Note'],
               paymentRows,
+              undefined,
+              { compactCols: [0, 2], moneyCols: [1] },
             )
       }
       <div class="payment-totals">
@@ -523,7 +632,13 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         money(commission),
         money(payable),
       ],
-    ) + paymentBox,
+      {
+        className: 'farmer-grid',
+        markCols: [0],
+        compactCols: [1, 2, 3, 4, 5, 6],
+        moneyCols: [7, 8, 9, 10],
+      },
+    ) + productKey(urdu) + paymentBox,
     urdu,
   )
 }
@@ -558,7 +673,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   )
   const rows = flat.map((item) => [
     item.invoice,
-    item.product,
+    productMark(item.product),
     String(item.bags),
     qtyLabel(item.bagQty),
     money(item.weight),
@@ -583,6 +698,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
           : table(
               ['Date', 'Amount (PKR)', 'Method', 'Reference'],
               paymentRows,
+              undefined,
+              { compactCols: [0, 2], moneyCols: [1] },
             )
       }
       <div class="payment-totals">
@@ -617,7 +734,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         '',
         money(billed),
       ],
-    ) + paymentBox,
+      { markCols: [1], compactCols: [2, 3], moneyCols: [4, 5, 6] },
+    ) + productKey(urdu) + paymentBox,
     urdu,
   )
 }
@@ -662,7 +780,7 @@ export async function buyerBillSelected(
   const sheets = chunks.map((chunk, index) => {
     const rows = chunk.map((item) => [
       item.sale.invoiceNumber,
-      item.product.name,
+      productMark(item.product.name),
       String(item.numberOfBags),
       qtyLabel(item.weightPerBag.toNumber()),
       money(item.totalWeight),
@@ -683,7 +801,8 @@ export async function buyerBillSelected(
         w.buyerCols,
         rows,
         [w.totals, '', String(bags), '', money(weight), '', money(amount)],
-      )}`
+        { markCols: [1], compactCols: [2, 3], moneyCols: [4, 5, 6] },
+      )}${productKey(urdu)}`
   })
 
   return page(
@@ -747,7 +866,7 @@ export async function saleBill(
       w.saleCols,
       items.map((item) => [
         party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
-        item.product.name,
+        productMark(item.product.name),
         String(item.numberOfBags),
         qtyLabel(item.weightPerBag.toNumber()),
         money(item.totalWeight),
@@ -755,7 +874,8 @@ export async function saleBill(
         money(item.amount),
       ]),
       [w.totals, '', String(bags), '', money(weight), '', money(amount)],
-    ),
+      { markCols: [1], compactCols: [2, 3], moneyCols: [4, 5, 6] },
+    ) + productKey(urdu),
     urdu,
   )
 }
@@ -801,6 +921,7 @@ export async function registerEntryBill(id: number | bigint, lang = 'en') {
     urdu ? ['تفصیل', 'رقم'] : ['Particulars', 'Amount (PKR)'],
     [[title, money(entry.amount)]],
     [urdu ? 'کل' : 'Total', money(entry.amount)],
+    { moneyCols: [1] },
   )
   return page('', partyHtml, body, urdu)
 }
@@ -892,6 +1013,7 @@ async function renderRegisterLedgerBill(
       money(Math.abs(net)),
       '',
     ],
+    { compactCols: [0, 1, 2], moneyCols: [4] },
   )
   return page('', partyHtml, body, urdu)
 }
@@ -973,6 +1095,7 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSli
       money(party.totalWeightKg),
       money(party.productTotal),
     ],
+    { compactCols: [2], moneyCols: [3] },
   )
 
   const cashLabel = isCompany
@@ -1004,6 +1127,7 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSli
       urdu ? ['تاریخ', 'قسم', 'رقم', 'نوٹ'] : ['Date', 'Type', 'Amount', 'Note'],
       paymentRows,
       [urdu ? 'کل رقم' : 'Cash total', '', money(party.cashTotal), ''],
+      { compactCols: [1], moneyCols: [2] },
     )}`
 
   const net = party.remaining
@@ -1085,6 +1209,8 @@ export async function arhatAmountBillHtml(lang = 'en') {
     table(
       urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
       arhatLineRows(book.history, urdu),
+      undefined,
+      { compactCols: [1], moneyCols: [3] },
     )
   return page('', partyHtml, body, urdu)
 }
@@ -1109,11 +1235,14 @@ export async function arhatAmountMergeBillHtml(lang = 'en') {
       [urdu ? 'زکوٰۃ' : 'Zakat', money(report.arhat.zakat), money(report.wheatKhata.zakat), money(report.combined.zakat)],
     ],
     [urdu ? 'کل رقم' : 'Total amount', money(report.arhat.totalAmount), money(report.wheatKhata.totalAmount), money(report.combined.totalAmount)],
+    { moneyCols: [1, 2, 3] },
   )
   const history = `<h3 class="section-title ${urdu ? 'urdu' : ''}">${urdu ? 'مکمل ہسٹری' : 'Complete history'}</h3>
     ${table(
       urdu ? ['تاریخ', 'قسم', 'وجہ', 'رقم'] : ['When', 'Type', 'Reason', 'Amount'],
       arhatLineRows(report.history, urdu),
+      undefined,
+      { compactCols: [1], moneyCols: [3] },
     )}`
   return page('', partyHtml, summary + history, urdu)
 }
