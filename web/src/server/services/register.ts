@@ -1,6 +1,12 @@
 import { prisma } from '@/server/db'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
+import {
+  findRegisterPartyByKey,
+  loadTradeIndex,
+  tradeForKey,
+  type LinkedTrade,
+} from '@/server/services/linked-account'
 
 const KINDS = ['GIVING', 'RECEIVING', 'ZAKAT', 'FARMER_ADVANCE'] as const
 const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
@@ -108,6 +114,7 @@ function partyDto(
       },
     }),
   )
+  const cash = totalsFromEntries(entries)
   return {
     id: Number(party.id),
     kind: party.kind,
@@ -115,9 +122,93 @@ function partyDto(
     address: party.address,
     notes: party.notes,
     createdAt: party.createdAt.toISOString(),
-    ...totalsFromEntries(entries),
+    ...cash,
+    cashReceivedTotal: cash.receivedTotal,
+    cashGivenTotal: cash.givenTotal,
+    productTotal: 0,
+    productCount: 0,
+    soldTotal: 0,
+    soldCount: 0,
+    farmerPaid: 0,
+    buyerPaid: 0,
+    linkedFarmerId: null as number | null,
+    farmerCode: null as string | null,
+    farmerName: null as string | null,
+    linkedBuyerId: null as number | null,
+    buyerCode: null as string | null,
+    buyerName: null as string | null,
     ...(includeEntries ? { entries } : {}),
   }
+}
+
+type PartyDto = ReturnType<typeof partyDto>
+
+function tradeLineDto(line: LinkedTrade['lines'][number], party: PartyDto): EntryDto {
+  const stamp = karachiParts(line.createdAt)
+  return {
+    id: line.id,
+    kind: line.kind,
+    amount: line.amount,
+    notes: line.notes,
+    createdAt: line.createdAt.toISOString(),
+    day: stamp.day,
+    date: stamp.date,
+    time: stamp.time,
+    partyId: party.id,
+    farmerId: line.farmerId,
+    paymentId: line.kind === 'FARMER_PAID' || line.kind === 'BUYER_PAID' ? line.id : null,
+    partyName: party.name,
+    partyAddress: party.address,
+    farmerCode: line.farmerCode,
+  }
+}
+
+function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false): PartyDto {
+  const cashReceived = dto.cashReceivedTotal
+  const cashGiven = dto.cashGivenTotal
+  const receivedTotal = cashReceived + trade.productTotal + trade.buyerPaid
+  const givenTotal = cashGiven + trade.soldTotal + trade.farmerPaid
+  const extra = includeEntries
+    ? trade.lines.map((line) => tradeLineDto(line, dto))
+    : []
+  const entries = includeEntries
+    ? [...(dto.entries || []), ...extra].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )
+    : dto.entries
+  return {
+    ...dto,
+    cashReceivedTotal: cashReceived,
+    cashGivenTotal: cashGiven,
+    receivedTotal,
+    givenTotal,
+    balance: receivedTotal - givenTotal,
+    receivedCount: dto.receivedCount,
+    givenCount: dto.givenCount,
+    productTotal: trade.productTotal,
+    productCount: trade.productCount,
+    soldTotal: trade.soldTotal,
+    soldCount: trade.soldCount,
+    farmerPaid: trade.farmerPaid,
+    buyerPaid: trade.buyerPaid,
+    linkedFarmerId: trade.farmerId,
+    farmerCode: trade.farmerCode,
+    farmerName: trade.farmerName,
+    linkedBuyerId: trade.buyerId,
+    buyerCode: trade.buyerCode,
+    buyerName: trade.buyerName,
+    ...(includeEntries ? { entries } : {}),
+  }
+}
+
+async function withTrade<T extends PartyDto>(dto: T, includeEntries = false) {
+  const index = await loadTradeIndex()
+  return attachTrade(dto, tradeForKey(index, dto.name), includeEntries) as T
+}
+
+async function withTradeAll(dtos: PartyDto[], includeEntries = false) {
+  const index = await loadTradeIndex()
+  return dtos.map((dto) => attachTrade(dto, tradeForKey(index, dto.name), includeEntries))
 }
 
 function parseKind(value: unknown, allowed: readonly string[] = KINDS): RegisterKind {
@@ -144,7 +235,7 @@ export async function listParties(kind: string) {
     orderBy: { name: 'asc' },
     include: moneyEntryInclude(),
   })
-  return rows.map((row) => partyDto(row, true))
+  return withTradeAll(rows.map((row) => partyDto(row, true)), true)
 }
 
 export async function getPartyLedger(id: number | bigint) {
@@ -159,7 +250,7 @@ export async function getPartyLedger(id: number | bigint) {
     },
   })
   if (!party) throw new Error('Person not found')
-  return partyDto(party, true)
+  return withTrade(partyDto(party, true), true)
 }
 
 export async function createParty(input: {
@@ -174,14 +265,7 @@ export async function createParty(input: {
   const address = String(input.address ?? '').trim() || null
   const notes = String(input.notes ?? '').trim() || null
 
-  const existing = await prisma.registerParty.findFirst({
-    where: {
-      deleted: false,
-      kind: { in: [...MONEY_PARTY_KINDS] },
-      name: { equals: name, mode: 'insensitive' },
-    },
-    include: moneyEntryInclude(),
-  })
+  const existing = await findRegisterPartyByKey(name)
   if (existing) {
     const row = await prisma.registerParty.update({
       where: { id: existing.id },
@@ -191,7 +275,7 @@ export async function createParty(input: {
       },
       include: moneyEntryInclude(),
     })
-    return partyDto(row)
+    return withTrade(partyDto(row, true), true)
   }
 
   const row = await prisma.registerParty.create({
@@ -202,7 +286,7 @@ export async function createParty(input: {
       notes,
     },
   })
-  return partyDto({ ...row, entries: [] })
+  return withTrade(partyDto({ ...row, entries: [] }), true)
 }
 
 export async function listEntries(kind?: string | null) {
@@ -330,17 +414,8 @@ export async function updateParty(
   const party = await liveMoneyParty(id)
   const name = input.name != null ? String(input.name).trim() : party.name
   if (!name) throw new Error('Name is required')
-  if (name.toLowerCase() !== party.name.toLowerCase()) {
-    const clash = await prisma.registerParty.findFirst({
-      where: {
-        deleted: false,
-        kind: { in: [...MONEY_PARTY_KINDS] },
-        name: { equals: name, mode: 'insensitive' },
-        NOT: { id: party.id },
-      },
-    })
-    if (clash) throw new Error('Another person already has this name')
-  }
+  const clash = await findRegisterPartyByKey(name)
+  if (clash && clash.id !== party.id) throw new Error('Another person already has this name')
   await prisma.registerParty.update({
     where: { id: party.id },
     data: {

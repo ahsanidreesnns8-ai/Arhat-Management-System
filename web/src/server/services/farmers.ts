@@ -4,9 +4,10 @@ import { normalizeOwnerCode } from '@/server/ids'
 import { listDherisByFarmer } from '@/server/services/dheris'
 import { listPaymentsByFarmer } from '@/server/services/payments'
 import { listTrucksByFarmer } from '@/server/services/trucks'
+import { ensureRegisterPartyForAccount, registerCashForKey } from '@/server/services/linked-account'
 
 type FarmerRow = Prisma.FarmerGetPayload<{
-  include: { dheris: true; payments: true }
+  include: { dheris: { where: { deleted: false } }; payments: true }
 }>
 
 export type PartyInput = {
@@ -54,7 +55,20 @@ export function farmerDto(farmer: FarmerRow) {
   }
 }
 
-const includeTotals = { dheris: true, payments: true } as const
+async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
+  const cash = await registerCashForKey(dto.farmerId)
+  const accountBalance =
+    (dto.totalBilled || 0) + cash.registerReceived - cash.registerGiven - (dto.totalPaid || 0)
+  return {
+    ...dto,
+    registerPartyId: cash.partyId,
+    registerReceived: cash.registerReceived,
+    registerGiven: cash.registerGiven,
+    accountBalance,
+  }
+}
+
+const includeTotals = { dheris: { where: { deleted: false } }, payments: true } as const
 
 export async function listFarmers() {
   const rows = await prisma.farmer.findMany({
@@ -71,7 +85,7 @@ export async function getFarmer(id: number | bigint) {
     include: includeTotals,
   })
   if (!row) throw new Error('Farmer not found')
-  return farmerDto(row)
+  return withRegisterAccount(farmerDto(row))
 }
 
 export async function createFarmer(input: PartyInput) {
@@ -94,7 +108,8 @@ export async function createFarmer(input: PartyInput) {
     },
     include: includeTotals,
   })
-  return farmerDto(row)
+  await ensureRegisterPartyForAccount(farmerId)
+  return withRegisterAccount(farmerDto(row))
 }
 
 export async function updateFarmer(id: number | bigint, input: PartyInput) {
@@ -122,7 +137,8 @@ export async function updateFarmer(id: number | bigint, input: PartyInput) {
     data,
     include: includeTotals,
   })
-  return farmerDto(row)
+  await ensureRegisterPartyForAccount(row.farmerId)
+  return withRegisterAccount(farmerDto(row))
 }
 
 export async function deleteFarmer(id: number | bigint) {

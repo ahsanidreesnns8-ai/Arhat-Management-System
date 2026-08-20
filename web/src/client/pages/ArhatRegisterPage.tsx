@@ -12,7 +12,7 @@ import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
 import { isOwnerFinanceRole } from '../../lib/roles'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Link, useSearchParams } from 'react-router-dom'
 import type { Farmer, RegisterEntry, RegisterParty, ZakatSummary } from '../types'
 import PartyCombobox from '../components/forms/PartyCombobox'
 
@@ -42,12 +42,52 @@ function moneySide(
 ): MoneySide {
   const net = received - given
   if (net > 0) {
-    return { kind: 'RECEIVING', label: 'Received', amount: received, count: receivedCount }
+    return { kind: 'RECEIVING', label: 'Received', amount: net, count: receivedCount }
   }
   if (net < 0) {
-    return { kind: 'GIVING', label: 'Given', amount: given, count: givenCount }
+    return { kind: 'GIVING', label: 'Given', amount: -net, count: givenCount }
   }
   return { kind: null, label: 'Settled', amount: 0, count: 0 }
+}
+
+function matchesSearch(party: RegisterParty, query: string) {
+  if (!query) return true
+  const blob = [
+    party.name,
+    party.address || '',
+    party.notes || '',
+    party.farmerCode || '',
+    party.farmerName || '',
+    party.buyerCode || '',
+    party.buyerName || '',
+  ].join(' ').toLowerCase()
+  const compact = blob.replace(/\s+/g, '')
+  const q = query.toLowerCase()
+  return blob.includes(q) || compact.includes(q.replace(/\s+/g, ''))
+}
+
+function kindLabel(kind: string) {
+  if (kind === 'RECEIVING') return 'Received'
+  if (kind === 'GIVING') return 'Given'
+  if (kind === 'PRODUCT') return 'Product'
+  if (kind === 'SOLD') return 'Sold'
+  if (kind === 'FARMER_PAID') return 'Paid to farmer'
+  if (kind === 'BUYER_PAID') return 'Paid by buyer'
+  return kind
+}
+
+function kindTone(kind: string) {
+  if (kind === 'RECEIVING' || kind === 'PRODUCT' || kind === 'BUYER_PAID') {
+    return 'text-emerald-700 dark:text-emerald-400'
+  }
+  if (kind === 'GIVING' || kind === 'SOLD' || kind === 'FARMER_PAID') {
+    return 'text-rose-700 dark:text-rose-400'
+  }
+  return 'text-slate-600'
+}
+
+function isCashKind(kind: string) {
+  return kind === 'RECEIVING' || kind === 'GIVING'
 }
 
 function sideNote(party: Pick<RegisterParty, 'receivedTotal' | 'givenTotal'>, kind?: MoneyKind) {
@@ -73,15 +113,51 @@ function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
   return aAmt - bAmt
 }
 
-function matchesSearch(party: RegisterParty, query: string) {
-  if (!query) return true
-  const blob = `${party.name} ${party.address || ''} ${party.notes || ''}`.toLowerCase()
-  return blob.includes(query)
+function AccountBreakdown({ party }: { party: RegisterParty }) {
+  const side = moneySide(party.receivedTotal || 0, party.givenTotal || 0)
+  const tradeLines = (party.entries || []).filter((row) => !isCashKind(row.kind))
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-white/10 p-3 text-sm space-y-1">
+      <p className="font-semibold">{side.kind ? `${side.label} balance ${formatCurrency(side.amount)}` : 'Settled'}</p>
+      <p className="text-slate-500">
+        Cash received {formatCurrency(party.cashReceivedTotal || 0)} · Cash given {formatCurrency(party.cashGivenTotal || 0)}
+      </p>
+      {(party.productTotal || 0) > 0 ? (
+        <p className="text-slate-500">
+          Product in {formatCurrency(party.productTotal || 0)}
+          {party.productCount ? ` · ${party.productCount} dheri${party.productCount === 1 ? '' : 's'}` : ''}
+        </p>
+      ) : null}
+      {(party.soldTotal || 0) > 0 ? <p className="text-slate-500">Sold {formatCurrency(party.soldTotal || 0)}</p> : null}
+      {(party.farmerPaid || 0) > 0 ? <p className="text-slate-500">Paid to farmer {formatCurrency(party.farmerPaid || 0)}</p> : null}
+      {(party.buyerPaid || 0) > 0 ? <p className="text-slate-500">Paid by buyer {formatCurrency(party.buyerPaid || 0)}</p> : null}
+      {party.linkedFarmerId ? (
+        <Link className="text-primary text-xs font-semibold inline-block" to={`/farmers/${party.linkedFarmerId}`}>
+          Open farmer products for {party.farmerName} ({party.farmerCode})
+        </Link>
+      ) : null}
+      {party.linkedBuyerId ? (
+        <Link className="text-primary text-xs font-semibold inline-block" to={`/buyers/${party.linkedBuyerId}`}>
+          Open buyer {party.buyerName} ({party.buyerCode})
+        </Link>
+      ) : null}
+      {tradeLines.length ? (
+        <div className="pt-2 space-y-1">
+          {tradeLines.map((row) => (
+            <p key={`${row.kind}-${row.id}`} className="text-[12px] text-slate-500">
+              {kindLabel(row.kind)} · {formatCurrency(row.amount)} · {row.notes || '—'}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export default function ArhatRegisterPage() {
   const { user } = useAuth()
   const isOwner = isOwnerFinanceRole(user?.role)
+  const [searchParams] = useSearchParams()
   const [section, setSection] = useState<Section>('PEOPLE')
   const [parties, setParties] = useState<RegisterParty[]>([])
   const [entries, setEntries] = useState<RegisterEntry[]>([])
@@ -99,8 +175,9 @@ export default function ArhatRegisterPage() {
   const [money, setMoney] = useState({ partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
   const [zakatForm, setZakatForm] = useState({ amount: '', notes: '' })
   const [advance, setAdvance] = useState({ farmerId: '', amount: '', notes: '' })
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') || '')
   const [editOpen, setEditOpen] = useState(false)
+  const [editLedger, setEditLedger] = useState<RegisterParty | null>(null)
   const [editForm, setEditForm] = useState({
     id: 0,
     name: '',
@@ -126,15 +203,15 @@ export default function ArhatRegisterPage() {
         setParties(p.data.data || [])
         setEntries([])
       } else {
-        const [p, given, received] = await Promise.all([
+        const [p] = await Promise.all([
           registerApi.parties('RECEIVING'),
-          registerApi.entries('GIVING'),
-          registerApi.entries('RECEIVING'),
         ])
         setParties(p.data.data || [])
-        const merged = [...(given.data.data || []), ...(received.data.data || [])].sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        )
+        const merged = (p.data.data || [])
+          .flatMap((row) => (row.entries || []).filter((line) => isCashKind(line.kind)))
+          .sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          )
         setEntries(merged)
       }
     } catch (err: unknown) {
@@ -163,13 +240,18 @@ export default function ArhatRegisterPage() {
   const receivedPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'RECEIVING')
   const givenPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'GIVING')
   const settledPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind == null)
-  const receivedTotal = receivedPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
-  const givenTotal = givenPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
+  const receivedTotal = receivedPeople.reduce((sum, p) => sum + moneySide(p.receivedTotal || 0, p.givenTotal || 0).amount, 0)
+  const givenTotal = givenPeople.reduce((sum, p) => sum + moneySide(p.receivedTotal || 0, p.givenTotal || 0).amount, 0)
   const searchHits = query ? visibleParties : []
   const ledgerGiven = ledgerPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
   const ledgerReceived = ledgerPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
   const ledgerRemaining = Math.abs(ledgerReceived - ledgerGiven)
   const ledgerTotal = ledgerReceived + ledgerGiven
+  const historyRows = section === 'PEOPLE' && query
+    ? visibleParties
+        .flatMap((p) => p.entries || [])
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    : entries
 
   if (!isOwner) return <Navigate to="/dashboard" replace />
 
@@ -183,6 +265,7 @@ export default function ArhatRegisterPage() {
       const res = await registerApi.getParty(party.id)
       const ledger = res.data.data || party
       const lines = (ledger.entries || []).filter((row) => row.kind === 'RECEIVING' || row.kind === 'GIVING')
+      setEditLedger(ledger)
       setEditForm({
         id: ledger.id,
         name: ledger.name,
@@ -403,6 +486,12 @@ export default function ArhatRegisterPage() {
         <div>
           <p className="font-semibold truncate">{p.name}</p>
           <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
+          {p.farmerName ? (
+            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName} · {p.farmerCode}</p>
+          ) : null}
+          {p.buyerName ? (
+            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName} · {p.buyerCode}</p>
+          ) : null}
         </div>
         <div className={`rounded-lg px-3 py-2 text-[11px] ${
           side.kind === 'RECEIVING'
@@ -424,11 +513,24 @@ export default function ArhatRegisterPage() {
           {side.kind ? (
             <div className="text-slate-500">{side.count} time{side.count === 1 ? '' : 's'}</div>
           ) : null}
+          {(p.productTotal || 0) > 0 ? (
+            <div className="text-slate-500 mt-1">Product {formatCurrency(p.productTotal || 0)}</div>
+          ) : null}
+          {(p.soldTotal || 0) > 0 ? (
+            <div className="text-slate-500">Sold {formatCurrency(p.soldTotal || 0)}</div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" variant="ghost" onClick={() => void openEdit(p)}>
             <Eye className="h-3.5 w-3.5" /> Details
           </Button>
+          {p.linkedFarmerId ? (
+            <Link to={`/farmers/${p.linkedFarmerId}`} className="inline-flex">
+              <Button size="sm" variant="secondary">
+                Farmer
+              </Button>
+            </Link>
+          ) : null}
           <Button size="sm" onClick={() => void openEdit(p)}>
             <Pencil className="h-3.5 w-3.5" /> Edit
           </Button>
@@ -447,7 +549,7 @@ export default function ArhatRegisterPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Register"
-        description="Received on the left, given on the right. Search a name to open details, edit, or delete."
+        description="Same ID as a farmer or buyer is one account. Product in or sold out is added to the running balance."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -530,7 +632,7 @@ export default function ArhatRegisterPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name"
+              placeholder="Search by name or ID (R74.1)"
               className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 pl-10 pr-3 py-2.5 text-sm"
             />
           </div>
@@ -548,13 +650,30 @@ export default function ArhatRegisterPage() {
                     onClick={() => void openEdit(p)}
                     className="w-full text-left rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center justify-between gap-2"
                   >
-                    <span className="font-medium truncate">{p.name}</span>
-                    <span className="text-[11px] text-slate-500 shrink-0">
-                      {side.kind ? `${side.label} ${formatCurrency(side.amount)}` : 'Settled'}
+                    <span className="min-w-0">
+                      <span className="font-medium truncate block">{p.name}</span>
+                      {p.farmerName ? (
+                        <span className="text-[11px] text-slate-500 truncate block">Farmer {p.farmerName}</span>
+                      ) : null}
+                      {p.buyerName ? (
+                        <span className="text-[11px] text-slate-500 truncate block">Buyer {p.buyerName}</span>
+                      ) : null}
+                    </span>
+                    <span className="text-[11px] text-slate-500 shrink-0 text-right">
+                      <span className="block">{side.kind ? `${side.label} ${formatCurrency(side.amount)}` : 'Settled'}</span>
+                      {(p.productTotal || 0) > 0 ? (
+                        <span className="block">Product {formatCurrency(p.productTotal || 0)}</span>
+                      ) : null}
+                      {(p.soldTotal || 0) > 0 ? (
+                        <span className="block">Sold {formatCurrency(p.soldTotal || 0)}</span>
+                      ) : null}
                     </span>
                   </button>
                 )
               })}
+              {searchHits.length === 1 ? (
+                <AccountBreakdown party={searchHits[0]} />
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -678,7 +797,7 @@ export default function ArhatRegisterPage() {
         </div>
         {loading ? (
           <div className="p-4"><TableSkeleton rows={4} /></div>
-        ) : !entries.length ? (
+        ) : !historyRows.length ? (
           <p className="p-5 text-sm text-slate-500">No entries yet.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -698,7 +817,7 @@ export default function ArhatRegisterPage() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((row) => (
+                {historyRows.map((row) => (
                   <tr key={`${row.kind}-${row.id}`} className="border-b border-slate-100 dark:border-white/10">
                     <td className="px-4 py-2">{row.day}</td>
                     <td className="px-4 py-2">{row.date}</td>
@@ -706,8 +825,8 @@ export default function ArhatRegisterPage() {
                     <td className="px-4 py-2 font-medium">{row.partyName || (row.kind === 'ZAKAT' ? 'Zakat' : '—')}</td>
                     {section === 'PEOPLE' && (
                       <td className="px-4 py-2">
-                        <span className={row.kind === 'RECEIVING' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}>
-                          {row.kind === 'RECEIVING' ? 'Received' : 'Given'}
+                        <span className={kindTone(row.kind)}>
+                          {kindLabel(row.kind)}
                         </span>
                       </td>
                     )}
@@ -715,7 +834,7 @@ export default function ArhatRegisterPage() {
                     <td className="px-4 py-2 text-slate-500">{row.notes || '—'}</td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-1">
-                        {section === 'PEOPLE' && row.partyId ? (
+                        {section === 'PEOPLE' && row.partyId && isCashKind(row.kind) ? (
                           <Button
                             variant="ghost"
                             className="!py-1.5 !px-2"
@@ -727,9 +846,11 @@ export default function ArhatRegisterPage() {
                             <Pencil className="h-3.5 w-3.5" /> Edit
                           </Button>
                         ) : null}
-                        <Button variant="secondary" className="!py-1.5 !px-2" onClick={() => void openEntryBill(row)}>
-                          <Printer className="h-3.5 w-3.5" /> Bill
-                        </Button>
+                        {isCashKind(row.kind) || row.kind === 'ZAKAT' || row.kind === 'FARMER_ADVANCE' ? (
+                          <Button variant="secondary" className="!py-1.5 !px-2" onClick={() => void openEntryBill(row)}>
+                            <Printer className="h-3.5 w-3.5" /> Bill
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -744,7 +865,7 @@ export default function ArhatRegisterPage() {
       <Modal open={personOpen} onClose={() => setPersonOpen(false)} title="Add person">
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            If the name already exists, that same account is reused.
+            If this is the same ID as a farmer or buyer (for example R74.1), later products and sales are added to this account automatically.
           </p>
           <Input label="Name *" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} />
           <Input label="Address (optional)" value={person.address} onChange={(e) => setPerson({ ...person, address: e.target.value })} />
@@ -780,7 +901,9 @@ export default function ArhatRegisterPage() {
           {selectedParty && (
             <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
               Current {money.kind === 'RECEIVING' ? 'received' : 'given'} for {selectedParty.name}: {formatCurrency(
-                money.kind === 'RECEIVING' ? (selectedParty.receivedTotal || 0) : (selectedParty.givenTotal || 0),
+                money.kind === 'RECEIVING'
+                  ? (selectedParty.cashReceivedTotal ?? selectedParty.receivedTotal ?? 0)
+                  : (selectedParty.cashGivenTotal ?? selectedParty.givenTotal ?? 0),
               )}
             </div>
           )}
@@ -799,11 +922,12 @@ export default function ArhatRegisterPage() {
         </div>
       </Modal>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Person details" size="lg">
+      <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditLedger(null) }} title="Person details" size="lg">
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
-            Change the name or amount, or move a payment from received to given (or the other way) if it was saved on the wrong side. Totals update on save.
+            Cash given or received on this ID is combined with farmer product and sales. Each product stays on its own line. Totals update on save.
           </p>
+          {editLedger ? <AccountBreakdown party={editLedger} /> : null}
           <Input
             label="Name *"
             value={editForm.name}
@@ -895,7 +1019,7 @@ export default function ArhatRegisterPage() {
               <Trash2 className="h-4 w-4" /> Delete person
             </Button>
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => { setEditOpen(false); setEditLedger(null) }}>Cancel</Button>
               <Button onClick={() => void saveEdit()} loading={saving}>Save changes</Button>
             </div>
           </div>

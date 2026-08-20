@@ -67,11 +67,16 @@ export default function FarmerDetailPage() {
 
   const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
   const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
+  const registerGiven = farmer.registerGiven ?? 0
+  const registerReceived = farmer.registerReceived ?? 0
+  const accountBalance = farmer.accountBalance ?? (totalBilled + registerReceived - registerGiven - totalPaid)
+  const remainingToPay = Math.max(0, accountBalance)
+  const givenRemaining = Math.max(0, -accountBalance)
   const settled = isPartySettled({
-    outstandingBalance: farmer.outstandingBalance,
+    outstandingBalance: remainingToPay,
     totalBilled,
-    totalPaid,
-  })
+    totalPaid: totalPaid + registerGiven,
+  }) && givenRemaining === 0
 
   return (
     <div className="space-y-6">
@@ -85,7 +90,7 @@ export default function FarmerDetailPage() {
               <SettledBadge settled={settled} label="Paid in full" />
               <Button
                 onClick={() => { setEditingPayment(null); setPayOpen(true) }}
-                disabled={(farmer.outstandingBalance || 0) <= 0}
+                disabled={(remainingToPay || 0) <= 0}
                 title={settled ? 'Already paid — history is kept' : 'Pay farmer'}
               >
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
@@ -99,21 +104,41 @@ export default function FarmerDetailPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <MoneyCard label="Total payable (products)" value={totalBilled} tone="neutral" />
+        <MoneyCard label="Register received" value={registerReceived} tone="good" />
+        <MoneyCard label="Register given" value={registerGiven} tone="warn" />
         <MoneyCard label="Amount paid to farmer" value={totalPaid} tone="good" />
-        <MoneyCard label="Remaining to pay" value={farmer.outstandingBalance} tone={settled ? 'good' : 'warn'} />
-        <div className="card-3d p-5">
-          <p className="text-sm text-gray-500">Father / address</p>
-          <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
-          <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
-          {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
-          {settled && (
-            <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records
-            </p>
-          )}
-        </div>
+        <MoneyCard
+          label={givenRemaining > 0 ? 'Balance (still given)' : 'Remaining to pay'}
+          value={givenRemaining > 0 ? givenRemaining : remainingToPay}
+          tone={settled || givenRemaining > 0 ? 'good' : 'warn'}
+        />
+      </div>
+      <div className="card-3d p-5">
+        <p className="text-sm text-gray-500">Father / address</p>
+        <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
+        <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
+        {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
+        {farmer.registerPartyId ? (
+          <p className="mt-2 text-sm text-slate-500">
+            Same ID on Arhat Register. Cash given or received is already in this balance.
+            Each product below stays separate; a new product only adds its amount.
+            {' '}
+            <Link className="text-primary font-semibold" to={`/arhat-register?q=${encodeURIComponent(farmer.farmerId)}`}>
+              Open register {farmer.farmerId}
+            </Link>
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500">
+            Use this same ID on Arhat Register to combine given / received cash with these products.
+          </p>
+        )}
+        {settled && (
+          <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records
+          </p>
+        )}
       </div>
 
       <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', t('bags'), 'Farmer amount', 'Status']}>
@@ -184,7 +209,7 @@ export default function FarmerDetailPage() {
         type="FARMER"
         partyId={farmer.id}
         partyName={farmer.name}
-        outstanding={farmer.outstandingBalance || 0}
+        outstanding={remainingToPay}
         editingPayment={editingPayment}
       />
     </div>
