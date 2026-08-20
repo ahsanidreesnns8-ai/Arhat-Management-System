@@ -11,6 +11,8 @@ import { farmerBill, buyerBill } from '../src/server/services/bills'
 import { createFarmer } from '../src/server/services/farmers'
 import { createBuyer } from '../src/server/services/buyers'
 import { settle } from '../src/server/services/arhat'
+import { getBook } from '../src/server/services/arhat-amount'
+import { deleteDheri } from '../src/server/services/dheris'
 import { runWithWorkspace } from '../src/server/workspace'
 
 const stamp = `BIL${Date.now().toString().slice(-8)}`
@@ -145,6 +147,23 @@ async function main() {
       assert(!buyerHtml.includes('Buyer Bill / Payment Receipt'), 'buyer bill still has module title')
       assert(!html.includes('Wheat Khata · Company'), 'farmer bill should not stamp Wheat Khata labels')
       assert(!buyerHtml.includes('Wheat Khata · Party'), 'buyer bill should not stamp Wheat Khata labels')
+
+      const dheriRow = await prisma.dheri.findFirst({ where: { id: { in: ids.dheriIds } } })
+      assert(dheriRow, 'settled farmer product missing')
+      const comm = dheriRow.commissionAmount.toNumber()
+      const lotsBefore = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
+      const bookBefore = await getBook()
+      await deleteDheri(dheriRow.id)
+      const bookAfter = await getBook()
+      const dheriAfter = await prisma.dheri.findFirst({ where: { id: dheriRow.id } })
+      assert(dheriAfter?.deleted, 'deleted farmer product should leave the live list')
+      assert(dheriAfter.commissionAmount.toNumber() === 0, 'deleted product commission should be cleared')
+      assert(
+        Math.abs(bookBefore.totals.commission - bookAfter.totals.commission - comm) < 0.05,
+        `Arhat Amount commission should drop by ${comm}, before ${bookBefore.totals.commission} after ${bookAfter.totals.commission}`,
+      )
+      const lotsAfter = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
+      assert(lotsAfter === lotsBefore, 'Extra KG stock must stay when a farmer product is deleted')
 
       console.log('farmer/buyer bill layout OK')
       console.log('printed header sample:', html.match(/<div class="dates">[\s\S]*?<\/div>/)?.[0])

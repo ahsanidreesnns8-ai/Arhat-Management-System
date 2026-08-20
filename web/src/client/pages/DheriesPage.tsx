@@ -194,7 +194,7 @@ export default function DheriesPage() {
 
       <ConfirmDialog open={deleteId !== null} onClose={() => setDeleteId(null)} onConfirm={async () => {
         if (deleteId) { await dheriApi.delete(deleteId); toast.success('Deleted'); setDeleteId(null); load() }
-      }} title="Delete Dheri" message="Are you sure you want to delete this dheri?" />
+      }} title="Delete farmer product" message="This product leaves the list and its commission leaves Arhat Amount. Extra KG stock is not changed." />
     </div>
   )
 }

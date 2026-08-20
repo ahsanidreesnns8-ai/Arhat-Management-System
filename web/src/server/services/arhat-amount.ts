@@ -153,6 +153,9 @@ async function arhatLines(): Promise<{
   const [manualRows, paymentRows, registerRows, commissionAgg] = await Promise.all([
     prisma.arhatAmountEntry.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.payment.findMany({
+      where: {
+        OR: [{ dheriId: null }, { dheri: { deleted: false } }],
+      },
       include: { farmer: true, buyer: true, sale: true },
       orderBy: { createdAt: 'desc' },
     }),

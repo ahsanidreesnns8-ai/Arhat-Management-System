@@ -180,9 +180,43 @@ export async function updateDheri(id: number | bigint, input: DheriInput) {
 }
 
 export async function deleteDheri(id: number | bigint) {
-  await getDheri(id)
-  await prisma.dheri.update({
-    where: { id: BigInt(id) },
-    data: { deleted: true },
+  const existing = await getDheri(id)
+  await prisma.$transaction(async (tx) => {
+    const dheri = await tx.dheri.findFirst({
+      where: { id: BigInt(existing.id), deleted: false },
+    })
+    if (!dheri) throw new Error('Dheri not found')
+
+    const payments = await tx.payment.findMany({
+      where: { dheriId: dheri.id, paymentType: 'FARMER' },
+    })
+    for (const payment of payments) {
+      if (payment.farmerId) {
+        await tx.farmer.update({
+          where: { id: payment.farmerId },
+          data: { outstandingBalance: { increment: payment.amount.toFixed(2) } },
+        })
+      }
+      await tx.payment.delete({ where: { id: payment.id } })
+    }
+
+    if (dheri.payablePosted) {
+      await tx.farmer.update({
+        where: { id: dheri.farmerId },
+        data: { outstandingBalance: { decrement: dheri.farmerReceivable.toFixed(2) } },
+      })
+    }
+
+    await tx.dheri.update({
+      where: { id: dheri.id },
+      data: {
+        deleted: true,
+        commissionAmount: 0,
+        arhatShare: 0,
+        supervisorShare: 0,
+        laborShare: 0,
+        payablePosted: false,
+      },
+    })
   })
 }
