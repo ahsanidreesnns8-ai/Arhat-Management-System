@@ -12,7 +12,7 @@ import { createFarmer } from '../src/server/services/farmers'
 import { createBuyer } from '../src/server/services/buyers'
 import { settle } from '../src/server/services/arhat'
 import { getBook } from '../src/server/services/arhat-amount'
-import { deleteDheri } from '../src/server/services/dheris'
+import { deleteDheri, createDheri } from '../src/server/services/dheris'
 import { runWithWorkspace } from '../src/server/workspace'
 
 const stamp = `BIL${Date.now().toString().slice(-8)}`
@@ -150,6 +150,7 @@ async function main() {
 
       const dheriRow = await prisma.dheri.findFirst({ where: { id: { in: ids.dheriIds } } })
       assert(dheriRow, 'settled farmer product missing')
+      const reusedCode = dheriRow.dheriId
       const comm = dheriRow.commissionAmount.toNumber()
       const lotsBefore = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
       const bookBefore = await getBook()
@@ -157,6 +158,7 @@ async function main() {
       const bookAfter = await getBook()
       const dheriAfter = await prisma.dheri.findFirst({ where: { id: dheriRow.id } })
       assert(dheriAfter?.deleted, 'deleted farmer product should leave the live list')
+      assert(dheriAfter.dheriId !== reusedCode, 'deleted dheri should release its number')
       assert(dheriAfter.commissionAmount.toNumber() === 0, 'deleted product commission should be cleared')
       assert(
         Math.abs(bookBefore.totals.commission - bookAfter.totals.commission - comm) < 0.05,
@@ -164,6 +166,17 @@ async function main() {
       )
       const lotsAfter = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
       assert(lotsAfter === lotsBefore, 'Extra KG stock must stay when a farmer product is deleted')
+      const reused = await createDheri({
+        farmerId: farmer.id,
+        productId: Number(product.id),
+        dheriCode: reusedCode,
+        numberOfBags: 2,
+        weightPerBag: 40,
+        partialBagWeight: 0,
+        marketRate: 100,
+      })
+      assert(reused.dheriId === reusedCode, 'saving after delete should reuse the same dheri number')
+      ids.dheriIds.push(BigInt(reused.id))
 
       console.log('farmer/buyer bill layout OK')
       console.log('printed header sample:', html.match(/<div class="dates">[\s\S]*?<\/div>/)?.[0])
