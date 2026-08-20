@@ -162,6 +162,7 @@ export interface Farmer {
   registerReceived?: number
   registerGiven?: number
   accountBalance?: number
+  combinedRemaining?: number
   notes?: string
   active: boolean
 }
@@ -447,6 +448,9 @@ export interface RegisterParty {
   soldCount?: number
   farmerPaid?: number
   buyerPaid?: number
+  remainingToGive?: number
+  remainingToReceive?: number
+  displayLabel?: string
   linkedFarmerId?: number | null
   farmerCode?: string | null
   farmerName?: string | null

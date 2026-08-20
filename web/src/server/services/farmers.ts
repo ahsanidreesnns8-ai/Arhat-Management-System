@@ -57,14 +57,15 @@ export function farmerDto(farmer: FarmerRow) {
 
 async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
   const cash = await registerCashForKey(dto.farmerId)
-  const accountBalance =
-    (dto.totalBilled || 0) + cash.registerReceived - cash.registerGiven - (dto.totalPaid || 0)
+  const productBalance = (dto.totalBilled || 0) - (dto.totalPaid || 0)
   return {
     ...dto,
     registerPartyId: cash.partyId,
     registerReceived: cash.registerReceived,
     registerGiven: cash.registerGiven,
-    accountBalance,
+    accountBalance: productBalance,
+    combinedRemaining:
+      (dto.totalBilled || 0) + cash.registerReceived - cash.registerGiven - (dto.totalPaid || 0),
   }
 }
 

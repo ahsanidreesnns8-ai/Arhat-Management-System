@@ -21,7 +21,7 @@ type MoneyKind = 'GIVING' | 'RECEIVING'
 
 type MoneySide = {
   kind: MoneyKind | null
-  label: 'Received' | 'Given' | 'Settled'
+  label: string
   amount: number
   count: number
 }
@@ -105,20 +105,29 @@ function apiError(err: unknown, fallback: string) {
   return msg || fallback
 }
 
+function partyFrame(party: Pick<RegisterParty, 'receivedTotal' | 'givenTotal' | 'receivedCount' | 'givenCount' | 'displayLabel'>): MoneySide {
+  const side = moneySide(
+    party.receivedTotal || 0,
+    party.givenTotal || 0,
+    party.receivedCount || 0,
+    party.givenCount || 0,
+  )
+  if (party.displayLabel) return { ...side, label: party.displayLabel }
+  return side
+}
+
 function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
   const name = a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
   if (name !== 0) return name
-  const aAmt = moneySide(a.receivedTotal || 0, a.givenTotal || 0).amount
-  const bAmt = moneySide(b.receivedTotal || 0, b.givenTotal || 0).amount
-  return aAmt - bAmt
+  return partyFrame(a).amount - partyFrame(b).amount
 }
 
 function AccountBreakdown({ party }: { party: RegisterParty }) {
-  const side = moneySide(party.receivedTotal || 0, party.givenTotal || 0)
+  const side = partyFrame(party)
   const tradeLines = (party.entries || []).filter((row) => !isCashKind(row.kind))
   return (
     <div className="rounded-xl border border-slate-200 dark:border-white/10 p-3 text-sm space-y-1">
-      <p className="font-semibold">{side.kind ? `${side.label} balance ${formatCurrency(side.amount)}` : 'Settled'}</p>
+      <p className="font-semibold">{side.kind ? `${side.label} ${formatCurrency(side.amount)}` : 'Settled'}</p>
       <p className="text-slate-500">
         Cash received {formatCurrency(party.cashReceivedTotal || 0)} · Cash given {formatCurrency(party.cashGivenTotal || 0)}
       </p>
@@ -133,12 +142,12 @@ function AccountBreakdown({ party }: { party: RegisterParty }) {
       {(party.buyerPaid || 0) > 0 ? <p className="text-slate-500">Paid by buyer {formatCurrency(party.buyerPaid || 0)}</p> : null}
       {party.linkedFarmerId ? (
         <Link className="text-primary text-xs font-semibold inline-block" to={`/farmers/${party.linkedFarmerId}`}>
-          Open farmer products for {party.farmerName} ({party.farmerCode})
+          Farmer product (eye) for {party.farmerName} ({party.farmerCode})
         </Link>
       ) : null}
       {party.linkedBuyerId ? (
         <Link className="text-primary text-xs font-semibold inline-block" to={`/buyers/${party.linkedBuyerId}`}>
-          Open buyer {party.buyerName} ({party.buyerCode})
+          Buyer sales for {party.buyerName} ({party.buyerCode})
         </Link>
       ) : null}
       {tradeLines.length ? (
@@ -237,11 +246,11 @@ export default function ArhatRegisterPage() {
     () => [...parties].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })),
     [parties],
   )
-  const receivedPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'RECEIVING')
-  const givenPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'GIVING')
-  const settledPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind == null)
-  const receivedTotal = receivedPeople.reduce((sum, p) => sum + moneySide(p.receivedTotal || 0, p.givenTotal || 0).amount, 0)
-  const givenTotal = givenPeople.reduce((sum, p) => sum + moneySide(p.receivedTotal || 0, p.givenTotal || 0).amount, 0)
+  const receivedPeople = visibleParties.filter((p) => partyFrame(p).kind === 'RECEIVING')
+  const givenPeople = visibleParties.filter((p) => partyFrame(p).kind === 'GIVING')
+  const settledPeople = visibleParties.filter((p) => partyFrame(p).kind == null)
+  const receivedTotal = receivedPeople.reduce((sum, p) => sum + partyFrame(p).amount, 0)
+  const givenTotal = givenPeople.reduce((sum, p) => sum + partyFrame(p).amount, 0)
   const searchHits = query ? visibleParties : []
   const ledgerGiven = ledgerPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
   const ledgerReceived = ledgerPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
@@ -466,6 +475,15 @@ export default function ArhatRegisterPage() {
     }
   }
 
+  const openBalanceBill = async (id: number) => {
+    try {
+      const res = await billApi.registerBalance(id, 'en')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Balance')
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate balance'))
+    }
+  }
+
   const openLedgerBill = async () => {
     try {
       const res = await billApi.registerBook('en')
@@ -478,9 +496,7 @@ export default function ArhatRegisterPage() {
   const historyTotal = entries.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const renderFrame = (p: RegisterParty) => {
-    const received = p.receivedTotal || 0
-    const given = p.givenTotal || 0
-    const side = moneySide(received, given, p.receivedCount || 0, p.givenCount || 0)
+    const side = partyFrame(p)
     return (
       <div key={p.id} className="card-3d p-4 space-y-3">
         <div>
@@ -540,6 +556,9 @@ export default function ArhatRegisterPage() {
           <Button size="sm" variant="secondary" onClick={() => void openPartyBill(p.id)}>
             <Printer className="h-3.5 w-3.5" /> Bill
           </Button>
+          <Button size="sm" variant="secondary" onClick={() => void openBalanceBill(p.id)}>
+            Balance
+          </Button>
         </div>
       </div>
     )
@@ -549,7 +568,7 @@ export default function ArhatRegisterPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Register"
-        description="Same ID as a farmer or buyer is one account. Product in or sold out is added to the running balance."
+        description="Give or receive cash on an ID. The same ID as a farmer or buyer is one account. Search the ID to see cash, product, sold, and remaining."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -642,7 +661,7 @@ export default function ArhatRegisterPage() {
                 {searchHits.length ? 'Tap a name to see details, edit, or delete.' : 'No name matches this search.'}
               </p>
               {searchHits.map((p) => {
-                const side = moneySide(p.receivedTotal || 0, p.givenTotal || 0)
+                const side = partyFrame(p)
                 return (
                   <button
                     key={p.id}
@@ -928,6 +947,11 @@ export default function ArhatRegisterPage() {
             Cash given or received on this ID is combined with farmer product and sales. Each product stays on its own line. Totals update on save.
           </p>
           {editLedger ? <AccountBreakdown party={editLedger} /> : null}
+          {editForm.id ? (
+            <Button variant="secondary" onClick={() => void openBalanceBill(editForm.id)}>
+              Print balance
+            </Button>
+          ) : null}
           <Input
             label="Name *"
             value={editForm.name}

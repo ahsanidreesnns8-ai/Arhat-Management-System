@@ -3,6 +3,7 @@ import { copyrightText, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger, listParties } from '@/server/services/register'
+import { getAccountStatement } from '@/server/services/linked-account'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
 import { getBook as getPaddyKhataBook } from '@/server/services/paddy-khata'
 import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
@@ -970,6 +971,87 @@ export async function saleBill(
 export async function registerPartyBill(id: number | bigint, lang = 'en') {
   const ledger = await getPartyLedger(id)
   return renderRegisterLedgerBill(ledger, lang)
+}
+
+export async function accountBalanceBillByKey(key: string, lang = 'en') {
+  const statement = await getAccountStatement(key)
+  return renderAccountBalanceBill(statement, lang)
+}
+
+export async function accountBalanceBillByFarmer(id: number | bigint, lang = 'en') {
+  const farmer = await prisma.farmer.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!farmer) throw new Error('Farmer not found')
+  return accountBalanceBillByKey(farmer.farmerId, lang)
+}
+
+export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en') {
+  const buyer = await prisma.buyer.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!buyer) throw new Error('Buyer not found')
+  return accountBalanceBillByKey(buyer.buyerId, lang)
+}
+
+export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
+  const party = await prisma.registerParty.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!party) throw new Error('Person not found')
+  return accountBalanceBillByKey(party.name, lang)
+}
+
+function renderAccountBalanceBill(
+  statement: Awaited<ReturnType<typeof getAccountStatement>>,
+  lang: string,
+) {
+  const urdu = lang === 'ur'
+  const remainingGive = statement.remainingToGive
+  const remainingReceive = statement.remainingToReceive
+  const remainingLabel = remainingGive > 0
+    ? (urdu ? 'باقی دینی ہے' : 'Remaining to give')
+    : remainingReceive > 0
+      ? (urdu ? 'باقی وصول' : 'Remaining to receive')
+      : (urdu ? 'حساب برابر' : 'Settled')
+  const remainingAmount = remainingGive > 0 ? remainingGive : remainingReceive
+  const who = statement.farmerName || statement.buyerName || statement.name
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${escape(who)}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'شناخت' : 'ID'}</span><div class="value">${escape(statement.name)}</div></div>
+      <div><span class="label">${remainingLabel}</span><div class="value">PKR ${money(remainingAmount)}</div></div>
+      <div><span class="label">${urdu ? 'مال' : 'Product in'}</span><div class="value">PKR ${money(statement.productTotal)}</div></div>
+      <div><span class="label">${urdu ? 'رجسٹر دی گئی' : 'Register given'}</span><div class="value">PKR ${money(statement.cashGiven)}</div></div>
+      <div><span class="label">${urdu ? 'رجسٹر وصول' : 'Register received'}</span><div class="value">PKR ${money(statement.cashReceived)}</div></div>
+      <div><span class="label">${urdu ? 'فروخت' : 'Sold'}</span><div class="value">PKR ${money(statement.soldTotal)}</div></div>
+    </div>
+  </div>`
+  const rows = statement.lines.length
+    ? statement.lines.map((row) => {
+        const stamp = karachiStamp(row.createdAt)
+        return [
+          stamp.date,
+          row.particular,
+          row.addition ? money(row.addition) : '—',
+          row.deduction ? money(row.deduction) : '—',
+        ]
+      })
+    : [[urdu ? 'کوئی اندراج نہیں' : 'No lines yet', '', '0', '0']]
+  const body = table(
+    urdu
+      ? ['تاریخ', 'تفصیل', 'جمع (مال / وصول)', 'منفی (دی گئی / فروخت)']
+      : ['Date', 'Particulars', 'Added', 'Deducted'],
+    rows,
+    [
+      urdu ? 'بقایا' : remainingLabel,
+      '',
+      remainingGive > 0 ? money(remainingGive) : '—',
+      remainingReceive > 0 ? money(remainingReceive) : '—',
+    ],
+    { nameCols: [1], moneyCols: [2, 3] },
+  )
+  return page('', partyHtml, body, urdu)
 }
 
 export async function registerBookBill(lang = 'en') {

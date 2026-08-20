@@ -2,6 +2,7 @@ import { prisma } from '@/server/db'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 import {
+  accountPosition,
   findRegisterPartyByKey,
   loadTradeIndex,
   tradeForKey,
@@ -131,6 +132,9 @@ function partyDto(
     soldCount: 0,
     farmerPaid: 0,
     buyerPaid: 0,
+    remainingToGive: 0,
+    remainingToReceive: 0,
+    displayLabel: 'Settled',
     linkedFarmerId: null as number | null,
     farmerCode: null as string | null,
     farmerName: null as string | null,
@@ -166,8 +170,14 @@ function tradeLineDto(line: LinkedTrade['lines'][number], party: PartyDto): Entr
 function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false): PartyDto {
   const cashReceived = dto.cashReceivedTotal
   const cashGiven = dto.cashGivenTotal
-  const receivedTotal = cashReceived + trade.productTotal + trade.buyerPaid
-  const givenTotal = cashGiven + trade.soldTotal + trade.farmerPaid
+  const position = accountPosition({
+    cashReceived,
+    cashGiven,
+    productTotal: trade.productTotal,
+    soldTotal: trade.soldTotal,
+    farmerPaid: trade.farmerPaid,
+    buyerPaid: trade.buyerPaid,
+  })
   const extra = includeEntries
     ? trade.lines.map((line) => tradeLineDto(line, dto))
     : []
@@ -180,9 +190,9 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
     ...dto,
     cashReceivedTotal: cashReceived,
     cashGivenTotal: cashGiven,
-    receivedTotal,
-    givenTotal,
-    balance: receivedTotal - givenTotal,
+    receivedTotal: position.receivedTotal,
+    givenTotal: position.givenTotal,
+    balance: position.netOwedToThem,
     receivedCount: dto.receivedCount,
     givenCount: dto.givenCount,
     productTotal: trade.productTotal,
@@ -191,6 +201,9 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
     soldCount: trade.soldCount,
     farmerPaid: trade.farmerPaid,
     buyerPaid: trade.buyerPaid,
+    remainingToGive: position.remainingToGive,
+    remainingToReceive: position.remainingToReceive,
+    displayLabel: position.displayLabel,
     linkedFarmerId: trade.farmerId,
     farmerCode: trade.farmerCode,
     farmerName: trade.farmerName,

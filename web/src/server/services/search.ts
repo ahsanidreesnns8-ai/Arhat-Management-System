@@ -1,4 +1,6 @@
 import { prisma } from '@/server/db'
+import { normalizeAccountKey } from '@/server/ids'
+import { getAccountStatement } from '@/server/services/linked-account'
 
 const PAGE_SHORTCUTS = [
   { id: 'dashboard', title: 'Dashboard', titleUr: 'ڈیش بورڈ', keywords: ['dashboard', 'home', 'ڈیش'], link: '/dashboard' },
@@ -44,14 +46,14 @@ export async function search(query: string) {
   if (q.length < 2) return pages
 
   const contains = { contains: q, mode: 'insensitive' as const }
-  const [farmers, buyers, trucks, dheris, sales, products, wheatParties] =
+  const [farmers, buyers, trucks, dheris, sales, products, wheatParties, registerParties] =
     await Promise.all([
       prisma.farmer.findMany({
         where: {
           deleted: false,
           OR: [{ name: contains }, { farmerId: contains }, { phone: contains }],
         },
-        take: 5,
+        take: 8,
       }),
       prisma.buyer.findMany({
         where: {
@@ -97,9 +99,44 @@ export async function search(query: string) {
         },
         take: 5,
       }),
+      prisma.registerParty.findMany({
+        where: { deleted: false, kind: { in: ['GIVING', 'RECEIVING', 'PERSON'] } },
+        take: 80,
+      }),
     ])
 
+  const needle = normalizeAccountKey(q)
+  const keys = new Map<string, string>()
+  const remember = (value: string) => {
+    const key = normalizeAccountKey(value)
+    if (key && (key.includes(needle) || needle.includes(key)) && !keys.has(key)) {
+      keys.set(key, value)
+    }
+  }
+  for (const item of registerParties) remember(item.name)
+  for (const item of farmers) remember(item.farmerId)
+  for (const item of buyers) remember(item.buyerId)
+  const accounts = []
+  for (const key of [...keys.values()].slice(0, 6)) {
+    const statement = await getAccountStatement(key)
+    const remaining = statement.remainingToGive > 0
+      ? `Remaining to give Rs ${Math.round(statement.remainingToGive)}`
+      : statement.remainingToReceive > 0
+        ? `Remaining to receive Rs ${Math.round(statement.remainingToReceive)}`
+        : 'Settled'
+    accounts.push({
+      id: statement.key,
+      type: 'ACCOUNT',
+      title: statement.farmerName || statement.buyerName
+        ? `${statement.name} · ${statement.farmerName || statement.buyerName}`
+        : statement.name,
+      subtitle: `${remaining} · Product Rs ${Math.round(statement.productTotal)} · Given Rs ${Math.round(statement.cashGiven)} · Received Rs ${Math.round(statement.cashReceived)} · Sold Rs ${Math.round(statement.soldTotal)}`,
+      link: `/arhat-register?q=${encodeURIComponent(statement.name)}`,
+    })
+  }
+
   return [
+    ...accounts,
     ...pages,
     ...farmers.map((item) => ({
       id: item.farmerId,

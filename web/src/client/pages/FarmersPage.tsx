@@ -146,7 +146,7 @@ export default function FarmersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Farmer Management"
-        description="Track farmer payables, product settlements, and payments made by the owner"
+        description="Eye opens product history only. Use the same ID as Arhat Register. Product bill and Balance bill are separate."
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
