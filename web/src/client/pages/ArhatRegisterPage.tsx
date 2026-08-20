@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BookOpen, Eye, HandCoins, Landmark, Pencil, Plus, Printer, Search, Sprout, Trash2, Wallet } from 'lucide-react'
+import { BookOpen, ClipboardList, Eye, HandCoins, Landmark, Pencil, Plus, Printer, Search, Sprout, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -16,7 +16,7 @@ import { Navigate } from 'react-router-dom'
 import type { Farmer, RegisterEntry, RegisterParty, ZakatSummary } from '../types'
 import PartyCombobox from '../components/forms/PartyCombobox'
 
-type Section = 'PEOPLE' | 'ZAKAT' | 'ADVANCE'
+type Section = 'PEOPLE' | 'LEDGER' | 'ZAKAT' | 'ADVANCE'
 type MoneyKind = 'GIVING' | 'RECEIVING'
 
 type MoneySide = {
@@ -121,6 +121,10 @@ export default function ArhatRegisterPage() {
         const [e, f] = await Promise.all([registerApi.entries('FARMER_ADVANCE'), farmerApi.getAll()])
         setEntries(e.data.data || [])
         setFarmers(f.data.data || [])
+      } else if (section === 'LEDGER') {
+        const p = await registerApi.parties('RECEIVING')
+        setParties(p.data.data || [])
+        setEntries([])
       } else {
         const [p, given, received] = await Promise.all([
           registerApi.parties('RECEIVING'),
@@ -152,12 +156,20 @@ export default function ArhatRegisterPage() {
     () => [...parties].filter((p) => matchesSearch(p, query)).sort(byNameThenAmount),
     [parties, query],
   )
+  const ledgerPeople = useMemo(
+    () => [...parties].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })),
+    [parties],
+  )
   const receivedPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'RECEIVING')
   const givenPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'GIVING')
   const settledPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind == null)
   const receivedTotal = receivedPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
   const givenTotal = givenPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
   const searchHits = query ? visibleParties : []
+  const ledgerGiven = ledgerPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
+  const ledgerReceived = ledgerPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
+  const ledgerRemaining = Math.abs(ledgerReceived - ledgerGiven)
+  const ledgerTotal = ledgerReceived + ledgerGiven
 
   if (!isOwner) return <Navigate to="/dashboard" replace />
 
@@ -371,6 +383,15 @@ export default function ArhatRegisterPage() {
     }
   }
 
+  const openLedgerBill = async () => {
+    try {
+      const res = await billApi.registerBook('en')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Ledger')
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate ledger'))
+    }
+  }
+
   const historyTotal = entries.reduce((sum, row) => sum + (row.amount || 0), 0)
 
   const renderFrame = (p: RegisterParty) => {
@@ -432,6 +453,7 @@ export default function ArhatRegisterPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {([
           { id: 'PEOPLE' as const, label: 'People', icon: BookOpen },
+          { id: 'LEDGER' as const, label: 'Ledger', icon: ClipboardList },
           { id: 'ZAKAT' as const, label: 'Zakat Amount', icon: Landmark },
           { id: 'ADVANCE' as const, label: 'Advance Payment To Farmer', icon: Sprout },
         ]).map((item) => (
@@ -459,6 +481,14 @@ export default function ArhatRegisterPage() {
           </Button>
           <Button variant="secondary" onClick={() => openMoney('GIVING')}>
             <HandCoins className="h-4 w-4" /> Give amount
+          </Button>
+        </div>
+      )}
+
+      {section === 'LEDGER' && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void openLedgerBill()} disabled={!parties.length}>
+            <Printer className="h-4 w-4" /> Print ledger
           </Button>
         </div>
       )}
@@ -587,6 +617,60 @@ export default function ArhatRegisterPage() {
         )
       )}
 
+      {section === 'LEDGER' && (
+        loading ? (
+          <div className="card-3d p-4"><TableSkeleton rows={6} /></div>
+        ) : !ledgerPeople.length ? (
+          <p className="card-3d p-5 text-sm text-slate-500">Add people in Arhat Register and they will all appear in this ledger.</p>
+        ) : (
+          <div className="card-3d overflow-hidden">
+            <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-[#C5A059]" />
+              Ledger
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-slate-100 dark:border-white/10">
+                    <th className="px-4 py-2">Name</th>
+                    <th className="px-4 py-2 text-right">Giving amount</th>
+                    <th className="px-4 py-2 text-right">Receiving amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerPeople.map((p) => (
+                    <tr key={p.id} className="border-b border-slate-100 dark:border-white/10">
+                      <td className="px-4 py-2 font-medium">{p.name}</td>
+                      <td className="px-4 py-2 text-right">{formatCurrency(p.givenTotal || 0)}</td>
+                      <td className="px-4 py-2 text-right">{formatCurrency(p.receivedTotal || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-4 border-t border-slate-100 dark:border-white/10 text-[12px]">
+              <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2">
+                <div className="text-slate-500">Total receiving amount</div>
+                <div className="font-semibold">{formatCurrency(ledgerReceived)}</div>
+              </div>
+              <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 px-3 py-2">
+                <div className="text-slate-500">Total giving amount</div>
+                <div className="font-semibold">{formatCurrency(ledgerGiven)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2">
+                <div className="text-slate-500">Remaining amount</div>
+                <div className="font-semibold">{formatCurrency(ledgerRemaining)}</div>
+              </div>
+              <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2">
+                <div className="text-slate-500">Total amount</div>
+                <div className="font-semibold">{formatCurrency(ledgerTotal)}</div>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {section !== 'LEDGER' && (
       <div className="card-3d overflow-hidden">
         <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-[#C5A059]" />
@@ -655,6 +739,7 @@ export default function ArhatRegisterPage() {
           </div>
         )}
       </div>
+      )}
 
       <Modal open={personOpen} onClose={() => setPersonOpen(false)} title="Add person">
         <div className="space-y-3">
