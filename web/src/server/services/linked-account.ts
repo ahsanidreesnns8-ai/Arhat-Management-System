@@ -197,3 +197,144 @@ export async function registerCashForKey(key: string) {
     .reduce((sum, row) => sum + row.amount.toNumber(), 0)
   return { partyId: Number(party.id), registerReceived, registerGiven }
 }
+
+export type AccountParts = {
+  cashReceived: number
+  cashGiven: number
+  productTotal: number
+  soldTotal: number
+  farmerPaid: number
+  buyerPaid: number
+}
+
+/**
+ * Current account for one ID.
+ * Product in and cash received from them add what we still owe.
+ * Cash given, farmer payments, and goods sold deduct.
+ * Example: given 80,000 then product 150,000 → remaining to give 70,000.
+ */
+export function accountPosition(parts: AccountParts) {
+  const credit = parts.productTotal + parts.cashReceived + parts.buyerPaid
+  const debit = parts.cashGiven + parts.soldTotal + parts.farmerPaid
+  const hasTrade =
+    parts.productTotal > 0 || parts.soldTotal > 0 || parts.farmerPaid > 0 || parts.buyerPaid > 0
+  const netOwedToThem = hasTrade ? credit - debit : parts.cashReceived - parts.cashGiven
+  const remainingToGive = netOwedToThem > 0 ? netOwedToThem : 0
+  const remainingToReceive = netOwedToThem < 0 ? -netOwedToThem : 0
+  const displayLabel = !hasTrade
+    ? parts.cashReceived > parts.cashGiven
+      ? 'Received'
+      : parts.cashGiven > parts.cashReceived
+        ? 'Given'
+        : 'Settled'
+    : remainingToGive > 0
+      ? 'Remaining to give'
+      : remainingToReceive > 0
+        ? 'Remaining to receive'
+        : 'Settled'
+  return {
+    hasTrade,
+    netOwedToThem,
+    remainingToGive: hasTrade ? remainingToGive : 0,
+    remainingToReceive: hasTrade ? remainingToReceive : 0,
+    receivedTotal: hasTrade ? remainingToReceive : parts.cashReceived,
+    givenTotal: hasTrade ? remainingToGive : parts.cashGiven,
+    displayLabel,
+  }
+}
+
+export type AccountStatementLine = {
+  createdAt: Date
+  particular: string
+  addition: number
+  deduction: number
+  kind: string
+}
+
+export type AccountStatement = {
+  key: string
+  name: string
+  partyId: number | null
+  farmerId: number | null
+  farmerCode: string | null
+  farmerName: string | null
+  buyerId: number | null
+  buyerCode: string | null
+  buyerName: string | null
+  cashGiven: number
+  cashReceived: number
+  productTotal: number
+  soldTotal: number
+  farmerPaid: number
+  buyerPaid: number
+  additionTotal: number
+  deductionTotal: number
+  remainingToGive: number
+  remainingToReceive: number
+  lines: AccountStatementLine[]
+}
+
+function stampLine(createdAt: Date, particular: string, addition: number, deduction: number, kind: string): AccountStatementLine {
+  return { createdAt, particular, addition, deduction, kind }
+}
+
+export async function getAccountStatement(key: string): Promise<AccountStatement> {
+  const norm = normalizeAccountKey(key)
+  const party = await findRegisterPartyByKey(key)
+  const index = await loadTradeIndex()
+  const trade = tradeForKey(index, key)
+  const cashReceived = (party?.entries || [])
+    .filter((row) => row.kind === 'RECEIVING')
+    .reduce((sum, row) => sum + row.amount.toNumber(), 0)
+  const cashGiven = (party?.entries || [])
+    .filter((row) => row.kind === 'GIVING')
+    .reduce((sum, row) => sum + row.amount.toNumber(), 0)
+
+  const lines: AccountStatementLine[] = []
+  for (const row of party?.entries || []) {
+    const amount = row.amount.toNumber()
+    if (row.kind === 'RECEIVING') {
+      lines.push(stampLine(row.createdAt, row.notes || 'Received on register', amount, 0, 'RECEIVING'))
+    }
+    if (row.kind === 'GIVING') {
+      lines.push(stampLine(row.createdAt, row.notes || 'Given on register', 0, amount, 'GIVING'))
+    }
+  }
+  for (const line of trade.lines) {
+    if (line.kind === 'PRODUCT') {
+      lines.push(stampLine(line.createdAt, line.notes || 'Farmer product', line.amount, 0, 'PRODUCT'))
+    } else if (line.kind === 'SOLD') {
+      lines.push(stampLine(line.createdAt, line.notes || 'Sold', 0, line.amount, 'SOLD'))
+    } else if (line.kind === 'FARMER_PAID') {
+      lines.push(stampLine(line.createdAt, line.notes || 'Paid to farmer', 0, line.amount, 'FARMER_PAID'))
+    } else if (line.kind === 'BUYER_PAID') {
+      lines.push(stampLine(line.createdAt, line.notes || 'Paid by buyer', line.amount, 0, 'BUYER_PAID'))
+    }
+  }
+  lines.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  const additionTotal = lines.reduce((sum, row) => sum + row.addition, 0)
+  const deductionTotal = lines.reduce((sum, row) => sum + row.deduction, 0)
+  const remaining = additionTotal - deductionTotal
+  return {
+    key: norm,
+    name: party?.name || trade.farmerCode || trade.buyerCode || key,
+    partyId: party ? Number(party.id) : null,
+    farmerId: trade.farmerId,
+    farmerCode: trade.farmerCode,
+    farmerName: trade.farmerName,
+    buyerId: trade.buyerId,
+    buyerCode: trade.buyerCode,
+    buyerName: trade.buyerName,
+    cashGiven,
+    cashReceived,
+    productTotal: trade.productTotal,
+    soldTotal: trade.soldTotal,
+    farmerPaid: trade.farmerPaid,
+    buyerPaid: trade.buyerPaid,
+    additionTotal,
+    deductionTotal,
+    remainingToGive: remaining > 0 ? remaining : 0,
+    remainingToReceive: remaining < 0 ? -remaining : 0,
+    lines,
+  }
+}

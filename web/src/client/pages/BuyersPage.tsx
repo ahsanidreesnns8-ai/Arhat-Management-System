@@ -142,7 +142,7 @@ export default function BuyersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Buyer Management"
-        description="Manage buyers, bills, payments received, and remaining balances"
+        description="Eye opens sales history only. Use the same ID as Arhat Register. Product bill and Balance bill are separate."
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />

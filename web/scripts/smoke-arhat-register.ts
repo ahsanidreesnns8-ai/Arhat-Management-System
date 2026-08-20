@@ -6,10 +6,12 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill } from '../src/server/services/bills'
+import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill, accountBalanceBillByFarmer } from '../src/server/services/bills'
 import { createFarmer, getFarmer } from '../src/server/services/farmers'
 import { createDheri } from '../src/server/services/dheris'
 import { normalizeAccountKey } from '../src/server/ids'
+import { getAccountStatement } from '../src/server/services/linked-account'
+import { search as systemSearch } from '../src/server/services/search'
 import {
   createParty,
   createEntry,
@@ -209,7 +211,7 @@ async function main() {
       const givenToId = await createEntry({
         kind: 'GIVING',
         partyId: linkedParty.id,
-        amount: 665822,
+        amount: 80000,
       })
       ids.entryIds.push(BigInt(givenToId.id))
       const linkedFarmer = await createFarmer({
@@ -218,7 +220,7 @@ async function main() {
       })
       ids.linkedFarmerId = BigInt(linkedFarmer.id)
       assert(linkedFarmer.registerPartyId === linkedParty.id, 'farmer page should find the register person by ID')
-      assert(linkedFarmer.registerGiven === 665822, `farmer should see register given, got ${linkedFarmer.registerGiven}`)
+      assert(linkedFarmer.registerGiven === 80000, `farmer should see register given, got ${linkedFarmer.registerGiven}`)
 
       const product = await prisma.product.findFirst({ where: { deleted: false, active: true } })
       assert(product, 'need a product to record farmer product against the same ID')
@@ -226,20 +228,30 @@ async function main() {
         farmerId: linkedFarmer.id,
         productId: Number(product.id),
         dheriCode: `L${stamp.slice(-6)}`,
-        numberOfBags: 2,
+        numberOfBags: 100,
         weightPerBag: 40,
         partialBagWeight: 0,
-        marketRate: 400,
+        marketRate: 1562.5,
       })
       ids.linkedDheriId = BigInt(dheri.id)
+      assert(Math.abs(dheri.farmerReceivable - 150000) < 1, `example product should be 150000, got ${dheri.farmerReceivable}`)
       const afterProduct = await getPartyLedger(linkedParty.id)
       assert(afterProduct.linkedFarmerId === linkedFarmer.id, 'register search should link the farmer by ID')
-      assert(afterProduct.productTotal === dheri.farmerReceivable, `product should add to the ID, got ${afterProduct.productTotal}`)
-      assert(afterProduct.cashGivenTotal === 665822, 'cash given should stay on the ID')
-      const expectedNet = afterProduct.productTotal - 665822
-      assert(Math.abs((afterProduct.balance || 0) - expectedNet) < 0.05, `running balance expected ${expectedNet} got ${afterProduct.balance}`)
+      assert(afterProduct.cashGivenTotal === 80000, 'cash given should stay on the ID')
+      assert(afterProduct.displayLabel === 'Remaining to give', `card should say remaining to give, got ${afterProduct.displayLabel}`)
+      assert(Math.abs((afterProduct.givenTotal || 0) - 70000) < 1, `remaining to give should be 70000 got ${afterProduct.givenTotal}`)
       const farmerAfter = await getFarmer(linkedFarmer.id)
-      assert(Math.abs((farmerAfter.accountBalance || 0) - expectedNet) < 0.05, 'farmer remaining should match register balance')
+      assert(Math.abs((farmerAfter.accountBalance || 0) - 150000) < 1, 'farmer eye remaining is product only')
+      const account = await getAccountStatement(linkedCode)
+      assert(Math.abs(account.remainingToGive - 70000) < 1, `balance remaining to give 70000 got ${account.remainingToGive}`)
+      const balanceHtml = await accountBalanceBillByFarmer(linkedFarmer.id, 'en')
+      assert(balanceHtml.includes('70000') || balanceHtml.includes('70,000') || balanceHtml.includes('70000'), 'balance bill missing remaining 70000')
+      assert(balanceHtml.includes('80000') || balanceHtml.includes('80,000'), 'balance bill missing register given')
+      const found = await systemSearch(linkedCode)
+      assert(
+        found.some((row) => row.type === 'ACCOUNT' && /70,?000/.test(row.subtitle)),
+        'system search by ID should show remaining',
+      )
 
       const dheri2 = await createDheri({
         farmerId: linkedFarmer.id,
@@ -260,8 +272,13 @@ async function main() {
       const productLines = (afterSecond.entries || []).filter((row) => row.kind === 'PRODUCT')
       assert(productLines.length === 2, 'register details should list both products separately')
       const farmerAfterSecond = await getFarmer(linkedFarmer.id)
-      const expectedNet2 = afterSecond.productTotal - 665822
-      assert(Math.abs((farmerAfterSecond.accountBalance || 0) - expectedNet2) < 0.05, 'farmer balance should include both products')
+      assert(
+        Math.abs((farmerAfterSecond.accountBalance || 0) - (dheri.farmerReceivable + dheri2.farmerReceivable)) < 1,
+        'farmer eye remaining should stay product-only after the second dheri',
+      )
+      const afterSecondStatement = await getAccountStatement(linkedCode)
+      const expectedGive = dheri.farmerReceivable + dheri2.farmerReceivable - 80000
+      assert(Math.abs(afterSecondStatement.remainingToGive - expectedGive) < 1, 'second product should add to remaining')
 
       const listed = await listEntries('GIVING')
       assert(listed.some((row) => row.id === given.id), 'giving history missing')

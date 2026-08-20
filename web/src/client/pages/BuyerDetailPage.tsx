@@ -54,6 +54,15 @@ export default function BuyerDetailPage() {
     }
   }
 
+  const openBalance = async (lang: 'en' | 'ur' = 'en') => {
+    try {
+      const res = await buyerApi.getBalanceHtml(buyerId, lang)
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), `Balance ${buyer?.buyerId || buyerId}`)
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate balance'))
+    }
+  }
+
   const openSelectedBill = async (lang: 'en' | 'ur' = 'en') => {
     if (!selectedItems.length) {
       toast.error('Tick at least one purchase line')
@@ -127,8 +136,9 @@ export default function BuyerDetailPage() {
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {settled ? 'Paid' : 'Receive / Settle remaining'}
               </Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Bill (EN)</Button>
-              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> بل (UR)</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
+              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
+              <Button variant="secondary" onClick={() => void openBalance()}>Balance</Button>
               <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
             </div>
           }
@@ -148,6 +158,9 @@ export default function BuyerDetailPage() {
           <p className="mt-1 font-medium">{buyer.fatherName || '—'}</p>
           <p className="text-sm text-gray-500">{[buyer.address, buyer.city].filter(Boolean).join(', ') || ''}</p>
           {buyer.notes ? <p className="mt-2 text-sm text-gray-500">{buyer.notes}</p> : null}
+          <p className="mt-2 text-sm text-slate-500">
+            This page is buyer sales only. Product bill prints these purchases. Balance prints sales plus Arhat Register given / received for ID {buyer.buyerId}.
+          </p>
           {settled && (
             <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records

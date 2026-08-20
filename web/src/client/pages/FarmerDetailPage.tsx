@@ -55,6 +55,15 @@ export default function FarmerDetailPage() {
     }
   }
 
+  const openBalance = async (lang: 'en' | 'ur' = 'en') => {
+    try {
+      const res = await farmerApi.getBalanceHtml(farmerId, lang)
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), `Balance ${farmer?.farmerId || farmerId}`)
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate balance'))
+    }
+  }
+
   if (loading) return <TableSkeleton rows={8} />
   if (!farmer) {
     return (
@@ -67,16 +76,12 @@ export default function FarmerDetailPage() {
 
   const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
   const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
-  const registerGiven = farmer.registerGiven ?? 0
-  const registerReceived = farmer.registerReceived ?? 0
-  const accountBalance = farmer.accountBalance ?? (totalBilled + registerReceived - registerGiven - totalPaid)
-  const remainingToPay = Math.max(0, accountBalance)
-  const givenRemaining = Math.max(0, -accountBalance)
+  const remainingToPay = Math.max(0, totalBilled - totalPaid)
   const settled = isPartySettled({
     outstandingBalance: remainingToPay,
     totalBilled,
-    totalPaid: totalPaid + registerGiven,
-  }) && givenRemaining === 0
+    totalPaid,
+  })
 
   return (
     <div className="space-y-6">
@@ -96,23 +101,22 @@ export default function FarmerDetailPage() {
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {settled ? 'Paid' : 'Pay / Settle remaining'}
               </Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Bill (EN)</Button>
-              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> بل (UR)</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
+              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
+              <Button variant="secondary" onClick={() => void openBalance()}>Balance</Button>
               <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
             </div>
           }
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MoneyCard label="Total payable (products)" value={totalBilled} tone="neutral" />
-        <MoneyCard label="Register received" value={registerReceived} tone="good" />
-        <MoneyCard label="Register given" value={registerGiven} tone="warn" />
         <MoneyCard label="Amount paid to farmer" value={totalPaid} tone="good" />
         <MoneyCard
-          label={givenRemaining > 0 ? 'Balance (still given)' : 'Remaining to pay'}
-          value={givenRemaining > 0 ? givenRemaining : remainingToPay}
-          tone={settled || givenRemaining > 0 ? 'good' : 'warn'}
+          label="Remaining to pay (products)"
+          value={remainingToPay}
+          tone={settled ? 'good' : 'warn'}
         />
       </div>
       <div className="card-3d p-5">
@@ -120,20 +124,10 @@ export default function FarmerDetailPage() {
         <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
         <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
         {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
-        {farmer.registerPartyId ? (
-          <p className="mt-2 text-sm text-slate-500">
-            Same ID on Arhat Register. Cash given or received is already in this balance.
-            Each product below stays separate; a new product only adds its amount.
-            {' '}
-            <Link className="text-primary font-semibold" to={`/arhat-register?q=${encodeURIComponent(farmer.farmerId)}`}>
-              Open register {farmer.farmerId}
-            </Link>
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">
-            Use this same ID on Arhat Register to combine given / received cash with these products.
-          </p>
-        )}
+        <p className="mt-2 text-sm text-slate-500">
+          This page is farmer product only. Arhat Register cash is not mixed here.
+          Product bill prints these dheris. Balance prints product plus register given / received for ID {farmer.farmerId}.
+        </p>
         {settled && (
           <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
             <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records

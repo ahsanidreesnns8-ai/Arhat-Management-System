@@ -186,6 +186,8 @@ export const farmerApi = {
   getTrucks: (id: number) => api.get<ApiResponse<Truck[]>>(`/farmers/${id}/trucks`),
   getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/farmer/${id}`, lang),
+  getBalanceHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
+    billRequest(`/bills/farmer/${id}/balance`, lang),
 }
 
 export const buyerApi = {
@@ -198,6 +200,8 @@ export const buyerApi = {
   getSales: (id: number) => api.get<ApiResponse<Sale[]>>(`/buyers/${id}/sales`),
   getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/buyer/${id}`, lang),
+  getBalanceHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
+    billRequest(`/bills/buyer/${id}/balance`, lang),
   getSelectedBillHtml: (
     id: number,
     saleItemIds: number[],
@@ -218,6 +222,8 @@ export const billApi = {
   register: (id: number, lang: 'en' | 'ur' = 'en') => billRequest(`/bills/register/${id}`, lang),
   registerParty: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/register/party/${id}`, lang),
+  registerBalance: (id: number, lang: 'en' | 'ur' = 'en') =>
+    billRequest(`/bills/register/party/${id}/balance`, lang),
   registerBook: (lang: 'en' | 'ur' = 'en') => billRequest('/bills/register/book', lang),
   wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/wheat-khata/${id}`, lang),
