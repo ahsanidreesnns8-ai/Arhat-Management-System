@@ -33,6 +33,11 @@ export function normalizeOwnerCode(value: string | null | undefined) {
   return String(value ?? '').trim()
 }
 
+/** Same person ID across Farmer / Buyer / Arhat Register: r74.1, R74.1, "R 74.1". */
+export function normalizeAccountKey(value: string | null | undefined) {
+  return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
+}
+
 export async function nextDheriQueueNumber() {
   const last = await prisma.dheri.findFirst({
     where: { deleted: false, queueNumber: { not: null } },

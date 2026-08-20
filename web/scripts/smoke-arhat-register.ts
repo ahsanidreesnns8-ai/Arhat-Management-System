@@ -7,7 +7,9 @@ config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
 import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill } from '../src/server/services/bills'
-import { createFarmer } from '../src/server/services/farmers'
+import { createFarmer, getFarmer } from '../src/server/services/farmers'
+import { createDheri } from '../src/server/services/dheris'
+import { normalizeAccountKey } from '../src/server/ids'
 import {
   createParty,
   createEntry,
@@ -41,6 +43,10 @@ async function main() {
       farmerId: undefined as bigint | undefined,
       partyId: undefined as bigint | undefined,
       entryIds: [] as bigint[],
+      linkedPartyId: undefined as bigint | undefined,
+      linkedFarmerId: undefined as bigint | undefined,
+      linkedDheriId: undefined as bigint | undefined,
+      linkedDheriId2: undefined as bigint | undefined,
     }
     try {
       const person = await createParty({
@@ -194,12 +200,83 @@ async function main() {
       assert(html.includes('Advance'), 'advance reference missing from farmer bill')
       assert(html.includes('aria-label="RTC"'), 'RTC logo missing on farmer bill')
 
+      assert(normalizeAccountKey('r74.1') === 'R74.1', 'farmer id case should match register id')
+      assert(normalizeAccountKey('R 74.1') === 'R74.1', 'spaces in the same id should still match')
+
+      const linkedCode = `R${stamp.slice(-6)}`
+      const linkedParty = await createParty({ kind: 'GIVING', name: linkedCode })
+      ids.linkedPartyId = BigInt(linkedParty.id)
+      const givenToId = await createEntry({
+        kind: 'GIVING',
+        partyId: linkedParty.id,
+        amount: 665822,
+      })
+      ids.entryIds.push(BigInt(givenToId.id))
+      const linkedFarmer = await createFarmer({
+        name: `Aw ${stamp}`,
+        code: linkedCode.toLowerCase(),
+      })
+      ids.linkedFarmerId = BigInt(linkedFarmer.id)
+      assert(linkedFarmer.registerPartyId === linkedParty.id, 'farmer page should find the register person by ID')
+      assert(linkedFarmer.registerGiven === 665822, `farmer should see register given, got ${linkedFarmer.registerGiven}`)
+
+      const product = await prisma.product.findFirst({ where: { deleted: false, active: true } })
+      assert(product, 'need a product to record farmer product against the same ID')
+      const dheri = await createDheri({
+        farmerId: linkedFarmer.id,
+        productId: Number(product.id),
+        dheriCode: `L${stamp.slice(-6)}`,
+        numberOfBags: 2,
+        weightPerBag: 40,
+        partialBagWeight: 0,
+        marketRate: 400,
+      })
+      ids.linkedDheriId = BigInt(dheri.id)
+      const afterProduct = await getPartyLedger(linkedParty.id)
+      assert(afterProduct.linkedFarmerId === linkedFarmer.id, 'register search should link the farmer by ID')
+      assert(afterProduct.productTotal === dheri.farmerReceivable, `product should add to the ID, got ${afterProduct.productTotal}`)
+      assert(afterProduct.cashGivenTotal === 665822, 'cash given should stay on the ID')
+      const expectedNet = afterProduct.productTotal - 665822
+      assert(Math.abs((afterProduct.balance || 0) - expectedNet) < 0.05, `running balance expected ${expectedNet} got ${afterProduct.balance}`)
+      const farmerAfter = await getFarmer(linkedFarmer.id)
+      assert(Math.abs((farmerAfter.accountBalance || 0) - expectedNet) < 0.05, 'farmer remaining should match register balance')
+
+      const dheri2 = await createDheri({
+        farmerId: linkedFarmer.id,
+        productId: Number(product.id),
+        dheriCode: `M${stamp.slice(-6)}`,
+        numberOfBags: 3,
+        weightPerBag: 40,
+        partialBagWeight: 0,
+        marketRate: 400,
+      })
+      ids.linkedDheriId2 = BigInt(dheri2.id)
+      const afterSecond = await getPartyLedger(linkedParty.id)
+      assert(afterSecond.productCount === 2, `each visit should keep its own product, got ${afterSecond.productCount}`)
+      assert(
+        Math.abs(afterSecond.productTotal - (dheri.farmerReceivable + dheri2.farmerReceivable)) < 0.05,
+        'second product should add to the same ID without replacing the first',
+      )
+      const productLines = (afterSecond.entries || []).filter((row) => row.kind === 'PRODUCT')
+      assert(productLines.length === 2, 'register details should list both products separately')
+      const farmerAfterSecond = await getFarmer(linkedFarmer.id)
+      const expectedNet2 = afterSecond.productTotal - 665822
+      assert(Math.abs((farmerAfterSecond.accountBalance || 0) - expectedNet2) < 0.05, 'farmer balance should include both products')
+
       const listed = await listEntries('GIVING')
       assert(listed.some((row) => row.id === given.id), 'giving history missing')
       console.log('arhat register OK', given.id, received.id, zakat.id, advance.id)
     } finally {
       if (ids.entryIds.length) {
         await prisma.registerEntry.deleteMany({ where: { id: { in: ids.entryIds } } })
+      }
+      if (ids.linkedDheriId || ids.linkedDheriId2) {
+        const dheriIds = [ids.linkedDheriId, ids.linkedDheriId2].filter((id): id is bigint => id != null)
+        await prisma.queueEntry.deleteMany({ where: { dheriId: { in: dheriIds } } })
+        await prisma.stockLot.deleteMany({ where: { dheriId: { in: dheriIds } } })
+        await prisma.stockTransaction.deleteMany({ where: { dheriId: { in: dheriIds } } })
+        await prisma.payment.deleteMany({ where: { dheriId: { in: dheriIds } } })
+        await prisma.dheri.deleteMany({ where: { id: { in: dheriIds } } })
       }
       if (ids.partyId) {
         await prisma.registerParty.deleteMany({
@@ -208,9 +285,16 @@ async function main() {
       } else {
         await prisma.registerParty.deleteMany({ where: { name: { contains: stamp } } })
       }
+      if (ids.linkedPartyId) {
+        await prisma.registerParty.deleteMany({ where: { id: ids.linkedPartyId } })
+      }
       if (ids.farmerId) {
         await prisma.payment.deleteMany({ where: { farmerId: ids.farmerId } })
         await prisma.farmer.deleteMany({ where: { id: ids.farmerId } })
+      }
+      if (ids.linkedFarmerId) {
+        await prisma.payment.deleteMany({ where: { farmerId: ids.linkedFarmerId } })
+        await prisma.farmer.deleteMany({ where: { id: ids.linkedFarmerId } })
       }
     }
   })

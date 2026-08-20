@@ -1067,9 +1067,9 @@ async function renderRegisterLedgerBill(
   lang: string,
 ) {
   const urdu = lang === 'ur'
-  const net = ledger.balance
-  const receivedTotal = ledger.receivedTotal || 0
-  const givenTotal = ledger.givenTotal || 0
+  const receivedTotal = ledger.cashReceivedTotal ?? ledger.receivedTotal ?? 0
+  const givenTotal = ledger.cashGivenTotal ?? ledger.givenTotal ?? 0
+  const net = receivedTotal - givenTotal
   const showReceived = net > 0
   const showGiven = net < 0
   const netLabel = showReceived

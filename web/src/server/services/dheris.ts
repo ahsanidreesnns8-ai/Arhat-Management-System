@@ -172,6 +172,8 @@ export async function createDheri(input: DheriInput) {
       },
       include: dheriInclude,
     })
+    const { ensureRegisterPartyForAccount } = await import('@/server/services/linked-account')
+    await ensureRegisterPartyForAccount(row.farmer.farmerId)
     return dheriDto(row)
   } catch (err) {
     const code = (err as { code?: string }).code

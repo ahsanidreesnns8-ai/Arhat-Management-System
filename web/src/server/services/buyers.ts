@@ -4,6 +4,7 @@ import { normalizeOwnerCode } from '@/server/ids'
 import type { PartyInput } from '@/server/services/farmers'
 import { listPaymentsByBuyer } from '@/server/services/payments'
 import { listSalesByBuyer } from '@/server/services/sales'
+import { ensureRegisterPartyForAccount } from '@/server/services/linked-account'
 
 type BuyerRow = Prisma.BuyerGetPayload<{
   include: { sales: true; payments: true }
@@ -75,6 +76,7 @@ export async function createBuyer(input: PartyInput) {
     },
     include: includeTotals,
   })
+  await ensureRegisterPartyForAccount(buyerId)
   return buyerDto(row)
 }
 
@@ -103,6 +105,7 @@ export async function updateBuyer(id: number | bigint, input: PartyInput) {
     data,
     include: includeTotals,
   })
+  await ensureRegisterPartyForAccount(row.buyerId)
   return buyerDto(row)
 }
 

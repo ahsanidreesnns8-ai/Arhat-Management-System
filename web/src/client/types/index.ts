@@ -158,6 +158,10 @@ export interface Farmer {
   outstandingBalance: number
   totalBilled?: number
   totalPaid?: number
+  registerPartyId?: number | null
+  registerReceived?: number
+  registerGiven?: number
+  accountBalance?: number
   notes?: string
   active: boolean
 }
@@ -435,6 +439,20 @@ export interface RegisterParty {
   balance?: number
   receivedCount?: number
   givenCount?: number
+  cashReceivedTotal?: number
+  cashGivenTotal?: number
+  productTotal?: number
+  productCount?: number
+  soldTotal?: number
+  soldCount?: number
+  farmerPaid?: number
+  buyerPaid?: number
+  linkedFarmerId?: number | null
+  farmerCode?: string | null
+  farmerName?: string | null
+  linkedBuyerId?: number | null
+  buyerCode?: string | null
+  buyerName?: string | null
   entries?: RegisterEntry[]
 }
 

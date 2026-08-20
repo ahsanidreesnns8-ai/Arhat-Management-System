@@ -199,7 +199,7 @@ export default function FarmerProductPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Farmer Product" description="Enter products and view farmer product records" />
+      <PageHeader title="Farmer Product" description="Each save is a new product row. Use the same farmer ID as Arhat Register so the amount is added to that ID automatically." />
 
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
