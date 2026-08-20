@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { formatMann, splitMann, farmerBill, registerPartyBill } from '../src/server/services/bills'
+import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill } from '../src/server/services/bills'
 import { createFarmer } from '../src/server/services/farmers'
 import {
   createParty,
@@ -93,6 +93,15 @@ async function main() {
       const card = people.find((row) => row.id === person.id)
       assert(card?.receivedTotal === 1000, 'person card received total should update')
       assert(card?.givenTotal === 1500, 'person card given total should update')
+
+      const book = await registerBookBill('en')
+      assert(book.includes(`Register Person ${stamp}`), 'book ledger missing person name')
+      assert(book.includes('Giving amount'), 'book ledger missing giving column')
+      assert(book.includes('Receiving amount'), 'book ledger missing receiving column')
+      assert(book.includes('Total receiving amount'), 'book ledger missing receiving total')
+      assert(book.includes('Total giving amount'), 'book ledger missing giving total')
+      assert(book.includes('Remaining amount'), 'book ledger missing remaining')
+      assert(book.includes('Total amount'), 'book ledger missing total amount')
 
       const statement = await registerPartyBill(person.id, 'en')
       assert(statement.includes('Register Person'), 'statement missing person name')

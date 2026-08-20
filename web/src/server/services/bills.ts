@@ -2,7 +2,7 @@ import { prisma } from '@/server/db'
 import { copyrightText, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
-import { getPartyLedger } from '@/server/services/register'
+import { getPartyLedger, listParties } from '@/server/services/register'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
 import { getBook as getPaddyKhataBook } from '@/server/services/paddy-khata'
 import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
@@ -970,6 +970,36 @@ export async function saleBill(
 export async function registerPartyBill(id: number | bigint, lang = 'en') {
   const ledger = await getPartyLedger(id)
   return renderRegisterLedgerBill(ledger, lang)
+}
+
+export async function registerBookBill(lang = 'en') {
+  const people = [...(await listParties('RECEIVING'))].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }),
+  )
+  const urdu = lang === 'ur'
+  const givenTotal = people.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
+  const receivedTotal = people.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
+  const remaining = Math.abs(receivedTotal - givenTotal)
+  const total = receivedTotal + givenTotal
+  const partyHtml = `<div class="party-card">
+    <h3 class="${urdu ? 'urdu' : ''}">${urdu ? 'رجسٹر لیجر' : 'Ledger'}</h3>
+    <div class="party-grid">
+      <div><span class="label">${urdu ? 'کل وصول' : 'Total receiving amount'}</span><div class="value">PKR ${money(receivedTotal)}</div></div>
+      <div><span class="label">${urdu ? 'کل دی گئی' : 'Total giving amount'}</span><div class="value">PKR ${money(givenTotal)}</div></div>
+      <div><span class="label">${urdu ? 'بقایا' : 'Remaining amount'}</span><div class="value">PKR ${money(remaining)}</div></div>
+      <div><span class="label">${urdu ? 'کل رقم' : 'Total amount'}</span><div class="value">PKR ${money(total)}</div></div>
+    </div>
+  </div>`
+  const rows = people.length
+    ? people.map((p) => [p.name, money(p.givenTotal || 0), money(p.receivedTotal || 0)])
+    : [[urdu ? 'کوئی نام نہیں' : 'No people yet', '0', '0']]
+  const body = table(
+    urdu ? ['نام', 'دی گئی رقم', 'وصول رقم'] : ['Name', 'Giving amount', 'Receiving amount'],
+    rows,
+    [urdu ? 'کل' : 'Totals', money(givenTotal), money(receivedTotal)],
+    { nameCols: [0], moneyCols: [1, 2] },
+  )
+  return page('', partyHtml, body, urdu)
 }
 
 export async function registerEntryBill(id: number | bigint, lang = 'en') {
