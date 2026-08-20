@@ -16,6 +16,9 @@ import {
   listParties,
   getPartyLedger,
   zakatSummary,
+  updateParty,
+  updateEntry,
+  deleteParty,
 } from '../src/server/services/register'
 import { runWithWorkspace } from '../src/server/workspace'
 
@@ -138,6 +141,25 @@ async function main() {
       assert(recvStatement.includes('Total received'), 'receive-only bill missing received total')
       assert(!recvStatement.includes('Given to them'), 'receive-only bill should not print given header')
       assert(!recvStatement.includes('Total given'), 'receive-only bill should not print given total')
+
+      const renamed = await updateParty(receivedParty.id, { name: `Recv ${stamp} B` })
+      assert(renamed.name === `Recv ${stamp} B`, 'person name should edit in place')
+      const flipped = await updateEntry(received.id, { kind: 'GIVING', amount: 900 })
+      assert(flipped.kind === 'GIVING', 'mistaken receive should move to given')
+      assert(flipped.amount === 900, 'edited amount should save')
+      const afterFlip = await getPartyLedger(receivedParty.id)
+      assert(afterFlip.receivedTotal === 0, `flip should clear received, got ${afterFlip.receivedTotal}`)
+      assert(afterFlip.givenTotal === 900, `flip should put 900 on given, got ${afterFlip.givenTotal}`)
+      const peopleAfterFlip = await listParties('RECEIVING')
+      const flippedCard = peopleAfterFlip.find((row) => row.id === receivedParty.id)
+      assert(flippedCard?.givenTotal === 900, 'list totals should match the flipped amount')
+      assert((flippedCard?.receivedTotal || 0) === 0, 'list received total should be zero after flip')
+
+      await deleteParty(receivedParty.id)
+      const peopleAfterDelete = await listParties('RECEIVING')
+      assert(!peopleAfterDelete.some((row) => row.id === receivedParty.id), 'deleted person should leave the register list')
+      const listedAfterDelete = await listEntries('GIVING')
+      assert(!listedAfterDelete.some((row) => row.id === received.id), 'deleted person amounts should leave history')
 
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))

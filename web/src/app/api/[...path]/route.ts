@@ -744,11 +744,31 @@ async function dispatch(
     if (path[1] === 'parties' && path.length === 3 && method === 'GET') {
       return result(await register.getPartyLedger(numericId(path[2])))
     }
+    if (path[1] === 'parties' && path.length === 3 && method === 'PUT') {
+      return result(
+        await register.updateParty(numericId(path[2]), payload as Parameters<typeof register.updateParty>[1]),
+        'Person updated',
+      )
+    }
+    if (path[1] === 'parties' && path.length === 3 && method === 'DELETE') {
+      await register.deleteParty(numericId(path[2]))
+      return result(null, 'Person deleted')
+    }
     if (path[1] === 'parties' && method === 'GET') {
       return result(await register.listParties(url.searchParams.get('kind') ?? ''))
     }
     if (path[1] === 'parties' && method === 'POST') {
       return result(await register.createParty(payload as Parameters<typeof register.createParty>[0]), 'Person added', 201)
+    }
+    if (path[1] === 'entries' && path.length === 3 && method === 'PUT') {
+      return result(
+        await register.updateEntry(numericId(path[2]), payload as Parameters<typeof register.updateEntry>[1]),
+        'Amount updated',
+      )
+    }
+    if (path[1] === 'entries' && path.length === 3 && method === 'DELETE') {
+      await register.deleteEntry(numericId(path[2]))
+      return result(null, 'Amount deleted')
     }
     if (path[1] === 'entries' && method === 'GET') {
       return result(await register.listEntries(url.searchParams.get('kind')))

@@ -238,12 +238,30 @@ export const billApi = {
 export const registerApi = {
   parties: (kind: 'GIVING' | 'RECEIVING') =>
     api.get<ApiResponse<RegisterParty[]>>('/register/parties', { params: { kind } }),
+  getParty: (id: number) =>
+    api.get<ApiResponse<RegisterParty>>(`/register/parties/${id}`),
   addParty: (data: { kind: string; name: string; address?: string; notes?: string }) =>
     api.post<ApiResponse<RegisterParty>>('/register/parties', data),
+  updateParty: (id: number, data: {
+    name?: string
+    address?: string
+    notes?: string
+    entries?: Array<{
+      id: number
+      amount?: number
+      kind?: 'GIVING' | 'RECEIVING'
+      notes?: string | null
+      delete?: boolean
+    }>
+  }) => api.put<ApiResponse<RegisterParty>>(`/register/parties/${id}`, data),
+  deleteParty: (id: number) => api.delete<ApiResponse<void>>(`/register/parties/${id}`),
   entries: (kind?: string) =>
     api.get<ApiResponse<RegisterEntry[]>>('/register/entries', { params: kind ? { kind } : {} }),
   addEntry: (data: Record<string, unknown>) =>
     api.post<ApiResponse<RegisterEntry>>('/register/entries', data),
+  updateEntry: (id: number, data: { amount?: number; kind?: 'GIVING' | 'RECEIVING'; notes?: string | null }) =>
+    api.put<ApiResponse<RegisterEntry>>(`/register/entries/${id}`, data),
+  deleteEntry: (id: number) => api.delete<ApiResponse<void>>(`/register/entries/${id}`),
   addPersonAmounts: (data: {
     partyId: number
     receivedAmount?: number
