@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calculator, PackagePlus, RotateCcw, Save } from 'lucide-react'
+import { Calculator, PackagePlus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Button from '../components/ui/Button'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
 import FarmerDetailFields from '../components/forms/FarmerDetailFields'
@@ -48,6 +49,9 @@ export default function FarmerProductPage() {
   const [dheriCode, setDheriCode] = useState('')
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [nameSearch, setNameSearch] = useState('')
 
   const suggestNextDheri = useCallback(async () => {
     try {
@@ -76,8 +80,13 @@ export default function FarmerProductPage() {
   useEffect(() => { void suggestNextDheri() }, [suggestNextDheri])
 
   const farmerProducts = useMemo(
-    () => dheris.filter((d) => !farmerId || String(d.farmerId) === farmerId),
-    [dheris, farmerId],
+    () => dheris.filter((d) => {
+      if (farmerId && String(d.farmerId) !== farmerId) return false
+      const q = nameSearch.trim().toLowerCase()
+      if (!q) return true
+      return `${d.farmerName} ${d.productName} ${d.dheriId}`.toLowerCase().includes(q)
+    }),
+    [dheris, farmerId, nameSearch],
   )
 
   const payload = useMemo(() => ({
@@ -160,6 +169,23 @@ export default function FarmerProductPage() {
     }
   }
 
+  const confirmDelete = async () => {
+    if (deleteId == null) return
+    setDeleting(true)
+    try {
+      await dheriApi.delete(deleteId)
+      toast.success('Farmer product deleted. Commission left Arhat Amount.')
+      setDeleteId(null)
+      loadLists()
+      farmerApi.getAll().then((r) => setFarmers(r.data.data))
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete farmer product')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const resultRows = [
     { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
@@ -178,7 +204,16 @@ export default function FarmerProductPage() {
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Farmer product details</h2>
-          <div className="w-56">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-56">
+              <Input
+                label=""
+                value={nameSearch}
+                onChange={(e) => setNameSearch(e.target.value)}
+                placeholder="Search Ishaq…"
+              />
+            </div>
+            <div className="w-56">
             <Select
               label=""
               value={farmerId}
@@ -188,6 +223,7 @@ export default function FarmerProductPage() {
                 ...farmers.map((f) => ({ value: f.id, label: `${f.farmerId} — ${f.name}` })),
               ]}
             />
+            </div>
           </div>
         </div>
         {farmerProducts.length === 0 ? (
@@ -208,6 +244,7 @@ export default function FarmerProductPage() {
                   <th className="px-4 py-2">Commission</th>
                   <th className="px-4 py-2">Payable</th>
                   <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -228,6 +265,11 @@ export default function FarmerProductPage() {
                     <td className="px-4 py-2">{formatCurrency(d.commissionAmount)}</td>
                     <td className="px-4 py-2 font-medium">{formatCurrency(d.farmerReceivable)}</td>
                     <td className="px-4 py-2">{d.sellingStatus}</td>
+                    <td className="px-4 py-2">
+                      <Button size="sm" variant="danger" onClick={() => setDeleteId(d.id)}>
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -327,6 +369,16 @@ export default function FarmerProductPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteId != null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => void confirmDelete()}
+        title="Delete this farmer product?"
+        message="This product leaves Farmer Product and its commission leaves Arhat Amount. Extra KG stock and other farmers are not changed."
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </div>
   )
 }
