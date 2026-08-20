@@ -22,6 +22,24 @@ export type DheriInput = PriceInput & {
   notes?: string | null
 }
 
+function retireDheriCode(original: string, id: bigint) {
+  const suffix = `#${id.toString()}`
+  if (suffix.length >= 20) return id.toString().slice(-20)
+  const base = original.replace(/#\d+$/, '').slice(0, 20 - suffix.length)
+  return `${base}${suffix}`
+}
+
+async function freeDheriCode(dheriId: string) {
+  const ghost = await prisma.dheri.findFirst({
+    where: { dheriId, deleted: true },
+  })
+  if (!ghost) return
+  await prisma.dheri.update({
+    where: { id: ghost.id },
+    data: { dheriId: retireDheriCode(dheriId, ghost.id) },
+  })
+}
+
 export function dheriDto(row: DheriRow) {
   return {
     id: Number(row.id),
@@ -126,33 +144,40 @@ export async function createDheri(input: DheriInput) {
     where: { dheriId, deleted: false },
   })
   if (taken) throw new Error(`Dheri number ${dheriId} is already used`)
+  await freeDheriCode(dheriId)
   const numericQueue = requested && /^\d+$/.test(requested) ? Number(requested) : null
   const queueNumber = input.queueNumber ?? numericQueue ?? (await nextDheriQueueNumber())
-  const row = await prisma.dheri.create({
-    data: {
-      dheriId,
-      farmerId: BigInt(input.farmerId!),
-      truckId: input.truckId == null ? null : BigInt(input.truckId),
-      productId: BigInt(input.productId!),
-      dayBatchId,
-      queueNumber,
-      numberOfBags: input.numberOfBags ?? 0,
-      weightPerBag: String(input.weightPerBag ?? 40),
-      partialBagWeight: String(input.partialBagWeight ?? 0),
-      totalWeight: result.totalWeight.toFixed(2),
-      marketRate: String(input.marketRate ?? 0),
-      commissionPercentage: result.commissionPercentage.toFixed(2),
-      totalPrice: result.totalAmount.toFixed(2),
-      commissionAmount: result.commission.toFixed(2),
-      farmerReceivable: result.farmerFinalBalance.toFixed(2),
-      supervisorShare: result.munshiNigranShare.toFixed(2),
-      laborShare: result.workersShare.toFixed(2),
-      arhatShare: result.arhatShare.toFixed(2),
-      notes: input.notes,
-    },
-    include: dheriInclude,
-  })
-  return dheriDto(row)
+  try {
+    const row = await prisma.dheri.create({
+      data: {
+        dheriId,
+        farmerId: BigInt(input.farmerId!),
+        truckId: input.truckId == null ? null : BigInt(input.truckId),
+        productId: BigInt(input.productId!),
+        dayBatchId,
+        queueNumber,
+        numberOfBags: input.numberOfBags ?? 0,
+        weightPerBag: String(input.weightPerBag ?? 40),
+        partialBagWeight: String(input.partialBagWeight ?? 0),
+        totalWeight: result.totalWeight.toFixed(2),
+        marketRate: String(input.marketRate ?? 0),
+        commissionPercentage: result.commissionPercentage.toFixed(2),
+        totalPrice: result.totalAmount.toFixed(2),
+        commissionAmount: result.commission.toFixed(2),
+        farmerReceivable: result.farmerFinalBalance.toFixed(2),
+        supervisorShare: result.munshiNigranShare.toFixed(2),
+        laborShare: result.workersShare.toFixed(2),
+        arhatShare: result.arhatShare.toFixed(2),
+        notes: input.notes,
+      },
+      include: dheriInclude,
+    })
+    return dheriDto(row)
+  } catch (err) {
+    const code = (err as { code?: string }).code
+    if (code === 'P2002') throw new Error(`Dheri number ${dheriId} is already used`)
+    throw err
+  }
 }
 
 export async function updateDheri(id: number | bigint, input: DheriInput) {
@@ -211,6 +236,7 @@ export async function deleteDheri(id: number | bigint) {
       where: { id: dheri.id },
       data: {
         deleted: true,
+        dheriId: retireDheriCode(dheri.dheriId, dheri.id),
         commissionAmount: 0,
         arhatShare: 0,
         supervisorShare: 0,
