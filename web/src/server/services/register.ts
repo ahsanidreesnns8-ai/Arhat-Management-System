@@ -126,19 +126,25 @@ function parseKind(value: unknown, allowed: readonly string[] = KINDS): Register
   return kind as RegisterKind
 }
 
+const MONEY_ENTRY_KINDS = ['GIVING', 'RECEIVING'] as const
+
+function moneyEntryInclude() {
+  return {
+    entries: {
+      where: { kind: { in: [...MONEY_ENTRY_KINDS] } },
+      orderBy: { createdAt: 'asc' as const },
+    },
+  }
+}
+
 export async function listParties(kind: string) {
   if (kind) parseKind(kind, ['GIVING', 'RECEIVING'])
   const rows = await prisma.registerParty.findMany({
     where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
     orderBy: { name: 'asc' },
-    include: {
-      entries: {
-        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
-        orderBy: { createdAt: 'desc' },
-      },
-    },
+    include: moneyEntryInclude(),
   })
-  return rows.map((row) => partyDto(row))
+  return rows.map((row) => partyDto(row, true))
 }
 
 export async function getPartyLedger(id: number | bigint) {
@@ -146,8 +152,8 @@ export async function getPartyLedger(id: number | bigint) {
     where: { id: BigInt(id), deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
     include: {
       entries: {
-        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
-        orderBy: { createdAt: 'desc' },
+        where: { kind: { in: [...MONEY_ENTRY_KINDS] } },
+        orderBy: { createdAt: 'asc' },
         include: { farmer: true },
       },
     },
@@ -174,12 +180,7 @@ export async function createParty(input: {
       kind: { in: [...MONEY_PARTY_KINDS] },
       name: { equals: name, mode: 'insensitive' },
     },
-    include: {
-      entries: {
-        where: { kind: { in: ['GIVING', 'RECEIVING'] } },
-        orderBy: { createdAt: 'desc' },
-      },
-    },
+    include: moneyEntryInclude(),
   })
   if (existing) {
     const row = await prisma.registerParty.update({
@@ -188,12 +189,7 @@ export async function createParty(input: {
         address: address ?? existing.address,
         notes: notes ?? existing.notes,
       },
-      include: {
-        entries: {
-          where: { kind: { in: ['GIVING', 'RECEIVING'] } },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: moneyEntryInclude(),
     })
     return partyDto(row)
   }
@@ -210,11 +206,13 @@ export async function createParty(input: {
 }
 
 export async function listEntries(kind?: string | null) {
-  const where = kind ? { kind: parseKind(kind) } : {}
   const rows = await prisma.registerEntry.findMany({
-    where,
+    where: {
+      ...(kind ? { kind: parseKind(kind) } : {}),
+      OR: [{ partyId: null }, { party: { deleted: false } }],
+    },
     include: { party: true, farmer: true },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'asc' },
   })
   return rows.map(entryDto)
 }
@@ -291,6 +289,126 @@ export async function createEntry(
     include: { party: true, farmer: true },
   })
   return entryDto(row)
+}
+
+async function liveMoneyParty(id: number | bigint) {
+  const party = await prisma.registerParty.findFirst({
+    where: { id: BigInt(id), deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
+  })
+  if (!party) throw new Error('Person not found')
+  return party
+}
+
+async function liveMoneyEntry(id: number | bigint) {
+  const row = await prisma.registerEntry.findFirst({
+    where: { id: BigInt(id) },
+    include: { party: true, farmer: true },
+  })
+  if (!row) throw new Error('Amount not found')
+  if (row.kind !== 'GIVING' && row.kind !== 'RECEIVING') {
+    throw new Error('Only received or given amounts can be changed here')
+  }
+  if (row.partyId && row.party?.deleted) throw new Error('Person not found')
+  return row
+}
+
+export async function updateParty(
+  id: number | bigint,
+  input: {
+    name?: string
+    address?: string | null
+    notes?: string | null
+    entries?: Array<{
+      id?: number
+      amount?: number | string | null
+      kind?: string
+      notes?: string | null
+      delete?: boolean
+    }>
+  },
+) {
+  const party = await liveMoneyParty(id)
+  const name = input.name != null ? String(input.name).trim() : party.name
+  if (!name) throw new Error('Name is required')
+  if (name.toLowerCase() !== party.name.toLowerCase()) {
+    const clash = await prisma.registerParty.findFirst({
+      where: {
+        deleted: false,
+        kind: { in: [...MONEY_PARTY_KINDS] },
+        name: { equals: name, mode: 'insensitive' },
+        NOT: { id: party.id },
+      },
+    })
+    if (clash) throw new Error('Another person already has this name')
+  }
+  await prisma.registerParty.update({
+    where: { id: party.id },
+    data: {
+      name,
+      address: input.address !== undefined ? (String(input.address ?? '').trim() || null) : undefined,
+      notes: input.notes !== undefined ? (String(input.notes ?? '').trim() || null) : undefined,
+    },
+  })
+  for (const line of input.entries || []) {
+    if (line.id == null) continue
+    const owned = await prisma.registerEntry.findFirst({
+      where: { id: BigInt(line.id), partyId: party.id, kind: { in: [...MONEY_ENTRY_KINDS] } },
+    })
+    if (!owned) throw new Error('Amount does not belong to this person')
+    if (line.delete) {
+      await deleteEntry(line.id)
+      continue
+    }
+    await updateEntry(line.id, {
+      amount: line.amount,
+      kind: line.kind,
+      notes: line.notes,
+    })
+  }
+  return getPartyLedger(party.id)
+}
+
+export async function deleteParty(id: number | bigint) {
+  const party = await liveMoneyParty(id)
+  await prisma.registerParty.update({
+    where: { id: party.id },
+    data: { deleted: true },
+  })
+}
+
+export async function updateEntry(
+  id: number | bigint,
+  input: {
+    amount?: number | string | null
+    kind?: string
+    notes?: string | null
+  },
+) {
+  const row = await liveMoneyEntry(id)
+  const data: { amount?: string; kind?: string; notes?: string | null } = {}
+  if (input.kind != null && String(input.kind).trim() !== '') {
+    data.kind = parseKind(input.kind, [...MONEY_ENTRY_KINDS])
+  }
+  if (input.amount != null && String(input.amount).trim() !== '') {
+    const amount = round2(input.amount)
+    if (amount.lte(0)) throw new Error('Amount must be greater than zero')
+    data.amount = amount.toFixed(2)
+  }
+  if (input.notes !== undefined) {
+    data.notes = String(input.notes ?? '').trim() || null
+  }
+  if (!Object.keys(data).length) return entryDto(row)
+  const updated = await prisma.registerEntry.update({
+    where: { id: row.id },
+    data,
+    include: { party: true, farmer: true },
+  })
+  return entryDto(updated)
+}
+
+export async function deleteEntry(id: number | bigint) {
+  const row = await liveMoneyEntry(id)
+  await prisma.registerEntry.delete({ where: { id: row.id } })
 }
 
 export async function addPersonAmounts(input: {

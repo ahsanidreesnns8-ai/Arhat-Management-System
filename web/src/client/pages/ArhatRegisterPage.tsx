@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BookOpen, HandCoins, Landmark, Plus, Printer, Sprout, Wallet } from 'lucide-react'
+import { BookOpen, Eye, HandCoins, Landmark, Pencil, Plus, Printer, Search, Sprout, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { farmerApi, registerApi, billApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -23,6 +24,14 @@ type MoneySide = {
   label: 'Received' | 'Given' | 'Settled'
   amount: number
   count: number
+}
+
+type EditLine = {
+  id: number
+  amount: string
+  kind: MoneyKind
+  notes: string
+  delete?: boolean
 }
 
 function moneySide(
@@ -51,6 +60,25 @@ function sideNote(party: Pick<RegisterParty, 'receivedTotal' | 'givenTotal'>, ki
   return `${side.label} ${formatCurrency(side.amount)}`
 }
 
+function apiError(err: unknown, fallback: string) {
+  const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+  return msg || fallback
+}
+
+function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
+  const name = a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
+  if (name !== 0) return name
+  const aAmt = moneySide(a.receivedTotal || 0, a.givenTotal || 0).amount
+  const bAmt = moneySide(b.receivedTotal || 0, b.givenTotal || 0).amount
+  return aAmt - bAmt
+}
+
+function matchesSearch(party: RegisterParty, query: string) {
+  if (!query) return true
+  const blob = `${party.name} ${party.address || ''} ${party.notes || ''}`.toLowerCase()
+  return blob.includes(query)
+}
+
 export default function ArhatRegisterPage() {
   const { user } = useAuth()
   const isOwner = isOwnerFinanceRole(user?.role)
@@ -69,9 +97,18 @@ export default function ArhatRegisterPage() {
 
   const [person, setPerson] = useState({ name: '', address: '', notes: '' })
   const [money, setMoney] = useState({ partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
-  const [calcPartyId, setCalcPartyId] = useState('')
   const [zakatForm, setZakatForm] = useState({ amount: '', notes: '' })
   const [advance, setAdvance] = useState({ farmerId: '', amount: '', notes: '' })
+  const [search, setSearch] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({
+    id: 0,
+    name: '',
+    address: '',
+    notes: '',
+    lines: [] as EditLine[],
+  })
+  const [deletePartyId, setDeletePartyId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -92,13 +129,12 @@ export default function ArhatRegisterPage() {
         ])
         setParties(p.data.data || [])
         const merged = [...(given.data.data || []), ...(received.data.data || [])].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         )
         setEntries(merged)
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not load register')
+      toast.error(apiError(err, 'Could not load register'))
     } finally {
       setLoading(false)
     }
@@ -111,14 +147,46 @@ export default function ArhatRegisterPage() {
     [parties, money.partyId],
   )
 
-  const bookReceived = parties.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
-  const bookGiven = parties.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
+  const query = search.trim().toLowerCase()
+  const visibleParties = useMemo(
+    () => [...parties].filter((p) => matchesSearch(p, query)).sort(byNameThenAmount),
+    [parties, query],
+  )
+  const receivedPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'RECEIVING')
+  const givenPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind === 'GIVING')
+  const settledPeople = visibleParties.filter((p) => moneySide(p.receivedTotal || 0, p.givenTotal || 0).kind == null)
+  const receivedTotal = receivedPeople.reduce((sum, p) => sum + (p.receivedTotal || 0), 0)
+  const givenTotal = givenPeople.reduce((sum, p) => sum + (p.givenTotal || 0), 0)
+  const searchHits = query ? visibleParties : []
 
   if (!isOwner) return <Navigate to="/dashboard" replace />
 
   const openMoney = (kind: MoneyKind, partyId = '') => {
     setMoney({ partyId, amount: '', notes: '', kind })
     setGiveOpen(true)
+  }
+
+  const openEdit = async (party: RegisterParty) => {
+    try {
+      const res = await registerApi.getParty(party.id)
+      const ledger = res.data.data || party
+      const lines = (ledger.entries || []).filter((row) => row.kind === 'RECEIVING' || row.kind === 'GIVING')
+      setEditForm({
+        id: ledger.id,
+        name: ledger.name,
+        address: ledger.address || '',
+        notes: ledger.notes || '',
+        lines: lines.map((row) => ({
+          id: row.id,
+          amount: String(row.amount),
+          kind: row.kind === 'GIVING' ? 'GIVING' : 'RECEIVING',
+          notes: row.notes || '',
+        })),
+      })
+      setEditOpen(true)
+    } catch (err: unknown) {
+      toast.error(apiError(err, 'Could not open this person'))
+    }
   }
 
   const savePerson = async () => {
@@ -139,8 +207,7 @@ export default function ArhatRegisterPage() {
       setPersonOpen(false)
       void load()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not add person')
+      toast.error(apiError(err, 'Could not add person'))
     } finally {
       setSaving(false)
     }
@@ -169,8 +236,60 @@ export default function ArhatRegisterPage() {
       setGiveOpen(false)
       void load()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not save amount')
+      toast.error(apiError(err, 'Could not save amount'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveEdit = async () => {
+    if (!editForm.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+    const liveLines = editForm.lines.filter((line) => !line.delete)
+    for (const line of liveLines) {
+      const amount = Number(line.amount)
+      if (!amount || amount <= 0) {
+        toast.error('Each amount must be greater than zero')
+        return
+      }
+    }
+    setSaving(true)
+    try {
+      await registerApi.updateParty(editForm.id, {
+        name: editForm.name.trim(),
+        address: editForm.address.trim(),
+        notes: editForm.notes.trim(),
+        entries: editForm.lines.map((line) => ({
+          id: line.id,
+          amount: Number(line.amount),
+          kind: line.kind,
+          notes: line.notes.trim() || null,
+          delete: line.delete || undefined,
+        })),
+      })
+      toast.success('Person updated — totals recalculated')
+      setEditOpen(false)
+      void load()
+    } catch (err: unknown) {
+      toast.error(apiError(err, 'Could not save changes'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDeleteParty = async () => {
+    if (deletePartyId == null) return
+    setSaving(true)
+    try {
+      await registerApi.deleteParty(deletePartyId)
+      toast.success('Person removed from the register')
+      setDeletePartyId(null)
+      setEditOpen(false)
+      void load()
+    } catch (err: unknown) {
+      toast.error(apiError(err, 'Could not delete person'))
     } finally {
       setSaving(false)
     }
@@ -194,8 +313,7 @@ export default function ArhatRegisterPage() {
       setZakatOpen(false)
       void load()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not save zakat')
+      toast.error(apiError(err, 'Could not save zakat'))
     } finally {
       setSaving(false)
     }
@@ -224,8 +342,7 @@ export default function ArhatRegisterPage() {
       setAdvanceOpen(false)
       void load()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg || 'Could not save advance')
+      toast.error(apiError(err, 'Could not save advance'))
     } finally {
       setSaving(false)
     }
@@ -255,22 +372,61 @@ export default function ArhatRegisterPage() {
   }
 
   const historyTotal = entries.reduce((sum, row) => sum + (row.amount || 0), 0)
-  const calcParty = parties.find((p) => String(p.id) === calcPartyId) || null
-  const calcReceived = calcParty ? calcParty.receivedTotal || 0 : bookReceived
-  const calcGiven = calcParty ? calcParty.givenTotal || 0 : bookGiven
-  const calcSide = moneySide(
-    calcReceived,
-    calcGiven,
-    calcParty?.receivedCount || 0,
-    calcParty?.givenCount || 0,
-  )
-  const bookSide = moneySide(bookReceived, bookGiven)
+
+  const renderFrame = (p: RegisterParty) => {
+    const received = p.receivedTotal || 0
+    const given = p.givenTotal || 0
+    const side = moneySide(received, given, p.receivedCount || 0, p.givenCount || 0)
+    return (
+      <div key={p.id} className="card-3d p-4 space-y-3">
+        <div>
+          <p className="font-semibold truncate">{p.name}</p>
+          <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
+        </div>
+        <div className={`rounded-lg px-3 py-2 text-[11px] ${
+          side.kind === 'RECEIVING'
+            ? 'bg-emerald-50 dark:bg-emerald-500/10'
+            : side.kind === 'GIVING'
+              ? 'bg-rose-50 dark:bg-rose-500/10'
+              : 'bg-slate-50 dark:bg-white/5'
+        }`}>
+          <div className="text-slate-500">{side.label}</div>
+          <div className={`font-semibold ${
+            side.kind === 'RECEIVING'
+              ? 'text-emerald-800 dark:text-emerald-300'
+              : side.kind === 'GIVING'
+                ? 'text-rose-800 dark:text-rose-300'
+                : ''
+          }`}>
+            {formatCurrency(side.kind ? side.amount : 0)}
+          </div>
+          {side.kind ? (
+            <div className="text-slate-500">{side.count} time{side.count === 1 ? '' : 's'}</div>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" variant="ghost" onClick={() => void openEdit(p)}>
+            <Eye className="h-3.5 w-3.5" /> Details
+          </Button>
+          <Button size="sm" onClick={() => void openEdit(p)}>
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => setDeletePartyId(p.id)}>
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void openPartyBill(p.id)}>
+            <Printer className="h-3.5 w-3.5" /> Bill
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Arhat Register"
-        description="One person, one ledger. Totals update on every save."
+        description="Received on the left, given on the right. Search a name to open details, edit, or delete."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -338,52 +494,39 @@ export default function ArhatRegisterPage() {
       )}
 
       {section === 'PEOPLE' && (
-        <div className="card-3d p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            {bookSide.kind === 'RECEIVING' ? 'Received from people' : bookSide.kind === 'GIVING' ? 'Given to people' : 'People'}
-          </p>
-          <p className={`text-2xl font-bold mt-1 ${
-            bookSide.kind === 'RECEIVING'
-              ? 'text-emerald-700 dark:text-emerald-400'
-              : bookSide.kind === 'GIVING'
-                ? 'text-rose-700 dark:text-rose-400'
-                : 'text-primary'
-          }`}>
-            {formatCurrency(bookSide.kind ? bookSide.amount : 0)}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">{bookSide.kind ? bookSide.label : 'Settled'}</p>
-        </div>
-      )}
-
-      {section === 'PEOPLE' && (
         <div className="card-3d p-4 space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold">Calculate totals</h3>
-            <p className="text-[11px] text-slate-500">Pick any person — or leave blank for everyone — to see the current side.</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name"
+              className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 pl-10 pr-3 py-2.5 text-sm"
+            />
           </div>
-          <PartyCombobox
-            label="Person"
-            items={parties.map((p) => ({
-              id: String(p.id),
-              name: p.name,
-              address: p.address,
-              notes: sideNote(p),
-            }))}
-            value={calcPartyId}
-            onChange={setCalcPartyId}
-            placeholder="All people, or type a name"
-            emptyLabel="Add a person first"
-          />
-          <div className={`rounded-lg px-3 py-2 text-[12px] ${
-            calcSide.kind === 'RECEIVING'
-              ? 'bg-emerald-50 dark:bg-emerald-500/10'
-              : calcSide.kind === 'GIVING'
-                ? 'bg-rose-50 dark:bg-rose-500/10'
-                : 'bg-slate-50 dark:bg-white/5'
-          }`}>
-            <div className="text-slate-500">{calcSide.label}</div>
-            <div className="font-semibold">{formatCurrency(calcSide.kind ? calcSide.amount : 0)}</div>
-          </div>
+          {query ? (
+            <div className="space-y-1">
+              <p className="text-[11px] text-slate-500">
+                {searchHits.length ? 'Tap a name to see details, edit, or delete.' : 'No name matches this search.'}
+              </p>
+              {searchHits.map((p) => {
+                const side = moneySide(p.receivedTotal || 0, p.givenTotal || 0)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => void openEdit(p)}
+                    className="w-full text-left rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center justify-between gap-2"
+                  >
+                    <span className="font-medium truncate">{p.name}</span>
+                    <span className="text-[11px] text-slate-500 shrink-0">
+                      {side.kind ? `${side.label} ${formatCurrency(side.amount)}` : 'Settled'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -395,70 +538,53 @@ export default function ArhatRegisterPage() {
       )}
 
       {section === 'PEOPLE' && (
-        <div className="space-y-3">
-          <div className="px-1">
-            <h3 className="text-sm font-semibold">People</h3>
-            <p className="text-[11px] text-slate-500">
-              The amount box shows only the larger side. Settled names show neither word.
-            </p>
-          </div>
-          {loading ? (
-            <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
-          ) : !parties.length ? (
-            <p className="card-3d p-5 text-sm text-slate-500">Add a person first, then save an amount.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {parties.map((p) => {
-                const received = p.receivedTotal || 0
-                const given = p.givenTotal || 0
-                const side = moneySide(received, given, p.receivedCount || 0, p.givenCount || 0)
-                return (
-                  <div key={p.id} className="card-3d p-4 space-y-3">
-                    <div>
-                      <p className="font-semibold truncate">{p.name}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
-                    </div>
-                    <div className={`rounded-lg px-3 py-2 text-[11px] ${
-                      side.kind === 'RECEIVING'
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10'
-                        : side.kind === 'GIVING'
-                          ? 'bg-rose-50 dark:bg-rose-500/10'
-                          : 'bg-slate-50 dark:bg-white/5'
-                    }`}>
-                      <div className="text-slate-500">{side.label}</div>
-                      <div className={`font-semibold ${
-                        side.kind === 'RECEIVING'
-                          ? 'text-emerald-800 dark:text-emerald-300'
-                          : side.kind === 'GIVING'
-                            ? 'text-rose-800 dark:text-rose-300'
-                            : ''
-                      }`}>
-                        {formatCurrency(side.kind ? side.amount : 0)}
-                      </div>
-                      {side.kind ? (
-                        <div className="text-slate-500">{side.count} time{side.count === 1 ? '' : 's'}</div>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Button size="sm" onClick={() => openMoney('RECEIVING', String(p.id))}>
-                        <Wallet className="h-3.5 w-3.5" /> Receive
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
-                        <HandCoins className="h-3.5 w-3.5" /> Give
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setCalcPartyId(String(p.id))}>
-                        Totals
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => void openPartyBill(p.id)}>
-                        <Printer className="h-3.5 w-3.5" /> Bill
-                      </Button>
-                    </div>
+        loading ? (
+          <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
+        ) : !parties.length ? (
+          <p className="card-3d p-5 text-sm text-slate-500">Add a person first, then save an amount.</p>
+        ) : !visibleParties.length ? (
+          <p className="card-3d p-5 text-sm text-slate-500">No person matches this search.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="px-1 flex items-end justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Received</h3>
+                    <p className="text-[11px] text-slate-500">Left side · names A to Z</p>
                   </div>
-                )
-              })}
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{formatCurrency(receivedTotal)}</p>
+                </div>
+                {receivedPeople.length ? receivedPeople.map(renderFrame) : (
+                  <p className="card-3d p-4 text-sm text-slate-500">No received names on this side.</p>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="px-1 flex items-end justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300">Given</h3>
+                    <p className="text-[11px] text-slate-500">Right side · names A to Z</p>
+                  </div>
+                  <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">{formatCurrency(givenTotal)}</p>
+                </div>
+                {givenPeople.length ? givenPeople.map(renderFrame) : (
+                  <p className="card-3d p-4 text-sm text-slate-500">No given names on this side.</p>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+            {settledPeople.length ? (
+              <div className="space-y-3">
+                <div className="px-1">
+                  <h3 className="text-sm font-semibold">Settled</h3>
+                  <p className="text-[11px] text-slate-500">These names are even, so neither word is shown.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {settledPeople.map(renderFrame)}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )
       )}
 
       <div className="card-3d overflow-hidden">
@@ -509,9 +635,12 @@ export default function ArhatRegisterPage() {
                           <Button
                             variant="ghost"
                             className="!py-1.5 !px-2"
-                            onClick={() => setCalcPartyId(String(row.partyId))}
+                            onClick={() => {
+                              const party = parties.find((p) => p.id === row.partyId)
+                              if (party) void openEdit(party)
+                            }}
                           >
-                            Totals
+                            <Pencil className="h-3.5 w-3.5" /> Edit
                           </Button>
                         ) : null}
                         <Button variant="secondary" className="!py-1.5 !px-2" onClick={() => void openEntryBill(row)}>
@@ -585,6 +714,109 @@ export default function ArhatRegisterPage() {
         </div>
       </Modal>
 
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Person details" size="lg">
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            Change the name or amount, or move a payment from received to given (or the other way) if it was saved on the wrong side. Totals update on save.
+          </p>
+          <Input
+            label="Name *"
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+          />
+          <Input
+            label="Address (optional)"
+            value={editForm.address}
+            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+          />
+          <Input
+            label="Note (optional)"
+            value={editForm.notes}
+            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+          />
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold">Amounts</h4>
+            {!editForm.lines.length ? (
+              <p className="text-sm text-slate-500">No amounts yet. Use Receive amount or Give amount.</p>
+            ) : editForm.lines.map((line, index) => (
+              <div
+                key={line.id}
+                className={`rounded-xl border border-slate-200 dark:border-white/10 p-3 space-y-2 ${line.delete ? 'opacity-50' : ''}`}
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={line.kind === 'RECEIVING' ? 'primary' : 'secondary'}
+                    onClick={() => {
+                      const lines = [...editForm.lines]
+                      lines[index] = { ...line, kind: 'RECEIVING', delete: false }
+                      setEditForm({ ...editForm, lines })
+                    }}
+                    disabled={line.delete}
+                  >
+                    Received
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={line.kind === 'GIVING' ? 'primary' : 'secondary'}
+                    onClick={() => {
+                      const lines = [...editForm.lines]
+                      lines[index] = { ...line, kind: 'GIVING', delete: false }
+                      setEditForm({ ...editForm, lines })
+                    }}
+                    disabled={line.delete}
+                  >
+                    Given
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={line.delete ? 'secondary' : 'danger'}
+                    onClick={() => {
+                      const lines = [...editForm.lines]
+                      lines[index] = { ...line, delete: !line.delete }
+                      setEditForm({ ...editForm, lines })
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> {line.delete ? 'Undo delete' : 'Delete amount'}
+                  </Button>
+                </div>
+                <Input
+                  label="Amount (PKR) *"
+                  type="number"
+                  min="0"
+                  value={line.amount}
+                  onChange={(e) => {
+                    const lines = [...editForm.lines]
+                    lines[index] = { ...line, amount: e.target.value }
+                    setEditForm({ ...editForm, lines })
+                  }}
+                  disabled={line.delete}
+                />
+                <Input
+                  label="Note (optional)"
+                  value={line.notes}
+                  onChange={(e) => {
+                    const lines = [...editForm.lines]
+                    lines[index] = { ...line, notes: e.target.value }
+                    setEditForm({ ...editForm, lines })
+                  }}
+                  disabled={line.delete}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-between gap-2 pt-2">
+            <Button variant="danger" onClick={() => setDeletePartyId(editForm.id)}>
+              <Trash2 className="h-4 w-4" /> Delete person
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button onClick={() => void saveEdit()} loading={saving}>Save changes</Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={zakatOpen} onClose={() => setZakatOpen(false)} title="Give Zakat">
         <div className="space-y-3">
           <Input
@@ -635,6 +867,16 @@ export default function ArhatRegisterPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deletePartyId != null}
+        onClose={() => setDeletePartyId(null)}
+        onConfirm={() => void confirmDeleteParty()}
+        title="Delete this person?"
+        message="They will leave the register and their amounts will leave the totals. This does not change other people you already saved."
+        confirmLabel="Delete"
+        loading={saving}
+      />
     </div>
   )
 }

@@ -157,7 +157,10 @@ async function arhatLines(): Promise<{
       orderBy: { createdAt: 'desc' },
     }),
     prisma.registerEntry.findMany({
-      where: { kind: { in: ['GIVING', 'RECEIVING', 'ZAKAT'] } },
+      where: {
+        kind: { in: ['GIVING', 'RECEIVING', 'ZAKAT'] },
+        OR: [{ partyId: null }, { party: { deleted: false } }],
+      },
       include: { party: true, farmer: true },
       orderBy: { createdAt: 'desc' },
     }),
