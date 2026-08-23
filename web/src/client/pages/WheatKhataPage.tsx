@@ -8,7 +8,7 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PartyCombobox from '../components/forms/PartyCombobox'
-import { billApi, wheatKhataApi } from '../services/api'
+import { billApi, grainKhataApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
@@ -111,9 +111,16 @@ function productPreview(
   }
 }
 
-export default function WheatKhataPage() {
+const CROP_FALLBACK: Record<string, { title: string; crop: string }> = {
+  WHEAT: { title: 'Wheat Khata', crop: 'wheat' },
+  BARLEY: { title: 'Barley Khata', crop: 'barley' },
+  MAIZE: { title: 'Maize Khata', crop: 'maize' },
+}
+
+export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string }) {
   const { user } = useAuth()
   const isOwner = isOwnerFinanceRole(user?.role)
+  const isWheat = bookKey === 'WHEAT'
   const [section, setSection] = useState<Section>('MONEY')
   const [book, setBook] = useState<WheatKhataBook>(emptyBook)
   const [loading, setLoading] = useState(true)
@@ -135,14 +142,14 @@ export default function WheatKhataPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
     try {
-      const res = await wheatKhataApi.book()
+      const res = await grainKhataApi.book(bookKey)
       setBook(res.data.data || emptyBook)
     } catch (err) {
-      toast.error(apiMessage(err, 'Could not load Wheat Khata'))
+      toast.error(apiMessage(err, `Could not load ${CROP_FALLBACK[bookKey]?.title || 'khata'}`))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [bookKey])
 
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
@@ -156,6 +163,9 @@ export default function WheatKhataPage() {
     () => entities.find((p) => String(p.id) === paymentForm.partyId) || null,
     [entities, paymentForm.partyId],
   )
+  const title = book.book?.name || CROP_FALLBACK[bookKey]?.title || 'Khata'
+  const crop = book.book?.cropWord || CROP_FALLBACK[bookKey]?.crop || 'grain'
+  const cropCap = crop.charAt(0).toUpperCase() + crop.slice(1)
   const livePreview = productPreview(
     productForm.bags,
     productForm.ratePerBag,
@@ -193,7 +203,7 @@ export default function WheatKhataPage() {
   const openEntityBill = async (party: WheatKhataParty) => {
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataParty(party.id)
+      const res = await billApi.wheatKhataParty(party.id, 'en', bookKey)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         `${party.name} bill`,
@@ -214,7 +224,7 @@ export default function WheatKhataPage() {
     }
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY')
+      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY', 'en', bookKey)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         'Bill',
@@ -256,11 +266,11 @@ export default function WheatKhataPage() {
     }
     setSaving(true)
     try {
-      await wheatKhataApi.addMoney({
+      await grainKhataApi.addMoney(bookKey, {
         amount,
         notes: moneyForm.notes.trim() || undefined,
       })
-      toast.success('Money added to Wheat Khata')
+      toast.success(`Money added to ${title}`)
       setMoneyForm({ amount: '', notes: '' })
       setMoneyOpen(false)
       void load(true)
@@ -279,7 +289,7 @@ export default function WheatKhataPage() {
     const kind = section === 'COMPANY' ? 'COMPANY' : 'PARTY'
     setSaving(true)
     try {
-      await wheatKhataApi.addParty({
+      await grainKhataApi.addParty(bookKey, {
         kind,
         name: partyForm.name.trim(),
         address: partyForm.address.trim() || undefined,
@@ -311,7 +321,7 @@ export default function WheatKhataPage() {
     }
     setCalculated(preview)
     toast.success(
-      `${preview.trucks ? `${preview.trucks} truck${preview.trucks === 1 ? '' : 's'} = ${preview.bags} bags. ` : ''}${preview.bags} bags · wheat ${formatCurrency(preview.wheatAmount)} + bags ${formatCurrency(preview.bagAmount)} + labour ${formatCurrency(preview.labourAmount)} = ${formatCurrency(preview.totalPrice)}`,
+      `${preview.trucks ? `${preview.trucks} truck${preview.trucks === 1 ? '' : 's'} = ${preview.bags} bags. ` : ''}${preview.bags} bags · ${cropCap} ${formatCurrency(preview.wheatAmount)} + bags ${formatCurrency(preview.bagAmount)} + labour ${formatCurrency(preview.labourAmount)} = ${formatCurrency(preview.totalPrice)}`,
     )
   }
 
@@ -334,7 +344,7 @@ export default function WheatKhataPage() {
     }
     setSaving(true)
     try {
-      await wheatKhataApi.addProduct({
+      await grainKhataApi.addProduct(bookKey, {
         partyId: Number(productForm.partyId),
         bags: preview.extraBags,
         trucks: preview.trucks || undefined,
@@ -372,7 +382,7 @@ export default function WheatKhataPage() {
     }
     setSaving(true)
     try {
-      await wheatKhataApi.addPayment({
+      await grainKhataApi.addPayment(bookKey, {
         partyId: Number(paymentForm.partyId),
         amount,
         notes: paymentForm.notes.trim() || undefined,
@@ -399,13 +409,19 @@ export default function WheatKhataPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Wheat Khata"
-        description="Separate wheat book: receive bags from a party and give money; give bags to a company and receive money. It never mixes with Arhat Amount unless the owner taps Merge all amount."
+        title={title}
+        description={`Separate ${crop} book: receive bags from a party and give money; give bags to a company and receive money.${isWheat ? ' It never mixes with Arhat Amount unless the owner taps Merge all amount.' : ' It stays in this book only and is not mixed with Arhat Amount.'}`}
         action={
-          isOwner ? (
+          isWheat && isOwner ? (
             <Link to="/arhat-amount">
               <Button variant="secondary">
                 <FileText className="h-4 w-4" /> Merge on Arhat Amount
+              </Button>
+            </Link>
+          ) : bookKey.startsWith('OTHER-') ? (
+            <Link to="/others-khata">
+              <Button variant="secondary">
+                Others Khata
               </Button>
             </Link>
           ) : undefined
@@ -413,7 +429,9 @@ export default function WheatKhataPage() {
       />
 
       <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-        Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.
+        {isWheat
+          ? 'Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.'
+          : `${title} stays in this book only. It is not mixed with Wheat Khata, Paddy Khata, or Arhat Amount.`}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -427,12 +445,12 @@ export default function WheatKhataPage() {
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount from company</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingFromCompany)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">Product given to companies (wheat + bag + labour) plus money received from them</p>
+          <p className="text-[11px] text-slate-500 mt-1">Product given to companies ({crop} + bag + labour) plus money received from them</p>
         </div>
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Giving amount to party</p>
           <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingToParty)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">Product received from parties (wheat + bag + labour) plus money given to them</p>
+          <p className="text-[11px] text-slate-500 mt-1">Product received from parties ({crop} + bag + labour) plus money given to them</p>
         </div>
       </div>
 
@@ -545,8 +563,8 @@ export default function WheatKhataPage() {
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
             <p className="text-[11px] text-slate-500">
               {isCompany
-                ? 'Owner gives wheat to the company and receives money from it. Receive Amount adds to total money. Bill lists every bag sale and cash received.'
-                : 'Owner receives wheat from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
+                ? 'Owner gives product to the company and receives money from it. Receive Amount adds to total money. Bill lists every bag sale and cash received.'
+                : 'Owner receives product from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
             </p>
           </div>
           {loading ? (
@@ -615,7 +633,7 @@ export default function WheatKhataPage() {
 
       <Modal open={moneyOpen} onClose={() => setMoneyOpen(false)} title="Add Money">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Cash deposited here increases the Wheat Khata total amount.</p>
+          <p className="text-sm text-slate-500">Cash deposited here increases the {title} total amount.</p>
           <Input
             label="Amount (PKR) *"
             type="number"
@@ -643,8 +661,8 @@ export default function WheatKhataPage() {
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
             {isCompany
-              ? 'Company: owner gives wheat to them and receives money from them.'
-              : 'Party: owner receives wheat from them and gives money to them.'}
+              ? `Company: owner gives ${crop} to them and receives money from them.`
+              : `Party: owner receives ${crop} from them and gives money to them.`}
           </p>
           <Input
             label="Name *"
@@ -750,7 +768,7 @@ export default function WheatKhataPage() {
           {preview && (
             <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm space-y-0.5">
               <div className="font-medium">{preview.bags} bags{isCompany ? ' (this truck load)' : preview.trucks ? ` (${preview.trucks} truck${preview.trucks === 1 ? '' : 's'}${preview.extraBags ? ` + ${preview.extraBags} bags` : ''})` : ''}</div>
-              <div>Wheat: {preview.bags} × {formatCurrency(preview.ratePerBag)} = {formatCurrency(preview.wheatAmount)}</div>
+              <div>{cropCap}: {preview.bags} × {formatCurrency(preview.ratePerBag)} = {formatCurrency(preview.wheatAmount)}</div>
               <div>Bag price: {preview.bags} × {formatCurrency(preview.bagPricePerBag)} = {formatCurrency(preview.bagAmount)}</div>
               <div>Labour: {preview.bags} × {formatCurrency(preview.labourPerBag)} = {formatCurrency(preview.labourAmount)}</div>
               <div className="font-semibold pt-1">
@@ -843,7 +861,7 @@ export default function WheatKhataPage() {
                 <div className="text-[11px] text-slate-500">Product</div>
                 <div className="font-semibold">{formatCurrency(detailParty.productTotal)}</div>
                 <div className="text-[11px] text-slate-500">
-                  Wheat {formatCurrency(detailParty.wheatAmount)} · Bags {formatCurrency(detailParty.bagAmount)} · Labour {formatCurrency(detailParty.labourAmount)}
+                  {cropCap} {formatCurrency(detailParty.wheatAmount)} · Bags {formatCurrency(detailParty.bagAmount)} · Labour {formatCurrency(detailParty.labourAmount)}
                 </div>
               </div>
               <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2">

@@ -523,8 +523,20 @@ export interface WheatKhataPayment {
   time: string
 }
 
+export interface GrainKhataBookMeta {
+  key: string
+  name: string
+  nameUr?: string | null
+  crop: string
+  cropWord: string
+  builtin: boolean
+  href: string
+  createdAt: string
+}
+
 export interface WheatKhataParty {
   id: number
+  bookKey?: string
   kind: 'RECEIVING' | 'GIVING' | string
   name: string
   address?: string | null
@@ -546,6 +558,7 @@ export interface WheatKhataParty {
 }
 
 export interface WheatKhataBook {
+  book?: GrainKhataBookMeta
   totals: {
     moneyIn: number
     receivingFromCompany: number

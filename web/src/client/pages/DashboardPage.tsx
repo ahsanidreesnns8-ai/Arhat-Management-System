@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp, Users, ShoppingBag, Package, Warehouse,
-  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus, Wheat, Leaf, Coins,
+  ListOrdered, DollarSign, Percent, Activity, UserPlus, Scale, BookOpen, PackagePlus, Wheat, Sprout, Flower2, BookMarked, Leaf, Coins,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -194,6 +194,21 @@ export default function DashboardPage() {
         <Link to="/wheat-khata" className="contents">
           <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
             <Wheat className="h-4 w-4" /> Wheat Khata
+          </Button>
+        </Link>
+        <Link to="/barley-khata" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Sprout className="h-4 w-4" /> Barley Khata
+          </Button>
+        </Link>
+        <Link to="/maize-khata" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <Flower2 className="h-4 w-4" /> Maize Khata
+          </Button>
+        </Link>
+        <Link to="/others-khata" className="contents">
+          <Button className="h-auto py-3 flex-col sm:flex-row gap-1.5 w-full" variant="secondary">
+            <BookMarked className="h-4 w-4" /> Others Khata
           </Button>
         </Link>
         <Link to="/paddy-khata" className="contents">

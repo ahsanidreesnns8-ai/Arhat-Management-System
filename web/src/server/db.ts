@@ -36,6 +36,7 @@ const SCOPED_MODELS = new Set<Prisma.ModelName>([
   'DayBatch',
   'RegisterParty',
   'RegisterEntry',
+  'GrainKhataBook',
   'WheatKhataMoney',
   'WheatKhataParty',
   'WheatKhataProduct',

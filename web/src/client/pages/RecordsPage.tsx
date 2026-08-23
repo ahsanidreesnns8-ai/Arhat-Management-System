@@ -18,6 +18,9 @@ import {
   Wallet,
   Warehouse,
   Wheat,
+  Sprout,
+  Flower2,
+  BookMarked,
   Leaf,
   Coins,
 } from 'lucide-react'
@@ -53,6 +56,24 @@ const sections: Array<{
     icon: Wheat,
     title: 'Wheat Khata',
     description: 'Give product to companies and receive money; receive product from parties and give money',
+  },
+  {
+    to: '/barley-khata',
+    icon: Sprout,
+    title: 'Barley Khata',
+    description: 'Same book as Wheat Khata for barley bags, parties, companies, and bills',
+  },
+  {
+    to: '/maize-khata',
+    icon: Flower2,
+    title: 'Maize Khata',
+    description: 'Same book as Wheat Khata for maize bags, parties, companies, and bills',
+  },
+  {
+    to: '/others-khata',
+    icon: BookMarked,
+    title: 'Others Khata',
+    description: 'Create a named khata when you need another book. It appears with that name and Others Khata stays ready for the next one',
   },
   {
     to: '/paddy-khata',

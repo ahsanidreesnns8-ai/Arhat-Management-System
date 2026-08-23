@@ -4,6 +4,7 @@ import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger, listParties } from '@/server/services/register'
 import { getAccountStatement } from '@/server/services/linked-account'
+import { bookLabel, resolveBook } from '@/server/services/grain-khata'
 import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
 import { getBook as getPaddyKhataBook } from '@/server/services/paddy-khata'
 import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
@@ -1276,7 +1277,7 @@ function wheatProductDetail(
   return `${qty} × ${money(row.ratePerBag)}${extras.length ? ` + ${extras.join(' + ')}` : ''}`
 }
 
-function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSlip {
+function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean, bookName: string): BillSlip {
   const isCompany = party.kind === 'GIVING'
   const partyHtml = `<div class="party-card">
     <h3 class="${urdu ? 'urdu' : ''}">${escape(party.name)}</h3>
@@ -1366,26 +1367,29 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean): BillSli
     <div style="grid-column:1/-1"><div class="label">${urdu ? 'بقایا' : 'Balance'}</div><div class="value">PKR ${money(Math.abs(net))} · ${escape(netLabel)}</div></div>
   </div>`
 
-  return { title: '', partyHtml, body: productTable + paymentTable + summary }
+  return { title: bookName, partyHtml, body: productTable + paymentTable + summary }
 }
 
-export async function wheatKhataBillHtml(id: number | bigint, lang = 'en') {
-  const party = await getParty(id)
+export async function wheatKhataBillHtml(id: number | bigint, lang = 'en', bookKey?: unknown) {
+  const party = await getParty(id, bookKey)
+  const book = await resolveBook(bookKey ?? party.bookKey)
   const urdu = lang === 'ur'
-  const slip = wheatKhataSlipParts(party, urdu)
-  return documentFromSlips(slip.title, urdu, [slip])
+  const name = bookLabel(book, urdu)
+  const slip = wheatKhataSlipParts(party, urdu, name)
+  return documentFromSlips(name, urdu, [slip])
 }
 
-export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en') {
+export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en', bookKey?: unknown) {
   const kind = wheatKhataKind(kindValue)
   const urdu = lang === 'ur'
-  const book = await getBook()
-  const list = kind === 'GIVING' ? book.companies : book.parties
+  const snapshot = await getBook(bookKey)
+  const name = bookLabel(snapshot.book, urdu)
+  const list = kind === 'GIVING' ? snapshot.companies : snapshot.parties
   if (!list.length) {
     throw new Error(kind === 'GIVING' ? 'No company bills yet' : 'No party bills yet')
   }
-  const slips = list.map((party) => wheatKhataSlipParts(party, urdu))
-  return documentFromSlips('', urdu, slips)
+  const slips = list.map((party) => wheatKhataSlipParts(party, urdu, name))
+  return documentFromSlips(name, urdu, slips)
 }
 
 function arhatLineRows(
