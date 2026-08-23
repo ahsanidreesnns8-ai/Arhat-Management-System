@@ -216,7 +216,7 @@ export default function FarmerProductPage() {
     <div className="space-y-6">
       <PageHeader
         title="Farmer Product"
-        description="Each save is a new product row. Generate bill here is product only. Register given/received is on Total balance on the farmer page."
+        description="Each save is a new product row. Generate bill here is product only. Total balance on the farmer page shows already given/received plus product history."
       />
 
       <div className="card-3d overflow-hidden">
@@ -364,8 +364,13 @@ export default function FarmerProductPage() {
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
               <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Calculate</Button>
               <Button variant="secondary" onClick={() => void openProductBill()} disabled={!farmerId}>
-                <FileText className="h-4 w-4" /> Product bill
+                <FileText className="h-4 w-4" /> Generate bill
               </Button>
+              {farmerId ? (
+                <Link to={`/farmers/${farmerId}`}>
+                  <Button variant="secondary">Total balance</Button>
+                </Link>
+              ) : null}
               <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save</Button>
             </div>
           </div>

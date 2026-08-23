@@ -59,12 +59,25 @@ function uniqueNameKeys<T extends { name: string }>(rows: T[]) {
   return new Set([...counts.entries()].filter(([, count]) => count === 1).map(([key]) => key))
 }
 
+function uniqueFirstTokenKeys<T extends { name: string }>(rows: T[]) {
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    const token = firstTokenKey(row.name)
+    if (!token || token.length < 3) continue
+    counts.set(token, (counts.get(token) ?? 0) + 1)
+  }
+  return new Set([...counts.entries()].filter(([, count]) => count === 1).map(([key]) => key))
+}
+
 function matchPerson<T extends { id: bigint; code: string; name: string }>(rows: T[], norm: string) {
   if (!norm) return null
   const byCode = rows.find((row) => normalizeAccountKey(row.code) === norm)
   if (byCode) return byCode
   const byName = rows.filter((row) => normalizeAccountKey(row.name) === norm)
-  return byName.length === 1 ? byName[0] : null
+  if (byName.length === 1) return byName[0]
+  const token = firstTokenKey(norm) || norm
+  const byFirst = rows.filter((row) => firstTokenKey(row.name) === token || firstTokenKey(row.name) === norm)
+  return byFirst.length === 1 ? byFirst[0] : null
 }
 
 function aliasUniqueName(
@@ -72,14 +85,20 @@ function aliasUniqueName(
   rawCode: string,
   rawName: string,
   uniqueNames: Set<string>,
+  uniqueFirstTokens?: Set<string>,
 ) {
-  const nameKey = normalizeAccountKey(rawName)
-  if (!nameKey || !uniqueNames.has(nameKey)) return
   const row = slot(map, rawCode)
   if (!row) return
-  const existing = map.get(nameKey)
-  if (existing && existing !== row) return
-  map.set(nameKey, row)
+  const nameKey = normalizeAccountKey(rawName)
+  if (nameKey && uniqueNames.has(nameKey)) {
+    const existing = map.get(nameKey)
+    if (!existing || existing === row) map.set(nameKey, row)
+  }
+  const token = firstTokenKey(rawName)
+  if (token && uniqueFirstTokens?.has(token) && token !== nameKey) {
+    const existing = map.get(token)
+    if (!existing || existing === row) map.set(token, row)
+  }
 }
 
 function slot(map: Map<string, LinkedTrade>, raw: string) {
@@ -130,6 +149,8 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
   const map = new Map<string, LinkedTrade>()
   const uniqueFarmerNames = uniqueNameKeys(farmers)
   const uniqueBuyerNames = uniqueNameKeys(buyers)
+  const uniqueFarmerTokens = uniqueFirstTokenKeys(farmers)
+  const uniqueBuyerTokens = uniqueFirstTokenKeys(buyers)
   const dheriByFarmer = new Map(
     dheriSums.map((row) => [
       String(row.farmerId),
@@ -163,7 +184,7 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
     row.productTotal = dheri?.total ?? 0
     row.productCount = dheri?.count ?? 0
     row.farmerPaid = farmerPaidByFarmer.get(String(farmer.id)) ?? 0
-    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames)
+    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames, uniqueFarmerTokens)
   }
 
   for (const buyer of buyers) {
@@ -176,7 +197,7 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
     row.soldTotal = sold?.total ?? 0
     row.soldCount = sold?.count ?? 0
     row.buyerPaid = buyerPaidByBuyer.get(String(buyer.id)) ?? 0
-    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames)
+    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames, uniqueBuyerTokens)
   }
 
   return map
@@ -234,6 +255,8 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
   const map = new Map<string, LinkedTrade>()
   const uniqueFarmerNames = uniqueNameKeys(farmers)
   const uniqueBuyerNames = uniqueNameKeys(buyers)
+  const uniqueFarmerTokens = uniqueFirstTokenKeys(farmers)
+  const uniqueBuyerTokens = uniqueFirstTokenKeys(buyers)
 
   for (const farmer of farmers) {
     const row = slot(map, farmer.farmerId)
@@ -272,7 +295,7 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
         })
       }
     }
-    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames)
+    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames, uniqueFarmerTokens)
   }
 
   for (const buyer of buyers) {
@@ -312,7 +335,7 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
         })
       }
     }
-    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames)
+    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames, uniqueBuyerTokens)
   }
 
   if (includeLines) {
@@ -323,23 +346,83 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
   return map
 }
 
+function firstTokenKey(value: string | null | undefined) {
+  const first = String(value ?? '').trim().split(/\s+/)[0] || ''
+  return normalizeAccountKey(first)
+}
+
+function expandAlias(value: string | null | undefined) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return [] as string[]
+  const aliases = [raw]
+  const first = raw.split(/\s+/)[0]
+  if (first && first !== raw && first.length >= 3) aliases.push(first)
+  return aliases
+}
+
 async function findRegisterPartiesForKeys(keys: Array<string | null | undefined>) {
-  const wanted = new Set(
-    keys.map((key) => normalizeAccountKey(key)).filter(Boolean),
-  )
+  const wanted = new Set<string>()
+  for (const key of keys) {
+    for (const alias of expandAlias(key)) {
+      const norm = normalizeAccountKey(alias)
+      if (norm) wanted.add(norm)
+    }
+  }
   if (!wanted.size) return []
   const parties = await prisma.registerParty.findMany({
     where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
     include: {
       entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
     },
+    orderBy: { createdAt: 'asc' },
   })
-  return parties.filter((row) => wanted.has(normalizeAccountKey(row.name)))
+  const firstCounts = new Map<string, number>()
+  for (const row of parties) {
+    const token = firstTokenKey(row.name)
+    if (!token) continue
+    firstCounts.set(token, (firstCounts.get(token) ?? 0) + 1)
+  }
+  const matched = new Map<string, (typeof parties)[number]>()
+  for (const row of parties) {
+    const nameKey = normalizeAccountKey(row.name)
+    const token = firstTokenKey(row.name)
+    const exact = wanted.has(nameKey)
+    const first = token.length >= 3 && wanted.has(token) && firstCounts.get(token) === 1
+    if (exact || first) matched.set(String(row.id), row)
+  }
+  return [...matched.values()]
+}
+
+async function mergeRegisterParties<T extends { id: bigint; entries?: unknown[] }>(parties: T[]) {
+  if (parties.length <= 1) return parties[0] ?? null
+  const ranked = [...parties].sort((a, b) => {
+    const ae = Array.isArray(a.entries) ? a.entries.length : 0
+    const be = Array.isArray(b.entries) ? b.entries.length : 0
+    if (be !== ae) return be - ae
+    return Number(a.id) - Number(b.id)
+  })
+  const canonical = ranked[0]
+  for (const extra of ranked.slice(1)) {
+    await prisma.registerEntry.updateMany({
+      where: { partyId: extra.id },
+      data: { partyId: canonical.id },
+    })
+    await prisma.registerParty.update({
+      where: { id: extra.id },
+      data: { deleted: true },
+    })
+  }
+  return prisma.registerParty.findFirst({
+    where: { id: canonical.id, deleted: false },
+    include: {
+      entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
+    },
+  })
 }
 
 async function resolveAccountKeys(key: string, extraName?: string | null) {
   const raw = String(key ?? '').trim()
-  const aliases = new Set<string>([raw, extraName || ''].filter(Boolean))
+  const aliases = new Set<string>([...expandAlias(raw), ...expandAlias(extraName)])
   const norm = normalizeAccountKey(raw)
   const [farmers, buyers] = await Promise.all([
     prisma.farmer.findMany({
@@ -358,6 +441,9 @@ async function resolveAccountKeys(key: string, extraName?: string | null) {
     ? matchPerson(
         farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
         normalizeAccountKey(extraName),
+      ) || matchPerson(
+        farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
+        firstTokenKey(extraName),
       )
     : null)
   const buyer = matchPerson(
@@ -367,15 +453,20 @@ async function resolveAccountKeys(key: string, extraName?: string | null) {
     ? matchPerson(
         buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
         normalizeAccountKey(extraName),
+      ) || matchPerson(
+        buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
+        firstTokenKey(extraName),
       )
     : null)
   if (farmer) {
     aliases.add(farmer.code)
     aliases.add(farmer.name)
+    for (const alias of expandAlias(farmer.name)) aliases.add(alias)
   }
   if (buyer) {
     aliases.add(buyer.code)
     aliases.add(buyer.name)
+    for (const alias of expandAlias(buyer.name)) aliases.add(alias)
   }
   return { aliases: [...aliases], farmer, buyer, norm }
 }
@@ -395,14 +486,35 @@ export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null
 
 const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
 
-/** Reuse the Arhat Register person when farmer/buyer ID or unique name matches. */
+/** Reuse the Arhat Register person when farmer/buyer ID or name matches. Merge split records. */
 export async function ensureRegisterPartyForAccount(code: string, extraName?: string | null) {
   const name = String(code ?? '').trim()
   if (!name) return null
-  const existing = await findRegisterPartyByKey(name, extraName)
-  if (existing) return existing
+  const resolved = await resolveAccountKeys(name, extraName)
+  const parties = await findRegisterPartiesForKeys(resolved.aliases)
+  const label = String(extraName ?? '').trim() || resolved.farmer?.name || resolved.buyer?.name || name
+  if (parties.length) {
+    const merged = await mergeRegisterParties(parties)
+    if (merged) {
+      const current = normalizeAccountKey(merged.name)
+      const wantsRename =
+        Boolean(label) &&
+        current === normalizeAccountKey(name) &&
+        normalizeAccountKey(label) !== current
+      if (wantsRename) {
+        return prisma.registerParty.update({
+          where: { id: merged.id },
+          data: { name: label, notes: merged.notes || `ID ${name}` },
+          include: {
+            entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
+          },
+        })
+      }
+      return merged
+    }
+  }
   return prisma.registerParty.create({
-    data: { kind: 'PERSON', name, address: null, notes: null },
+    data: { kind: 'PERSON', name: label, address: null, notes: extraName && extraName !== name ? `ID ${name}` : null },
   })
 }
 
@@ -635,9 +747,10 @@ export async function loadTradeForKey(key: string): Promise<LinkedTrade> {
 
 export async function getAccountStatement(key: string, extraName?: string | null): Promise<AccountStatement> {
   const resolved = await resolveAccountKeys(key, extraName)
+  const tradeKey = resolved.farmer?.code || resolved.buyer?.code || key
   const [parties, trade] = await Promise.all([
     findRegisterPartiesForKeys(resolved.aliases),
-    loadTradeForKey(key),
+    loadTradeForKey(tradeKey),
   ])
   const entries = parties.flatMap((party) => party.entries)
   const cashReceived = entries

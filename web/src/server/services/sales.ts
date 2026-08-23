@@ -343,7 +343,7 @@ async function createSaleOnce(input: SaleInput, createdById?: bigint) {
   const sale = await getSale(saleId)
   if (sale.buyerCode) {
     const { ensureRegisterPartyForAccount } = await import('@/server/services/linked-account')
-    await ensureRegisterPartyForAccount(sale.buyerCode)
+    await ensureRegisterPartyForAccount(sale.buyerCode, sale.buyerName)
   }
   return sale
 }

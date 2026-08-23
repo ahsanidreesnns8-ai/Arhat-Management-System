@@ -4,7 +4,7 @@ import { normalizeOwnerCode } from '@/server/ids'
 import type { PartyInput } from '@/server/services/farmers'
 import { listPaymentsByBuyer } from '@/server/services/payments'
 import { listSalesByBuyer } from '@/server/services/sales'
-import { ensureRegisterPartyForAccount } from '@/server/services/linked-account'
+import { ensureRegisterPartyForAccount, getAccountStatement } from '@/server/services/linked-account'
 
 type BuyerRow = Prisma.BuyerGetPayload<{
   include: {
@@ -94,13 +94,27 @@ export async function listBuyers() {
   )
 }
 
+async function withRegisterAccount<T extends ReturnType<typeof buyerDto>>(dto: T) {
+  await ensureRegisterPartyForAccount(dto.buyerId, dto.name)
+  const statement = await getAccountStatement(dto.buyerId, dto.name)
+  return {
+    ...dto,
+    registerPartyId: statement.partyId,
+    registerReceived: statement.cashReceived,
+    registerGiven: statement.cashGiven,
+    remainingToGive: statement.remainingToGive,
+    remainingToReceive: statement.remainingToReceive,
+    statement,
+  }
+}
+
 export async function getBuyer(id: number | bigint) {
   const row = await prisma.buyer.findFirst({
     where: { id: BigInt(id), deleted: false },
     include: includeTotals,
   })
   if (!row) throw new Error('Buyer not found')
-  return buyerDto(row)
+  return withRegisterAccount(buyerDto(row))
 }
 
 export async function createBuyer(input: PartyInput) {
@@ -123,7 +137,7 @@ export async function createBuyer(input: PartyInput) {
     include: includeTotals,
   })
   await ensureRegisterPartyForAccount(buyerId, input.name.trim())
-  return buyerDto(row)
+  return withRegisterAccount(buyerDto(row))
 }
 
 export async function updateBuyer(id: number | bigint, input: PartyInput) {
@@ -152,7 +166,7 @@ export async function updateBuyer(id: number | bigint, input: PartyInput) {
     include: includeTotals,
   })
   await ensureRegisterPartyForAccount(row.buyerId, row.name)
-  return buyerDto(row)
+  return withRegisterAccount(buyerDto(row))
 }
 
 export async function deleteBuyer(id: number | bigint) {

@@ -4,14 +4,17 @@ import { ArrowLeft, CheckCircle2, FileText, Pencil, Printer, Trash2, Wallet } fr
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
-import { buyerApi, paymentApi } from '../services/api'
+import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
+import { buyerApi, paymentApi, registerApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
-import type { Buyer, Payment, Sale } from '../types'
+import type { AccountStatement, Buyer, Payment, Sale } from '../types'
 
 export default function BuyerDetailPage() {
   const { t } = useLanguage()
@@ -25,6 +28,11 @@ export default function BuyerDetailPage() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [groupSize, setGroupSize] = useState('')
+  const [balanceOpen, setBalanceOpen] = useState(false)
+  const [idCashOpen, setIdCashOpen] = useState<'GIVING' | 'RECEIVING' | null>(null)
+  const [idCashForm, setIdCashForm] = useState({ amount: '', notes: '' })
+  const [savingIdCash, setSavingIdCash] = useState(false)
+  const [statement, setStatement] = useState<AccountStatement | null>(null)
 
   const load = useCallback(() => {
     if (!buyerId) return
@@ -35,9 +43,11 @@ export default function BuyerDetailPage() {
       buyerApi.getSales(buyerId).catch(() => ({ data: { data: [] } })),
     ])
       .then(([b, p, s]) => {
-        setBuyer(b.data.data)
+        const next = b.data.data
+        setBuyer(next)
         setPayments(p.data.data || [])
         setSales(s.data.data || [])
+        setStatement(next?.statement || null)
       })
       .catch(() => toast.error('Failed to load buyer'))
       .finally(() => setLoading(false))
@@ -138,8 +148,8 @@ export default function BuyerDetailPage() {
               </Button>
               <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
               <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
-              <Button variant="secondary" onClick={() => void openBalance()}>Balance</Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
+              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>Total balance</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print product bill</Button>
             </div>
           }
         />
@@ -159,7 +169,7 @@ export default function BuyerDetailPage() {
           <p className="text-sm text-gray-500">{[buyer.address, buyer.city].filter(Boolean).join(', ') || ''}</p>
           {buyer.notes ? <p className="mt-2 text-sm text-gray-500">{buyer.notes}</p> : null}
           <p className="mt-2 text-sm text-slate-500">
-            This page is buyer sales only. Product bill prints these purchases. Balance prints sales plus Arhat Register given / received for ID {buyer.buyerId}.
+            Product bill prints these purchases only. Tap Total balance for Arhat Register given/received plus sales history.
           </p>
           {settled && (
             <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
@@ -167,6 +177,32 @@ export default function BuyerDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      <TotalBalancePreview statement={statement} onOpen={() => setBalanceOpen(true)} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => {
+            const summary = statementSummary(statement)
+            setIdCashForm({ amount: summary.remainingToGive > 0 ? String(summary.remainingToGive) : '', notes: '' })
+            setIdCashOpen('GIVING')
+          }}
+        >
+          <Wallet className="h-4 w-4" /> Give on this ID
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            const summary = statementSummary(statement)
+            setIdCashForm({ amount: summary.remainingToReceive > 0 ? String(summary.remainingToReceive) : '', notes: '' })
+            setIdCashOpen('RECEIVING')
+          }}
+        >
+          Receive on this ID
+        </Button>
+        <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
+          <FileText className="h-4 w-4" /> Open total balance
+        </Button>
       </div>
 
       <div className="card-3d overflow-hidden">
@@ -371,6 +407,85 @@ export default function BuyerDetailPage() {
           </table>
         )}
       </div>
+
+      <TotalBalancePanel
+        open={balanceOpen}
+        onClose={() => setBalanceOpen(false)}
+        title={`Total balance · ${buyer.name}`}
+        statement={statement}
+        onPrint={(lang) => void openBalance(lang)}
+        onGive={() => {
+          const summary = statementSummary(statement)
+          setBalanceOpen(false)
+          setIdCashForm({ amount: summary.remainingToGive > 0 ? String(summary.remainingToGive) : '', notes: '' })
+          setIdCashOpen('GIVING')
+        }}
+        onReceive={() => {
+          const summary = statementSummary(statement)
+          setBalanceOpen(false)
+          setIdCashForm({ amount: summary.remainingToReceive > 0 ? String(summary.remainingToReceive) : '', notes: '' })
+          setIdCashOpen('RECEIVING')
+        }}
+      />
+
+      <Modal
+        open={!!idCashOpen}
+        onClose={() => setIdCashOpen(null)}
+        title={idCashOpen === 'RECEIVING' ? `Receive on ID ${buyer.buyerId}` : `Give on ID ${buyer.buyerId}`}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            {idCashOpen === 'RECEIVING'
+              ? `Record money received from ${buyer.name} (${buyer.buyerId}). Product bill is not changed.`
+              : `Record money given to ${buyer.name} (${buyer.buyerId}). Product bill is not changed.`}
+          </p>
+          <Input
+            label="Amount (PKR) *"
+            type="number"
+            min="0"
+            value={idCashForm.amount}
+            onChange={(e) => setIdCashForm({ ...idCashForm, amount: e.target.value })}
+          />
+          <Input
+            label="Note (optional)"
+            value={idCashForm.notes}
+            onChange={(e) => setIdCashForm({ ...idCashForm, notes: e.target.value })}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setIdCashOpen(null)}>Cancel</Button>
+            <Button
+              loading={savingIdCash}
+              onClick={async () => {
+                const amount = Number(idCashForm.amount)
+                if (!idCashOpen || !amount || amount <= 0) {
+                  toast.error('Enter the amount')
+                  return
+                }
+                setSavingIdCash(true)
+                try {
+                  await registerApi.adjust({
+                    key: buyer.buyerId,
+                    kind: idCashOpen,
+                    amount,
+                    notes: idCashForm.notes.trim() || undefined,
+                    buyerId: buyer.id,
+                  })
+                  toast.success(idCashOpen === 'RECEIVING' ? 'Received on this buyer ID' : 'Given on this buyer ID')
+                  setIdCashOpen(null)
+                  load()
+                } catch (err: unknown) {
+                  const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                  toast.error(msg || 'Could not save amount')
+                } finally {
+                  setSavingIdCash(false)
+                }
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <PaymentModal
         open={payOpen}

@@ -4,7 +4,7 @@ import { normalizeOwnerCode } from '@/server/ids'
 import { listDherisByFarmer } from '@/server/services/dheris'
 import { listPaymentsByFarmer } from '@/server/services/payments'
 import { listTrucksByFarmer } from '@/server/services/trucks'
-import { ensureRegisterPartyForAccount, registerCashForKey } from '@/server/services/linked-account'
+import { ensureRegisterPartyForAccount, getAccountStatement } from '@/server/services/linked-account'
 
 type FarmerRow = Prisma.FarmerGetPayload<{
   include: {
@@ -79,16 +79,20 @@ export function farmerDto(farmer: FarmerRow) {
 }
 
 async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
-  const cash = await registerCashForKey(dto.farmerId, dto.name)
+  await ensureRegisterPartyForAccount(dto.farmerId, dto.name)
+  const statement = await getAccountStatement(dto.farmerId, dto.name)
   const productBalance = (dto.totalBilled || 0) - (dto.totalPaid || 0)
   return {
     ...dto,
-    registerPartyId: cash.partyId,
-    registerReceived: cash.registerReceived,
-    registerGiven: cash.registerGiven,
+    registerPartyId: statement.partyId,
+    registerReceived: statement.cashReceived,
+    registerGiven: statement.cashGiven,
     accountBalance: productBalance,
+    remainingToGive: statement.remainingToGive,
+    remainingToReceive: statement.remainingToReceive,
     combinedRemaining:
-      (dto.totalBilled || 0) + cash.registerReceived - cash.registerGiven - (dto.totalPaid || 0),
+      (dto.totalBilled || 0) + statement.cashReceived - statement.cashGiven - (dto.totalPaid || 0),
+    statement,
   }
 }
 

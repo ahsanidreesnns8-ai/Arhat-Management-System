@@ -162,7 +162,10 @@ export interface Farmer {
   registerReceived?: number
   registerGiven?: number
   accountBalance?: number
+  remainingToGive?: number
+  remainingToReceive?: number
   combinedRemaining?: number
+  statement?: AccountStatement
   notes?: string
   active: boolean
 }
@@ -179,6 +182,12 @@ export interface Buyer {
   outstandingBalance: number
   totalBilled?: number
   totalPaid?: number
+  registerPartyId?: number | null
+  registerReceived?: number
+  registerGiven?: number
+  remainingToGive?: number
+  remainingToReceive?: number
+  statement?: AccountStatement
   notes?: string
   active: boolean
 }

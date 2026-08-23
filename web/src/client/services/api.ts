@@ -356,7 +356,7 @@ export const registerApi = {
   zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
   statement: (key: string) =>
     api.get<ApiResponse<AccountStatement>>('/register/statement', { params: { key } }),
-  adjust: (data: { key: string; kind: 'GIVING' | 'RECEIVING'; amount: number; notes?: string; farmerId?: number }) =>
+  adjust: (data: { key: string; kind: 'GIVING' | 'RECEIVING'; amount: number; notes?: string; farmerId?: number; buyerId?: number }) =>
     api.post<ApiResponse<{ entry: RegisterEntry; statement: AccountStatement }>>('/register/adjust', data),
 }
 
