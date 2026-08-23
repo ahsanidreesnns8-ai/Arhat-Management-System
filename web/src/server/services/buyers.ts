@@ -7,10 +7,29 @@ import { listSalesByBuyer } from '@/server/services/sales'
 import { ensureRegisterPartyForAccount } from '@/server/services/linked-account'
 
 type BuyerRow = Prisma.BuyerGetPayload<{
-  include: { sales: true; payments: true }
+  include: {
+    sales: { where: { deleted: false }; select: { totalAmount: true } }
+    payments: { select: { amount: true } }
+  }
 }>
 
-export function buyerDto(buyer: BuyerRow) {
+function buyerDtoFromTotals(
+  buyer: {
+    id: bigint
+    buyerId: string
+    name: string
+    fatherName: string | null
+    cnic: string | null
+    phone: string | null
+    address: string | null
+    city: string | null
+    outstandingBalance: { toNumber(): number }
+    notes: string | null
+    active: boolean
+  },
+  totalBilled: number,
+  totalPaid: number,
+) {
   return {
     id: Number(buyer.id),
     buyerId: buyer.buyerId,
@@ -21,31 +40,58 @@ export function buyerDto(buyer: BuyerRow) {
     address: buyer.address,
     city: buyer.city,
     outstandingBalance: buyer.outstandingBalance.toNumber(),
-    totalBilled: buyer.sales.reduce(
-      (sum, item) => sum + item.totalAmount.toNumber(),
-      0,
-    ),
-    totalPaid: buyer.payments.reduce(
-      (sum, item) => sum + item.amount.toNumber(),
-      0,
-    ),
+    totalBilled,
+    totalPaid,
     notes: buyer.notes,
     active: buyer.active,
   }
 }
 
+export function buyerDto(buyer: BuyerRow) {
+  return buyerDtoFromTotals(
+    buyer,
+    buyer.sales.reduce((sum, item) => sum + item.totalAmount.toNumber(), 0),
+    buyer.payments.reduce((sum, item) => sum + item.amount.toNumber(), 0),
+  )
+}
+
 const includeTotals = {
-  sales: { where: { deleted: false } },
-  payments: true,
+  sales: { where: { deleted: false }, select: { totalAmount: true } },
+  payments: { select: { amount: true } },
 } as const
 
 export async function listBuyers() {
-  const rows = await prisma.buyer.findMany({
-    where: { deleted: false },
-    include: includeTotals,
-    orderBy: { createdAt: 'desc' },
-  })
-  return rows.map(buyerDto)
+  const [rows, billed, paid] = await Promise.all([
+    prisma.buyer.findMany({
+      where: { deleted: false },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.sale.groupBy({
+      by: ['buyerId'],
+      where: { deleted: false },
+      _sum: { totalAmount: true },
+    }),
+    prisma.payment.groupBy({
+      by: ['buyerId'],
+      where: { buyerId: { not: null } },
+      _sum: { amount: true },
+    }),
+  ])
+  const billedByBuyer = new Map(
+    billed.map((row) => [String(row.buyerId), row._sum.totalAmount?.toNumber() ?? 0]),
+  )
+  const paidByBuyer = new Map(
+    paid
+      .filter((row) => row.buyerId != null)
+      .map((row) => [String(row.buyerId), row._sum.amount?.toNumber() ?? 0]),
+  )
+  return rows.map((row) =>
+    buyerDtoFromTotals(
+      row,
+      billedByBuyer.get(String(row.id)) ?? 0,
+      paidByBuyer.get(String(row.id)) ?? 0,
+    ),
+  )
 }
 
 export async function getBuyer(id: number | bigint) {

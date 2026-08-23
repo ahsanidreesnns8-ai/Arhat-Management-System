@@ -9,10 +9,16 @@ const globalForPrisma = globalThis as unknown as {
 function datasourceUrl() {
   const base = process.env.DATABASE_URL
   if (!base) return undefined
-  const sep = base.includes('?') ? '&' : '?'
-  // Keep pool tiny for serverless; allow a couple statements to queue
   if (base.includes('connection_limit=')) return base
-  return `${base}${sep}connection_limit=1&pool_timeout=30&connect_timeout=15`
+  const sep = base.includes('?') ? '&' : '?'
+  const pooled = /-pooler\./i.test(base) || /[?&]pgbouncer=true/i.test(base)
+  const extras = [
+    `connection_limit=${pooled ? 10 : 8}`,
+    'pool_timeout=20',
+    'connect_timeout=10',
+    pooled && !/[?&]pgbouncer=/i.test(base) ? 'pgbouncer=true' : '',
+  ].filter(Boolean).join('&')
+  return `${base}${sep}${extras}`
 }
 
 /** Models that belong to a live/demo workspace sandbox */

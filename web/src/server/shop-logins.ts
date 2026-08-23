@@ -1,6 +1,6 @@
 import { basePrisma } from '@/server/db'
-import { hashPassword, verifyPassword } from '@/server/auth'
-import { DEFAULT_SHOP_LOGINS, legacyLeakedShopPassword } from '@/server/shop-login-defaults'
+import { hashPassword } from '@/server/auth'
+import { DEFAULT_SHOP_LOGINS } from '@/server/shop-login-defaults'
 
 export {
   DEFAULT_SHOP_LOGINS,
@@ -12,8 +12,7 @@ export {
 let ensureOnce: Promise<void> | null = null
 
 /**
- * Create owner/staff if missing. Upgrade only leaked shop passwords.
- * Never overwrite a password the owner has already changed.
+ * Create owner/staff if missing. Password upgrades happen at login, not on every API call.
  */
 export function ensureShopLogins() {
   if (!ensureOnce) {
@@ -25,19 +24,19 @@ export function ensureShopLogins() {
   return ensureOnce
 }
 
-async function passwordMatches(plain: string, encoded: string | null | undefined) {
-  if (!encoded) return false
-  try {
-    return await verifyPassword(plain, encoded)
-  } catch {
-    return false
-  }
-}
-
 async function repairShopLogins() {
   for (const login of DEFAULT_SHOP_LOGINS) {
     const existing = await basePrisma.user.findUnique({
       where: { username: login.username },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        workspace: true,
+        deleted: true,
+        active: true,
+      },
     })
 
     if (!existing) {
@@ -56,8 +55,14 @@ async function repairShopLogins() {
       continue
     }
 
-    const leaked = legacyLeakedShopPassword(login.username)
-    const stillLeaked = leaked ? await passwordMatches(leaked, existing.password) : false
+    const needsRepair =
+      existing.deleted ||
+      (login.username === 'owner' && !existing.active) ||
+      existing.role !== login.role ||
+      !(existing.email || '').trim() ||
+      !(existing.fullName || '').trim()
+    if (!needsRepair) continue
+
     await basePrisma.user.update({
       where: { id: existing.id },
       data: {
@@ -69,7 +74,6 @@ async function repairShopLogins() {
         failedLoginAttempts: 0,
         lockedUntil: null,
         ...(login.username === 'owner' ? { active: true } : {}),
-        ...(stillLeaked ? { password: await hashPassword(login.password) } : {}),
       },
     })
   }

@@ -1,7 +1,9 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { d, roundRupee, totalWeight } from '@/server/money'
 import { requireOwnedBook, resolveShopBook } from '@/server/services/grain-khata'
 import { addBank as parkInBank, listHeads, loadTreasury, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
+import { getWorkspace } from '@/server/workspace'
 
 export type GrainBookAccess = { userId: bigint; secret?: unknown }
 
@@ -247,6 +249,61 @@ function partyDto(
   }
 }
 
+function num(value: unknown) {
+  if (value == null) return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'bigint') return Number(value)
+  if (typeof value === 'object' && value && 'toNumber' in value && typeof (value as { toNumber: () => number }).toNumber === 'function') {
+    return (value as { toNumber: () => number }).toNumber()
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function partySummaryDto(
+  party: {
+    id: bigint
+    bookKey?: string
+    kind: string
+    name: string
+    address: string | null
+    notes: string | null
+    createdAt: Date
+  },
+  stats: {
+    productCount: number
+    paymentCount: number
+    totalBags: number
+    totalWeightKg: number
+    wheatAmount: number
+    bagAmount: number
+    labourAmount: number
+    productTotal: number
+    cashTotal: number
+  },
+) {
+  return {
+    id: Number(party.id),
+    bookKey: party.bookKey || 'WHEAT',
+    kind: party.kind,
+    name: party.name,
+    address: party.address,
+    notes: party.notes,
+    createdAt: party.createdAt.toISOString(),
+    productCount: stats.productCount,
+    paymentCount: stats.paymentCount,
+    totalBags: stats.totalBags,
+    totalWeightKg: stats.totalWeightKg,
+    wheatAmount: stats.wheatAmount,
+    bagAmount: stats.bagAmount,
+    labourAmount: stats.labourAmount,
+    productTotal: stats.productTotal,
+    cashTotal: stats.cashTotal,
+    totalPrice: stats.productTotal + stats.cashTotal,
+    remaining: stats.productTotal - stats.cashTotal,
+  }
+}
+
 const partyInclude = {
   products: { orderBy: { createdAt: 'desc' as const } },
   payments: { orderBy: { createdAt: 'desc' as const } },
@@ -311,29 +368,108 @@ async function bagStock(bookKey: string) {
   }
 }
 
+type ProductStatRow = {
+  party_id: bigint
+  product_count: bigint | number
+  bags: bigint | number
+  weight_kg: unknown
+  wheat_amount: unknown
+  bag_amount: unknown
+  labour_amount: unknown
+  product_total: unknown
+}
+
 export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
   const book = await openBook(bookKey, access)
-  const [moneyRows, receivingRows, givingRows] = await Promise.all([
+  const workspace = getWorkspace()
+  const [moneySum, moneyRows, receivingRows, givingRows, productStats, paymentSums, treasury] = await Promise.all([
+    prisma.wheatKhataMoney.aggregate({
+      where: { bookKey: book.key },
+      _sum: { amount: true },
+    }),
     prisma.wheatKhataMoney.findMany({
       where: { bookKey: book.key },
       orderBy: { createdAt: 'desc' },
+      take: 120,
     }),
     prisma.wheatKhataParty.findMany({
       where: { deleted: false, kind: 'RECEIVING', bookKey: book.key },
       orderBy: { name: 'asc' },
-      include: partyInclude,
     }),
     prisma.wheatKhataParty.findMany({
       where: { deleted: false, kind: 'GIVING', bookKey: book.key },
       orderBy: { name: 'asc' },
-      include: partyInclude,
     }),
+    prisma.$queryRaw<ProductStatRow[]>(Prisma.sql`
+      SELECT p.party_id,
+        COUNT(*)::int AS product_count,
+        COALESCE(SUM(p.bags), 0)::int AS bags,
+        COALESCE(SUM(p.bags * p.bag_weight_kg), 0) AS weight_kg,
+        COALESCE(SUM(ROUND(p.bags * p.rate_per_bag)), 0) AS wheat_amount,
+        COALESCE(SUM(ROUND(p.bags * p.bag_price_per_bag)), 0) AS bag_amount,
+        COALESCE(SUM(ROUND(p.bags * p.labour_per_bag)), 0) AS labour_amount,
+        COALESCE(SUM(p.total_price), 0) AS product_total
+      FROM wheat_khata_products p
+      INNER JOIN wheat_khata_parties party ON party.id = p.party_id
+      WHERE p.workspace = ${workspace}
+        AND party.workspace = ${workspace}
+        AND party.book_key = ${book.key}
+        AND party.deleted = false
+      GROUP BY p.party_id
+    `),
+    prisma.wheatKhataPayment.groupBy({
+      by: ['partyId'],
+      where: { party: { bookKey: book.key, deleted: false } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    loadTreasury('GRAIN', book.key),
   ])
 
+  const productByParty = new Map(
+    productStats.map((row) => [
+      String(row.party_id),
+      {
+        productCount: num(row.product_count),
+        totalBags: num(row.bags),
+        totalWeightKg: num(row.weight_kg),
+        wheatAmount: num(row.wheat_amount),
+        bagAmount: num(row.bag_amount),
+        labourAmount: num(row.labour_amount),
+        productTotal: num(row.product_total),
+      },
+    ]),
+  )
+  const paymentByParty = new Map(
+    paymentSums.map((row) => [
+      String(row.partyId),
+      {
+        paymentCount: row._count._all,
+        cashTotal: row._sum.amount?.toNumber() ?? 0,
+      },
+    ]),
+  )
+
+  const summarize = (row: (typeof receivingRows)[number]) => {
+    const products = productByParty.get(String(row.id))
+    const payments = paymentByParty.get(String(row.id))
+    return partySummaryDto(row, {
+      productCount: products?.productCount ?? 0,
+      paymentCount: payments?.paymentCount ?? 0,
+      totalBags: products?.totalBags ?? 0,
+      totalWeightKg: products?.totalWeightKg ?? 0,
+      wheatAmount: products?.wheatAmount ?? 0,
+      bagAmount: products?.bagAmount ?? 0,
+      labourAmount: products?.labourAmount ?? 0,
+      productTotal: products?.productTotal ?? 0,
+      cashTotal: payments?.cashTotal ?? 0,
+    })
+  }
+
   const money = moneyRows.map(moneyDto)
-  const parties = receivingRows.map((row) => partyDto(row))
-  const companies = givingRows.map((row) => partyDto(row))
-  const moneyIn = money.reduce((sum, row) => sum + row.amount, 0)
+  const parties = receivingRows.map(summarize)
+  const companies = givingRows.map(summarize)
+  const moneyIn = moneySum._sum.amount?.toNumber() ?? 0
   const givingToParty =
     parties.reduce((sum, row) => sum + row.productTotal, 0) +
     parties.reduce((sum, row) => sum + row.cashTotal, 0)
@@ -343,7 +479,6 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
   const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashTotal = moneyIn + cashReceived - cashGiven
-  const treasury = await loadTreasury('GRAIN', book.key)
   const cash = withTreasury(cashTotal, treasury)
   const bagsReceived = parties.reduce((sum, row) => sum + row.totalBags, 0)
   const bagsGiven = companies.reduce((sum, row) => sum + row.totalBags, 0)

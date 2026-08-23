@@ -28,6 +28,7 @@ export async function getDashboardStats(role?: string | null) {
     activity,
     weekSales,
     stockLots,
+    lotRows,
   ] = await Promise.all([
     prisma.sale.aggregate({
       where: { deleted: false, saleDate: { gte: start, lt: end } },
@@ -59,6 +60,12 @@ export async function getDashboardStats(role?: string | null) {
       select: { saleDate: true, totalAmount: true },
     }),
     prisma.stockLot.aggregate({ _sum: { remainingKg: true } }),
+    prisma.stockLot.findMany({
+      where: { remainingKg: { gt: 0 } },
+      include: { product: true },
+      orderBy: { intakeDate: 'desc' },
+      take: 12,
+    }),
   ])
 
   const salesByDay = new Map<string, number>()
@@ -82,12 +89,6 @@ export async function getDashboardStats(role?: string | null) {
   const todaySales = sales._sum.totalAmount?.toNumber() ?? 0
   const showFinance = role == null || isOwnerFinanceRole(role)
   const stockAsOf = start.toISOString().slice(0, 10)
-  const lotRows = await prisma.stockLot.findMany({
-    where: { remainingKg: { gt: 0 } },
-    include: { product: true },
-    orderBy: { intakeDate: 'desc' },
-    take: 12,
-  })
   return {
     todaySales,
     currentQueue,

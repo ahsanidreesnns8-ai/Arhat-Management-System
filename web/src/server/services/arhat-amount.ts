@@ -1,6 +1,5 @@
 import { prisma } from '@/server/db'
 import { roundRupee } from '@/server/money'
-import { allTreasuryRows } from '@/server/services/khata-treasury'
 
 const MANUAL_KINDS = ['ADD', 'RECEIVING', 'GIVING'] as const
 export type ArhatAmountKind = (typeof MANUAL_KINDS)[number]
@@ -145,32 +144,78 @@ export async function addEntry(input: { kind?: unknown; amount?: unknown; notes?
   return manualDto(row)
 }
 
+const HISTORY_TAKE = 80
+
 async function arhatLines(): Promise<{
   lines: ArhatAmountLine[]
   commission: number
   zakat: number
   manual: ReturnType<typeof manualDto>[]
+  totals: { added: number; receiving: number; giving: number }
 }> {
-  const [manualRows, paymentRows, registerRows, commissionAgg] = await Promise.all([
-    prisma.arhatAmountEntry.findMany({ orderBy: { createdAt: 'desc' } }),
+  const [manualRows, paymentRows, registerRows, commissionAgg, manualSum, buyerSum, farmerSum, registerSum] = await Promise.all([
+    prisma.arhatAmountEntry.findMany({ orderBy: { createdAt: 'desc' }, take: HISTORY_TAKE }),
     prisma.payment.findMany({
       where: {
         OR: [{ dheriId: null }, { dheri: { deleted: false } }],
       },
-      include: { farmer: true, buyer: true, sale: true },
+      select: {
+        id: true,
+        paymentType: true,
+        amount: true,
+        notes: true,
+        referenceNumber: true,
+        createdAt: true,
+        farmer: { select: { name: true } },
+        buyer: { select: { name: true } },
+        sale: { select: { invoiceNumber: true } },
+      },
       orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
     }),
     prisma.registerEntry.findMany({
       where: {
         kind: { in: ['GIVING', 'RECEIVING', 'ZAKAT'] },
         OR: [{ partyId: null }, { party: { deleted: false } }],
       },
-      include: { party: true, farmer: true },
+      select: {
+        id: true,
+        kind: true,
+        amount: true,
+        notes: true,
+        createdAt: true,
+        party: { select: { name: true } },
+        farmer: { select: { name: true } },
+      },
       orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
     }),
     prisma.dheri.aggregate({
       _sum: { commissionAmount: true },
       where: { deleted: false },
+    }),
+    prisma.arhatAmountEntry.groupBy({ by: ['kind'], _sum: { amount: true } }),
+    prisma.payment.aggregate({
+      where: {
+        paymentType: 'BUYER',
+        OR: [{ dheriId: null }, { dheri: { deleted: false } }],
+      },
+      _sum: { amount: true },
+    }),
+    prisma.payment.aggregate({
+      where: {
+        paymentType: 'FARMER',
+        OR: [{ dheriId: null }, { dheri: { deleted: false } }],
+      },
+      _sum: { amount: true },
+    }),
+    prisma.registerEntry.groupBy({
+      by: ['kind'],
+      where: {
+        kind: { in: ['GIVING', 'RECEIVING', 'ZAKAT'] },
+        OR: [{ partyId: null }, { party: { deleted: false } }],
+      },
+      _sum: { amount: true },
     }),
   ])
 
@@ -278,30 +323,82 @@ async function arhatLines(): Promise<{
   }
 
   const sorted = sortLines(lines)
+  const kindSum = (rows: typeof manualSum, kind: string) =>
+    rows.find((row) => row.kind === kind)?._sum.amount?.toNumber() ?? 0
+  const added = kindSum(manualSum, 'ADD')
+  const receiving =
+    kindSum(manualSum, 'RECEIVING') +
+    (buyerSum._sum.amount?.toNumber() ?? 0) +
+    kindSum(registerSum, 'RECEIVING')
+  const giving =
+    kindSum(manualSum, 'GIVING') +
+    (farmerSum._sum.amount?.toNumber() ?? 0) +
+    kindSum(registerSum, 'GIVING') +
+    kindSum(registerSum, 'ZAKAT')
   return {
     lines: sorted,
     commission: commissionAgg._sum.commissionAmount?.toNumber() ?? 0,
-    zakat: sorted.filter((row) => row.source === 'ZAKAT').reduce((sum, row) => sum + row.amount, 0),
+    zakat: kindSum(registerSum, 'ZAKAT'),
     manual: manualRows.map(manualDto),
+    totals: { added, receiving, giving },
   }
 }
 
-async function khataCashLines(): Promise<ArhatAmountLine[]> {
-  const [grainBooks, paddyBooks, moneyRows, paymentRows, paddyAmounts, paddyCash, paddyExpenses, treasury] = await Promise.all([
-    prisma.grainKhataBook.findMany({ where: { deleted: false } }),
-    prisma.paddyKhataBook.findMany({ where: { deleted: false } }),
-    prisma.wheatKhataMoney.findMany({ orderBy: { createdAt: 'desc' } }),
+async function khataCashLines(): Promise<{ lines: ArhatAmountLine[]; totals: { added: number; receiving: number; giving: number } }> {
+  const [
+    grainBooks,
+    paddyBooks,
+    moneyRows,
+    paymentRows,
+    paddyAmounts,
+    paddyCash,
+    paddyExpenses,
+    treasury,
+    moneySum,
+    payGive,
+    payReceive,
+    paddyAdd,
+    paddyGive,
+    paddyReceive,
+    paddyExp,
+    transferOut,
+    transferIn,
+  ] = await Promise.all([
+    prisma.grainKhataBook.findMany({ where: { deleted: false }, select: { key: true, name: true } }),
+    prisma.paddyKhataBook.findMany({ where: { deleted: false }, select: { id: true, name: true } }),
+    prisma.wheatKhataMoney.findMany({ orderBy: { createdAt: 'desc' }, take: HISTORY_TAKE }),
     prisma.wheatKhataPayment.findMany({
-      include: { party: true },
+      include: { party: { select: { deleted: true, bookKey: true, kind: true, name: true } } },
       orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
     }),
-    prisma.paddyKhataAmount.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.paddyKhataAmount.findMany({ orderBy: { createdAt: 'desc' }, take: HISTORY_TAKE }),
     prisma.paddyKhataCash.findMany({
-      include: { party: true, book: true },
+      include: { party: { select: { name: true } }, book: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
     }),
-    prisma.paddyKhataExpense.findMany({ orderBy: { createdAt: 'desc' } }),
-    allTreasuryRows(),
+    prisma.paddyKhataExpense.findMany({ orderBy: { createdAt: 'desc' }, take: HISTORY_TAKE }),
+    prisma.khataTreasury.findMany({
+      where: { kind: { in: ['TRANSFER_IN', 'TRANSFER_OUT'] } },
+      orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
+    }),
+    prisma.wheatKhataMoney.aggregate({ _sum: { amount: true } }),
+    prisma.wheatKhataPayment.aggregate({
+      where: { party: { deleted: false, kind: 'RECEIVING' } },
+      _sum: { amount: true },
+    }),
+    prisma.wheatKhataPayment.aggregate({
+      where: { party: { deleted: false, kind: 'GIVING' } },
+      _sum: { amount: true },
+    }),
+    prisma.paddyKhataAmount.aggregate({ _sum: { amount: true } }),
+    prisma.paddyKhataCash.aggregate({ where: { kind: 'GIVE' }, _sum: { amount: true } }),
+    prisma.paddyKhataCash.aggregate({ where: { kind: 'RECEIVE' }, _sum: { amount: true } }),
+    prisma.paddyKhataExpense.aggregate({ _sum: { amount: true } }),
+    prisma.khataTreasury.aggregate({ where: { kind: 'TRANSFER_OUT' }, _sum: { amount: true } }),
+    prisma.khataTreasury.aggregate({ where: { kind: 'TRANSFER_IN' }, _sum: { amount: true } }),
   ])
   const grainName = new Map(grainBooks.map((row) => [row.key, row.name]))
   const paddyName = new Map(paddyBooks.map((row) => [Number(row.id), row.name]))
@@ -399,18 +496,26 @@ async function khataCashLines(): Promise<ArhatAmountLine[]> {
         'KHATA',
         'KHATA',
         giving ? 'GIVING' : 'RECEIVING',
-        row.amount,
+        row.amount.toNumber(),
         joinReason([
           giving
             ? `Borrowed to ${row.counterName || 'another khata'}`
             : `Borrowed from ${row.counterName || 'another khata'}`,
           row.notes,
         ]),
-        new Date(row.createdAt),
+        row.createdAt,
       ),
     )
   }
-  return sortLines(lines)
+  const n = (value?: { toNumber(): number } | null) => value?.toNumber() ?? 0
+  return {
+    lines: sortLines(lines),
+    totals: {
+      added: n(moneySum._sum.amount) + n(paddyAdd._sum.amount),
+      receiving: n(payReceive._sum.amount) + n(paddyReceive._sum.amount) + n(transferIn._sum.amount),
+      giving: n(payGive._sum.amount) + n(paddyGive._sum.amount) + n(paddyExp._sum.amount) + n(transferOut._sum.amount),
+    },
+  }
 }
 
 function totalsFromLines(
@@ -431,26 +536,39 @@ function totalsFromLines(
 }
 
 export async function getBook() {
-  const [arhat, khataHistory] = await Promise.all([arhatLines(), khataCashLines()])
-  const history = sortLines([...arhat.lines, ...khataHistory])
-  const totals = totalsFromLines(history, {
-    commission: arhat.commission,
-    zakat: arhat.zakat,
-  })
+  const [arhat, khata] = await Promise.all([arhatLines(), khataCashLines()])
+  const history = sortLines([...arhat.lines, ...khata.lines])
+  const added = arhat.totals.added + khata.totals.added
+  const receiving = arhat.totals.receiving + khata.totals.receiving
+  const giving = arhat.totals.giving + khata.totals.giving
   return {
-    totals,
+    totals: {
+      added,
+      receiving,
+      giving,
+      zakat: arhat.zakat,
+      commission: arhat.commission,
+      totalAmount: added + receiving - giving,
+    },
     manual: arhat.manual,
     history,
   }
 }
 
 export async function getMergeReport() {
-  const [arhat, khataHistory] = await Promise.all([arhatLines(), khataCashLines()])
-  const arhatTotals = totalsFromLines(arhat.lines, {
-    commission: arhat.commission,
+  const [arhat, khata] = await Promise.all([arhatLines(), khataCashLines()])
+  const arhatTotals = {
+    ...arhat.totals,
     zakat: arhat.zakat,
-  })
-  const khataTotals = totalsFromLines(khataHistory, { commission: 0, zakat: 0 })
+    commission: arhat.commission,
+    totalAmount: arhat.totals.added + arhat.totals.receiving - arhat.totals.giving,
+  }
+  const khataTotals = {
+    ...khata.totals,
+    zakat: 0,
+    commission: 0,
+    totalAmount: khata.totals.added + khata.totals.receiving - khata.totals.giving,
+  }
   return {
     arhat: arhatTotals,
     wheatKhata: khataTotals,
@@ -463,6 +581,6 @@ export async function getMergeReport() {
       commission: arhatTotals.commission,
       totalAmount: arhatTotals.totalAmount + khataTotals.totalAmount,
     },
-    history: sortLines([...arhat.lines, ...khataHistory]),
+    history: sortLines([...arhat.lines, ...khata.lines]),
   }
 }

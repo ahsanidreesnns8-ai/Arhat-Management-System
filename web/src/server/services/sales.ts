@@ -4,12 +4,12 @@ import { nextInvoiceCode } from '@/server/ids'
 import { amountFromWeight, d, round2, totalWeight } from '@/server/money'
 
 const saleInclude = {
-  buyer: true,
+  buyer: { select: { id: true, name: true, buyerId: true } },
   items: {
     include: {
-      product: true,
-      farmer: true,
-      dheri: true,
+      product: { select: { id: true, name: true } },
+      farmer: { select: { id: true, name: true } },
+      dheri: { select: { id: true, dheriId: true } },
     },
   },
 } as const

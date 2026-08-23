@@ -7,6 +7,7 @@ import {
   ensureRegisterPartyForAccount,
   findRegisterPartyByKey,
   getAccountStatement,
+  loadTradeForKey,
   loadTradeIndex,
   tradeForKey,
   type LinkedTrade,
@@ -218,12 +219,12 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
 }
 
 async function withTrade<T extends PartyDto>(dto: T, includeEntries = false) {
-  const index = await loadTradeIndex()
-  return attachTrade(dto, tradeForKey(index, dto.name), includeEntries) as T
+  const trade = await loadTradeForKey(dto.name)
+  return attachTrade(dto, trade, includeEntries) as T
 }
 
 async function withTradeAll(dtos: PartyDto[], includeEntries = false) {
-  const index = await loadTradeIndex()
+  const index = await loadTradeIndex(includeEntries)
   return dtos.map((dto) => attachTrade(dto, tradeForKey(index, dto.name), includeEntries))
 }
 
@@ -246,12 +247,44 @@ function moneyEntryInclude() {
 
 export async function listParties(kind: string) {
   if (kind) parseKind(kind, ['GIVING', 'RECEIVING'])
-  const rows = await prisma.registerParty.findMany({
-    where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
-    orderBy: { name: 'asc' },
-    include: moneyEntryInclude(),
+  const [rows, sums] = await Promise.all([
+    prisma.registerParty.findMany({
+      where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.registerEntry.groupBy({
+      by: ['partyId', 'kind'],
+      where: { kind: { in: [...MONEY_ENTRY_KINDS] }, partyId: { not: null } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+  ])
+  const received = new Map<string, { amount: number; count: number }>()
+  const given = new Map<string, { amount: number; count: number }>()
+  for (const row of sums) {
+    if (row.partyId == null) continue
+    const key = String(row.partyId)
+    const amount = row._sum.amount?.toNumber() ?? 0
+    const count = row._count._all
+    if (row.kind === 'RECEIVING') received.set(key, { amount, count })
+    if (row.kind === 'GIVING') given.set(key, { amount, count })
+  }
+  const dtos = rows.map((row) => {
+    const dto = partyDto({ ...row, entries: [] }, false)
+    const r = received.get(String(row.id)) ?? { amount: 0, count: 0 }
+    const g = given.get(String(row.id)) ?? { amount: 0, count: 0 }
+    return {
+      ...dto,
+      receivedTotal: r.amount,
+      givenTotal: g.amount,
+      cashReceivedTotal: r.amount,
+      cashGivenTotal: g.amount,
+      receivedCount: r.count,
+      givenCount: g.count,
+      balance: r.amount - g.amount,
+    }
   })
-  return withTradeAll(rows.map((row) => partyDto(row, true)), true)
+  return withTradeAll(dtos, false)
 }
 
 export async function getPartyLedger(id: number | bigint) {
@@ -400,10 +433,20 @@ async function farmerForAccountKey(key: string, farmerId?: number | null) {
     })
     if (row) return row
   }
-  const norm = normalizeAccountKey(key)
+  const raw = String(key ?? '').trim()
+  const norm = normalizeAccountKey(raw)
   if (!norm) return null
-  const farmers = await prisma.farmer.findMany({ where: { deleted: false } })
-  return farmers.find((row) => normalizeAccountKey(row.farmerId) === norm) ?? null
+  const direct = await prisma.farmer.findFirst({
+    where: { deleted: false, OR: [{ farmerId: raw }, { farmerId: norm }] },
+  })
+  if (direct) return direct
+  const farmers = await prisma.farmer.findMany({
+    where: { deleted: false },
+    select: { id: true, farmerId: true },
+  })
+  const hit = farmers.find((row) => normalizeAccountKey(row.farmerId) === norm)
+  if (!hit) return null
+  return prisma.farmer.findFirst({ where: { id: hit.id, deleted: false } })
 }
 
 export async function getStatement(key: unknown) {

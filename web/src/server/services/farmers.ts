@@ -7,7 +7,10 @@ import { listTrucksByFarmer } from '@/server/services/trucks'
 import { ensureRegisterPartyForAccount, registerCashForKey } from '@/server/services/linked-account'
 
 type FarmerRow = Prisma.FarmerGetPayload<{
-  include: { dheris: { where: { deleted: false } }; payments: true }
+  include: {
+    dheris: { where: { deleted: false }; select: { farmerReceivable: true } }
+    payments: { select: { amount: true } }
+  }
 }>
 
 export type PartyInput = {
@@ -29,15 +32,23 @@ function ownerPartyCode(input: PartyInput, kind: 'farmer' | 'buyer') {
   return raw
 }
 
-export function farmerDto(farmer: FarmerRow) {
-  const totalBilled = farmer.dheris.reduce(
-    (sum, item) => sum + item.farmerReceivable.toNumber(),
-    0,
-  )
-  const totalPaid = farmer.payments.reduce(
-    (sum, item) => sum + item.amount.toNumber(),
-    0,
-  )
+function farmerDtoFromTotals(
+  farmer: {
+    id: bigint
+    farmerId: string
+    name: string
+    fatherName: string | null
+    cnic: string | null
+    phone: string | null
+    address: string | null
+    city: string | null
+    outstandingBalance: { toNumber(): number }
+    notes: string | null
+    active: boolean
+  },
+  totalBilled: number,
+  totalPaid: number,
+) {
   return {
     id: Number(farmer.id),
     farmerId: farmer.farmerId,
@@ -55,6 +66,18 @@ export function farmerDto(farmer: FarmerRow) {
   }
 }
 
+export function farmerDto(farmer: FarmerRow) {
+  const totalBilled = farmer.dheris.reduce(
+    (sum, item) => sum + item.farmerReceivable.toNumber(),
+    0,
+  )
+  const totalPaid = farmer.payments.reduce(
+    (sum, item) => sum + item.amount.toNumber(),
+    0,
+  )
+  return farmerDtoFromTotals(farmer, totalBilled, totalPaid)
+}
+
 async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
   const cash = await registerCashForKey(dto.farmerId)
   const productBalance = (dto.totalBilled || 0) - (dto.totalPaid || 0)
@@ -69,15 +92,43 @@ async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: 
   }
 }
 
-const includeTotals = { dheris: { where: { deleted: false } }, payments: true } as const
+const includeTotals = {
+  dheris: { where: { deleted: false }, select: { farmerReceivable: true } },
+  payments: { select: { amount: true } },
+} as const
 
 export async function listFarmers() {
-  const rows = await prisma.farmer.findMany({
-    where: { deleted: false },
-    include: includeTotals,
-    orderBy: { createdAt: 'desc' },
-  })
-  return rows.map(farmerDto)
+  const [rows, billed, paid] = await Promise.all([
+    prisma.farmer.findMany({
+      where: { deleted: false },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.dheri.groupBy({
+      by: ['farmerId'],
+      where: { deleted: false },
+      _sum: { farmerReceivable: true },
+    }),
+    prisma.payment.groupBy({
+      by: ['farmerId'],
+      where: { farmerId: { not: null } },
+      _sum: { amount: true },
+    }),
+  ])
+  const billedByFarmer = new Map(
+    billed.map((row) => [String(row.farmerId), row._sum.farmerReceivable?.toNumber() ?? 0]),
+  )
+  const paidByFarmer = new Map(
+    paid
+      .filter((row) => row.farmerId != null)
+      .map((row) => [String(row.farmerId), row._sum.amount?.toNumber() ?? 0]),
+  )
+  return rows.map((row) =>
+    farmerDtoFromTotals(
+      row,
+      billedByFarmer.get(String(row.id)) ?? 0,
+      paidByFarmer.get(String(row.id)) ?? 0,
+    ),
+  )
 }
 
 export async function getFarmer(id: number | bigint) {

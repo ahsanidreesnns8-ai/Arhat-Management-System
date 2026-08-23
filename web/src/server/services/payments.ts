@@ -3,10 +3,10 @@ import { prisma } from '@/server/db'
 import { d, round2 } from '@/server/money'
 
 const paymentInclude = {
-  farmer: true,
-  buyer: true,
-  sale: true,
-  dheri: true,
+  farmer: { select: { id: true, name: true, farmerId: true } },
+  buyer: { select: { id: true, name: true, buyerId: true } },
+  sale: { select: { id: true, invoiceNumber: true } },
+  dheri: { select: { id: true, dheriId: true } },
 } as const
 
 type PaymentRow = Prisma.PaymentGetPayload<{ include: typeof paymentInclude }>
