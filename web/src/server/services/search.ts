@@ -42,7 +42,7 @@ function matchPages(q: string) {
   }))
 }
 
-export async function search(query: string) {
+export async function search(query: string, userId?: bigint) {
   const q = query.trim()
   if (q.length < 1) return []
 
@@ -104,7 +104,12 @@ export async function search(query: string) {
         take: 8,
       }),
       prisma.grainKhataBook.findMany({
-        where: { deleted: false },
+        where: {
+          deleted: false,
+          ...(userId != null
+            ? { OR: [{ createdById: userId }, { createdById: null }] }
+            : { createdById: null }),
+        },
         take: 40,
       }),
       prisma.registerParty.findMany({
@@ -189,15 +194,17 @@ export async function search(query: string) {
       link: `/stock?product=${item.id}`,
     })),
     ...grainBooks
-      .filter((item) => !item.builtin && item.name.toLowerCase().includes(q.toLowerCase()))
+      .filter((item) => item.name.toLowerCase().includes(q.toLowerCase()))
       .map((item) => ({
         id: `khata-book-${item.key}`,
         type: 'PAGE',
         title: item.name,
-        subtitle: 'Open khata',
-        link: bookHref(item.key),
+        subtitle: item.publicId ? `${item.publicId} · Open khata` : 'Open khata',
+        link: bookHref(item.crop || item.key),
       })),
-    ...wheatParties.map((item) => {
+    ...wheatParties
+      .filter((item) => grainBooks.some((book) => book.key === item.bookKey) || item.bookKey === 'WHEAT')
+      .map((item) => {
       const bookName = grainBooks.find((book) => book.key === item.bookKey)?.name
         || (item.bookKey === 'WHEAT' ? 'Wheat Khata' : item.bookKey === 'BARLEY' ? 'Barley Khata' : item.bookKey === 'MAIZE' ? 'Maize Khata' : 'Khata')
       return {

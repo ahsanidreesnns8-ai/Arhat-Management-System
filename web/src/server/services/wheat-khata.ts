@@ -1,6 +1,13 @@
 import { prisma } from '@/server/db'
 import { d, roundRupee, totalWeight } from '@/server/money'
-import { resolveBook } from '@/server/services/grain-khata'
+import { requireOwnedBook, resolveShopBook } from '@/server/services/grain-khata'
+
+export type GrainBookAccess = { userId: bigint; secret?: unknown }
+
+async function openBook(bookKey?: unknown, access?: GrainBookAccess) {
+  if (access?.userId != null) return requireOwnedBook(bookKey ?? 'WHEAT', access.userId, access.secret)
+  return resolveShopBook(bookKey ?? 'WHEAT')
+}
 
 const PARTY_KINDS = ['RECEIVING', 'GIVING'] as const
 export type WheatKhataPartyKind = (typeof PARTY_KINDS)[number]
@@ -303,8 +310,8 @@ async function bagStock(bookKey: string) {
   }
 }
 
-export async function getBook(bookKey?: unknown) {
-  const book = await resolveBook(bookKey)
+export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
   const [moneyRows, receivingRows, givingRows] = await Promise.all([
     prisma.wheatKhataMoney.findMany({
       where: { bookKey: book.key },
@@ -357,8 +364,8 @@ export async function getBook(bookKey?: unknown) {
   }
 }
 
-export async function addMoney(input: { amount?: unknown; notes?: unknown }, bookKey?: unknown) {
-  const book = await resolveBook(bookKey)
+export async function addMoney(input: { amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
   const amount = parseAmount(input.amount)
   const row = await prisma.wheatKhataMoney.create({
     data: {
@@ -375,8 +382,8 @@ export async function createParty(input: {
   name?: unknown
   address?: unknown
   notes?: unknown
-}, bookKey?: unknown) {
-  const book = await resolveBook(bookKey)
+}, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
   const kind = parseKind(input.kind)
   const name = String(input.name ?? '').trim()
   if (!name) throw new Error(kind === 'GIVING' ? 'Company name is required' : 'Party name is required')
@@ -411,16 +418,14 @@ export async function createParty(input: {
   return partyDto(row)
 }
 
-export async function getParty(id: number | bigint, bookKey?: unknown) {
+export async function getParty(id: number | bigint, bookKey?: unknown, access?: GrainBookAccess) {
   const party = await prisma.wheatKhataParty.findFirst({
     where: { id: BigInt(id), deleted: false },
     include: partyInclude,
   })
   if (!party) throw new Error('Party not found')
-  if (bookKey != null && String(bookKey).trim()) {
-    const book = await resolveBook(bookKey)
-    if (party.bookKey !== book.key) throw new Error('Party not found')
-  }
+  const book = await openBook(bookKey ?? party.bookKey, access)
+  if (party.bookKey !== book.key) throw new Error('Party not found')
   return partyDto(party)
 }
 
@@ -433,7 +438,7 @@ export async function addProduct(input: {
   bagPricePerBag?: unknown
   labourPerBag?: unknown
   notes?: unknown
-}, bookKey?: unknown) {
+}, bookKey?: unknown, access?: GrainBookAccess) {
   const partyId = Number(input.partyId)
   if (!Number.isSafeInteger(partyId) || partyId <= 0) {
     throw new Error('Choose a party first')
@@ -442,10 +447,8 @@ export async function addProduct(input: {
     where: { id: BigInt(partyId), deleted: false },
   })
   if (!party) throw new Error('Party not found')
-  if (bookKey != null && String(bookKey).trim()) {
-    const book = await resolveBook(bookKey)
-    if (party.bookKey !== book.key) throw new Error('Party not found')
-  }
+  const book = await openBook(bookKey ?? party.bookKey, access)
+  if (party.bookKey !== book.key) throw new Error('Party not found')
 
   const preview = previewProduct(input)
   if (party.kind === 'GIVING') {
@@ -475,7 +478,7 @@ export async function addProduct(input: {
   })
 }
 
-export async function addPayment(input: { partyId?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown) {
+export async function addPayment(input: { partyId?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
   const partyId = Number(input.partyId)
   if (!Number.isSafeInteger(partyId) || partyId <= 0) {
     throw new Error('Choose a party first')
@@ -484,10 +487,8 @@ export async function addPayment(input: { partyId?: unknown; amount?: unknown; n
     where: { id: BigInt(partyId), deleted: false },
   })
   if (!party) throw new Error('Party not found')
-  if (bookKey != null && String(bookKey).trim()) {
-    const book = await resolveBook(bookKey)
-    if (party.bookKey !== book.key) throw new Error('Party not found')
-  }
+  const book = await openBook(bookKey ?? party.bookKey, access)
+  if (party.bookKey !== book.key) throw new Error('Party not found')
 
   const amount = parseAmount(input.amount)
   const row = await prisma.wheatKhataPayment.create({

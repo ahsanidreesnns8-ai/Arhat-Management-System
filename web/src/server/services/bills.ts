@@ -5,7 +5,7 @@ import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger, listParties } from '@/server/services/register'
 import { getAccountStatement } from '@/server/services/linked-account'
 import { bookLabel, resolveBook } from '@/server/services/grain-khata'
-import { BAGS_PER_TRUCK, getBook, getParty } from '@/server/services/wheat-khata'
+import { BAGS_PER_TRUCK, getBook, getParty, type GrainBookAccess } from '@/server/services/wheat-khata'
 import { getBook as getPaddyKhataBook } from '@/server/services/paddy-khata'
 import { getBook as getArhatAmountBook, getMergeReport } from '@/server/services/arhat-amount'
 
@@ -1370,8 +1370,8 @@ function wheatKhataSlipParts(party: WheatKhataBillParty, urdu: boolean, bookName
   return { title: bookName, partyHtml, body: productTable + paymentTable + summary }
 }
 
-export async function wheatKhataBillHtml(id: number | bigint, lang = 'en', bookKey?: unknown) {
-  const party = await getParty(id, bookKey)
+export async function wheatKhataBillHtml(id: number | bigint, lang = 'en', bookKey?: unknown, access?: GrainBookAccess) {
+  const party = await getParty(id, bookKey, access)
   const book = await resolveBook(bookKey ?? party.bookKey)
   const urdu = lang === 'ur'
   const name = bookLabel(book, urdu)
@@ -1379,10 +1379,10 @@ export async function wheatKhataBillHtml(id: number | bigint, lang = 'en', bookK
   return documentFromSlips(name, urdu, [slip])
 }
 
-export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en', bookKey?: unknown) {
+export async function wheatKhataAllBillsHtml(kindValue: unknown, lang = 'en', bookKey?: unknown, access?: GrainBookAccess) {
   const kind = wheatKhataKind(kindValue)
   const urdu = lang === 'ur'
-  const snapshot = await getBook(bookKey)
+  const snapshot = await getBook(bookKey, access)
   const name = bookLabel(snapshot.book, urdu)
   const list = kind === 'GIVING' ? snapshot.companies : snapshot.parties
   if (!list.length) {

@@ -39,8 +39,7 @@ import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import OwnerPage from './pages/OwnerPage'
 import ArhatRegisterPage from './pages/ArhatRegisterPage'
-import WheatKhataPage from './pages/WheatKhataPage'
-import OthersKhataPage, { OtherGrainKhataPage } from './pages/OthersKhataPage'
+import GrainKhataHubPage from './pages/GrainKhataHubPage'
 import PaddyKhataPage from './pages/PaddyKhataPage'
 import ArhatAmountPage from './pages/ArhatAmountPage'
 
@@ -104,11 +103,10 @@ function AppRoutes() {
           path="arhat-register"
           element={isOwner ? <ArhatRegisterPage /> : <Navigate to="/dashboard" replace />}
         />
-        <Route path="wheat-khata" element={<WheatKhataPage bookKey="WHEAT" />} />
-        <Route path="barley-khata" element={<WheatKhataPage bookKey="BARLEY" />} />
-        <Route path="maize-khata" element={<WheatKhataPage bookKey="MAIZE" />} />
-        <Route path="others-khata" element={<OthersKhataPage />} />
-        <Route path="others-khata/:bookKey" element={<OtherGrainKhataPage />} />
+        <Route path="wheat-khata" element={<GrainKhataHubPage crop="wheat" />} />
+        <Route path="barley-khata" element={<GrainKhataHubPage crop="barley" />} />
+        <Route path="maize-khata" element={<GrainKhataHubPage crop="maize" />} />
+        <Route path="others-khata" element={<GrainKhataHubPage crop="other" />} />
         <Route path="paddy-khata" element={<PaddyKhataPage />} />
         <Route path="arhat-amount" element={<ArhatAmountPage />} />
         <Route path="settings" element={<SettingsPage />} />

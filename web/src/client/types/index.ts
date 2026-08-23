@@ -524,12 +524,15 @@ export interface WheatKhataPayment {
 }
 
 export interface GrainKhataBookMeta {
+  id: number
   key: string
+  publicId: string
   name: string
   nameUr?: string | null
   crop: string
   cropWord: string
   builtin: boolean
+  locked: boolean
   href: string
   createdAt: string
 }

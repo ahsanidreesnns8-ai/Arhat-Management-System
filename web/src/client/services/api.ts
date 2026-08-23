@@ -226,13 +226,15 @@ export const billApi = {
   registerBalance: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/register/party/${id}/balance`, lang),
   registerBook: (lang: 'en' | 'ur' = 'en') => billRequest('/bills/register/book', lang),
-  wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en', book = 'WHEAT') =>
+  wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en', book = 'WHEAT', secret?: string) =>
     book && book !== 'WHEAT'
-      ? billRequest(`/bills/grain-khata/${id}`, lang, { book })
-      : billRequest(`/bills/wheat-khata/${id}`, lang),
-  wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en', book = 'WHEAT') =>
-    book && book !== 'WHEAT'
-      ? billRequest('/bills/grain-khata/all', lang, { kind, book })
+      ? billRequest(`/bills/grain-khata/${id}`, lang, { book, ...(secret ? { secret } : {}) })
+      : secret
+        ? billRequest(`/bills/grain-khata/${id}`, lang, { book, secret })
+        : billRequest(`/bills/wheat-khata/${id}`, lang),
+  wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en', book = 'WHEAT', secret?: string) =>
+    secret || (book && book !== 'WHEAT')
+      ? billRequest('/bills/grain-khata/all', lang, { kind, book, ...(secret ? { secret } : {}) })
       : billRequest('/bills/wheat-khata/all', lang, { kind }),
   paddyKhata: (bookId: number, secret: string, module?: string, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/paddy-khata/${bookId}`, lang, {
@@ -294,18 +296,23 @@ function grainKhataPath(bookKey: string, suffix = '') {
   return `/grain-khata/${encodeURIComponent(bookKey)}${suffix}`
 }
 
+function withSecret<T extends Record<string, unknown>>(data: T, secret?: string) {
+  return secret ? { ...data, secret } : data
+}
+
 export const grainKhataApi = {
-  books: () => api.get<ApiResponse<GrainKhataBookMeta[]>>('/grain-khata/books'),
-  createBook: (data: { name: string }) =>
+  books: (crop: 'wheat' | 'barley' | 'maize' | 'other') =>
+    api.get<ApiResponse<GrainKhataBookMeta[]>>('/grain-khata/books', { params: { crop } }),
+  createBook: (data: { crop: 'wheat' | 'barley' | 'maize' | 'other'; name?: string; secret: string }) =>
     api.post<ApiResponse<GrainKhataBookMeta>>('/grain-khata/books', data),
-  book: (bookKey: string) =>
-    api.get<ApiResponse<WheatKhataBook>>(grainKhataPath(bookKey)),
-  addMoney: (bookKey: string, data: { amount: number; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataMoney>>(grainKhataPath(bookKey, '/money'), data),
-  addParty: (bookKey: string, data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, '/parties'), data),
-  getParty: (bookKey: string, id: number) =>
-    api.get<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, `/parties/${id}`)),
+  book: (bookKey: string, secret?: string) =>
+    api.get<ApiResponse<WheatKhataBook>>(grainKhataPath(bookKey), { params: secret ? { secret } : {} }),
+  addMoney: (bookKey: string, data: { amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<WheatKhataMoney>>(grainKhataPath(bookKey, '/money'), withSecret(data, secret)),
+  addParty: (bookKey: string, data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, '/parties'), withSecret(data, secret)),
+  getParty: (bookKey: string, id: number, secret?: string) =>
+    api.get<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, `/parties/${id}`), { params: secret ? { secret } : {} }),
   previewProduct: (bookKey: string, data: {
     bags?: number
     trucks?: number
@@ -313,7 +320,7 @@ export const grainKhataApi = {
     bagWeightKg?: number
     bagPricePerBag?: number
     labourPerBag?: number
-  }) =>
+  }, secret?: string) =>
     api.post<ApiResponse<{
       bags: number
       trucks: number
@@ -326,7 +333,7 @@ export const grainKhataApi = {
       labourAmount: number
       totalPrice: number
       totalWeightKg: number
-    }>>(grainKhataPath(bookKey, '/preview'), data),
+    }>>(grainKhataPath(bookKey, '/preview'), withSecret(data, secret)),
   addProduct: (bookKey: string, data: {
     partyId: number
     bags?: number
@@ -336,9 +343,9 @@ export const grainKhataApi = {
     bagPricePerBag?: number
     labourPerBag?: number
     notes?: string
-  }) => api.post<ApiResponse<WheatKhataProduct>>(grainKhataPath(bookKey, '/products'), data),
-  addPayment: (bookKey: string, data: { partyId: number; amount: number; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataPayment>>(grainKhataPath(bookKey, '/payments'), data),
+  }, secret?: string) => api.post<ApiResponse<WheatKhataProduct>>(grainKhataPath(bookKey, '/products'), withSecret(data, secret)),
+  addPayment: (bookKey: string, data: { partyId: number; amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<WheatKhataPayment>>(grainKhataPath(bookKey, '/payments'), withSecret(data, secret)),
 }
 
 export const wheatKhataApi = {

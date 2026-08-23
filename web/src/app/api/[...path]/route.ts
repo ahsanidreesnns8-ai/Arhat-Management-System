@@ -608,7 +608,7 @@ async function dispatch(
     return result(await dashboard.getDashboardStats(user?.role))
   }
   if (path[0] === 'search' && method === 'GET') {
-    return result(await searchService.search(url.searchParams.get('q') ?? ''))
+    return result(await searchService.search(url.searchParams.get('q') ?? '', user?.id))
   }
   if (path[0] === 'weather' && method === 'GET') {
     return result(await weather.getWeather())
@@ -671,30 +671,34 @@ async function dispatch(
   }
 
   if (path[0] === 'grain-khata') {
+    const userId = user!.id
     if (path[1] === 'books' && path.length === 2 && method === 'GET') {
-      return result(await grainKhata.listBooks())
+      return result(await grainKhata.listBooks(userId, url.searchParams.get('crop') ?? payload.crop))
     }
     if (path[1] === 'books' && path.length === 2 && method === 'POST') {
-      return result(await grainKhata.createOtherBook(payload), 'Khata created', 201)
+      return result(await grainKhata.createBook(userId, payload), 'Khata ID created', 201)
     }
     const bookKey = path[1]
+    const secret = payload.secret ?? url.searchParams.get('secret')
+    if (secret != null && String(secret).length) payload.secret = secret
+    const access = { userId, secret }
     if (path.length === 2 && method === 'GET') {
-      return result(await wheatKhata.getBook(bookKey))
+      return result(await wheatKhata.getBook(bookKey, access))
     }
     if (path[2] === 'money' && method === 'POST') {
-      return result(await wheatKhata.addMoney(payload, bookKey), 'Money added', 201)
+      return result(await wheatKhata.addMoney(payload, bookKey, access), 'Money added', 201)
     }
     if (path[2] === 'parties' && path.length === 4 && method === 'GET') {
-      return result(await wheatKhata.getParty(numericId(path[3]), bookKey))
+      return result(await wheatKhata.getParty(numericId(path[3]), bookKey, access))
     }
     if (path[2] === 'parties' && method === 'POST') {
-      return result(await wheatKhata.createParty(payload, bookKey), 'Party saved', 201)
+      return result(await wheatKhata.createParty(payload, bookKey, access), 'Party saved', 201)
     }
     if (path[2] === 'products' && method === 'POST') {
-      return result(await wheatKhata.addProduct(payload, bookKey), 'Product saved', 201)
+      return result(await wheatKhata.addProduct(payload, bookKey, access), 'Product saved', 201)
     }
     if (path[2] === 'payments' && method === 'POST') {
-      return result(await wheatKhata.addPayment(payload, bookKey), 'Amount saved', 201)
+      return result(await wheatKhata.addPayment(payload, bookKey, access), 'Amount saved', 201)
     }
     if (path[2] === 'preview' && method === 'POST') {
       return result(wheatKhata.previewProduct(payload))
@@ -840,10 +844,20 @@ async function dispatch(
       return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang, url.searchParams.get('book')))
     }
     if (path[1] === 'grain-khata' && path[2] === 'all' && path.length === 3) {
-      return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang, url.searchParams.get('book')))
+      return html(await bills.wheatKhataAllBillsHtml(
+        url.searchParams.get('kind') ?? 'PARTY',
+        lang,
+        url.searchParams.get('book'),
+        { userId: user!.id, secret: url.searchParams.get('secret') },
+      ))
     }
     if (path[1] === 'grain-khata' && path.length === 3) {
-      return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang, url.searchParams.get('book')))
+      return html(await bills.wheatKhataBillHtml(
+        numericId(path[2]),
+        lang,
+        url.searchParams.get('book'),
+        { userId: user!.id, secret: url.searchParams.get('secret') },
+      ))
     }
     if (path[1] === 'paddy-khata' && path[3] === 'all' && path.length === 4) {
       return html(

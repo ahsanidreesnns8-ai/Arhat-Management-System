@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Banknote, Building2, FileText, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
+import { ArrowLeft, Banknote, Building2, FileText, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -117,10 +117,18 @@ const CROP_FALLBACK: Record<string, { title: string; crop: string }> = {
   MAIZE: { title: 'Maize Khata', crop: 'maize' },
 }
 
-export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string }) {
+export default function WheatKhataPage({
+  bookKey = 'WHEAT',
+  secret = '',
+  onBack,
+}: {
+  bookKey?: string
+  secret?: string
+  onBack?: () => void
+}) {
   const { user } = useAuth()
   const isOwner = isOwnerFinanceRole(user?.role)
-  const isWheat = bookKey === 'WHEAT'
+  const isShopWheat = bookKey === 'WHEAT'
   const [section, setSection] = useState<Section>('MONEY')
   const [book, setBook] = useState<WheatKhataBook>(emptyBook)
   const [loading, setLoading] = useState(true)
@@ -142,14 +150,14 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
     try {
-      const res = await grainKhataApi.book(bookKey)
+      const res = await grainKhataApi.book(bookKey, secret || undefined)
       setBook(res.data.data || emptyBook)
     } catch (err) {
       toast.error(apiMessage(err, `Could not load ${CROP_FALLBACK[bookKey]?.title || 'khata'}`))
     } finally {
       setLoading(false)
     }
-  }, [bookKey])
+  }, [bookKey, secret])
 
   useEffect(() => { void load() }, [load])
   useLiveReload(() => { void load(true) })
@@ -203,7 +211,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
   const openEntityBill = async (party: WheatKhataParty) => {
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataParty(party.id, 'en', bookKey)
+      const res = await billApi.wheatKhataParty(party.id, 'en', bookKey, secret || undefined)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         `${party.name} bill`,
@@ -224,7 +232,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
     }
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY', 'en', bookKey)
+      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY', 'en', bookKey, secret || undefined)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         'Bill',
@@ -269,7 +277,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
       await grainKhataApi.addMoney(bookKey, {
         amount,
         notes: moneyForm.notes.trim() || undefined,
-      })
+      }, secret || undefined)
       toast.success(`Money added to ${title}`)
       setMoneyForm({ amount: '', notes: '' })
       setMoneyOpen(false)
@@ -294,7 +302,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
         name: partyForm.name.trim(),
         address: partyForm.address.trim() || undefined,
         notes: partyForm.notes.trim() || undefined,
-      })
+      }, secret || undefined)
       toast.success(kind === 'COMPANY' ? 'Company saved' : 'Party saved')
       setPartyForm({ name: '', address: '', notes: '' })
       setPartyOpen(false)
@@ -353,7 +361,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
         bagPricePerBag: preview.bagPricePerBag,
         labourPerBag: preview.labourPerBag,
         notes: productForm.notes.trim() || undefined,
-      })
+      }, secret || undefined)
       toast.success(
         section === 'COMPANY'
           ? `${preview.bags} bags deducted from stock and given to company`
@@ -386,7 +394,7 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
         partyId: Number(paymentForm.partyId),
         amount,
         notes: paymentForm.notes.trim() || undefined,
-      })
+      }, secret || undefined)
       toast.success(
         section === 'COMPANY'
           ? 'Amount received from company — added to total money'
@@ -410,28 +418,33 @@ export default function WheatKhataPage({ bookKey = 'WHEAT' }: { bookKey?: string
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description={`Separate ${crop} book: receive bags from a party and give money; give bags to a company and receive money.${isWheat ? ' It never mixes with Arhat Amount unless the owner taps Merge all amount.' : ' It stays in this book only and is not mixed with Arhat Amount.'}`}
+        description={
+          book.book?.publicId
+            ? `${book.book.publicId} · receive bags from a party and give money; give bags to a company and receive money`
+            : `Separate ${crop} book: receive bags from a party and give money; give bags to a company and receive money.`
+        }
         action={
-          isWheat && isOwner ? (
-            <Link to="/arhat-amount">
-              <Button variant="secondary">
-                <FileText className="h-4 w-4" /> Merge on Arhat Amount
+          <div className="flex flex-wrap gap-2">
+            {onBack ? (
+              <Button variant="secondary" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" /> All IDs
               </Button>
-            </Link>
-          ) : bookKey.startsWith('OTHER-') ? (
-            <Link to="/others-khata">
-              <Button variant="secondary">
-                Others Khata
-              </Button>
-            </Link>
-          ) : undefined
+            ) : null}
+            {isShopWheat && isOwner ? (
+              <Link to="/arhat-amount">
+                <Button variant="secondary">
+                  <FileText className="h-4 w-4" /> Merge on Arhat Amount
+                </Button>
+              </Link>
+            ) : null}
+          </div>
         }
       />
 
       <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-        {isWheat
-          ? 'Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.'
-          : `${title} stays in this book only. It is not mixed with Wheat Khata, Paddy Khata, or Arhat Amount.`}
+        {isShopWheat
+          ? 'This shop Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.'
+          : `${title} stays in this ID only. Use the secret code to open it. It is not mixed with other khatas or Arhat Amount.`}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
