@@ -477,6 +477,60 @@ export interface RegisterEntry {
   farmerCode?: string | null
 }
 
+export interface KhataTreasuryLine {
+  id: number
+  kind: 'BANK' | 'TRANSFER_IN' | 'TRANSFER_OUT' | string
+  amount: number
+  bankName?: string | null
+  counterBookType?: string | null
+  counterBookRef?: string | null
+  counterName?: string | null
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface KhataHead {
+  bookType: 'GRAIN' | 'PADDY' | string
+  bookRef: string
+  name: string
+  publicId: string
+  crop: string
+}
+
+export interface AccountStatementLine {
+  createdAt: string
+  particular: string
+  addition: number
+  deduction: number
+  kind: string
+}
+
+export interface AccountStatement {
+  key: string
+  name: string
+  partyId: number | null
+  farmerId: number | null
+  farmerCode: string | null
+  farmerName: string | null
+  buyerId: number | null
+  buyerCode: string | null
+  buyerName: string | null
+  cashGiven: number
+  cashReceived: number
+  productTotal: number
+  soldTotal: number
+  farmerPaid: number
+  buyerPaid: number
+  additionTotal: number
+  deductionTotal: number
+  remainingToGive: number
+  remainingToReceive: number
+  lines: AccountStatementLine[]
+}
+
 export interface WheatKhataMoney {
   id: number
   amount: number
@@ -524,12 +578,15 @@ export interface WheatKhataPayment {
 }
 
 export interface GrainKhataBookMeta {
+  id: number
   key: string
+  publicId: string
   name: string
   nameUr?: string | null
   crop: string
   cropWord: string
   builtin: boolean
+  locked: boolean
   href: string
   createdAt: string
 }
@@ -566,12 +623,18 @@ export interface WheatKhataBook {
     cashGiven: number
     cashReceived: number
     totalAmount: number
+    bankTotal: number
+    inHand: number
+    borrowedIn: number
+    borrowedOut: number
     bagsReceived: number
     bagsGiven: number
     bagsInStock: number
     bagsPerTruck: number
   }
   money: WheatKhataMoney[]
+  banks: KhataTreasuryLine[]
+  transfers: KhataTreasuryLine[]
   parties: WheatKhataParty[]
   companies: WheatKhataParty[]
 }
@@ -676,6 +739,10 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     givingAmount: number
     receivingAmount: number
     totalAmount: number
+    bankTotal: number
+    inHand: number
+    borrowedIn: number
+    borrowedOut: number
     paddyBags: number
     processingBags: number
     processedBags: number
@@ -685,6 +752,8 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     expenseTotal: number
   }
   amounts: PaddyKhataMoneyLine[]
+  banks: KhataTreasuryLine[]
+  transfers: KhataTreasuryLine[]
   purchaseParties: PaddyKhataParty[]
   saleParties: PaddyKhataParty[]
   purchases: PaddyKhataPurchase[]
@@ -805,6 +874,7 @@ export interface ArhatAmountBook {
 export interface ArhatAmountMergeReport {
   arhat: ArhatAmountTotals
   wheatKhata: ArhatAmountTotals
+  khatas?: ArhatAmountTotals
   combined: ArhatAmountTotals
   history: ArhatAmountLine[]
 }

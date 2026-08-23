@@ -12,6 +12,7 @@ import { billApi, paddyKhataApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useLiveReload } from '../context/SyncContext'
+import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
 import type { PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataParty } from '../types'
 
 type Section =
@@ -218,7 +219,7 @@ export default function PaddyKhataPage() {
         amount: Number(amountForm.amount),
         notes: amountForm.notes.trim() || undefined,
       })
-      toast.success('Amount added to this Paddy Khata ID only')
+      toast.success('Amount added to this Paddy Khata ID and Arhat Amount')
       setAmountOpen(false)
       setAmountForm({ amount: '', notes: '' })
       refresh()
@@ -439,7 +440,7 @@ export default function PaddyKhataPage() {
       <div className="space-y-6">
         <PageHeader
           title="Paddy Khata"
-          description="Separate paddy books. Each Paddy Khata ID has its own secret code and stays out of the main shop cash."
+          description="Create your own Paddy Khata ID with a name and secret code. Cash in each ID also updates Arhat Amount."
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" /> Paddy Khata ID
@@ -505,7 +506,7 @@ export default function PaddyKhataPage() {
     <div className="space-y-6">
       <PageHeader
         title={book.name}
-        description={`${book.publicId} · separate from shop cash until you print a bill`}
+        description={`${book.publicId} · cash here also updates Arhat Amount`}
         action={
           <Button variant="secondary" onClick={() => { setBook(null); setSection('HOME'); void loadList() }}>
             <ArrowLeft className="h-4 w-4" /> All IDs
@@ -518,6 +519,17 @@ export default function PaddyKhataPage() {
           <p className="text-xs uppercase tracking-wide text-slate-500">Total amount</p>
           <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(totals.totalAmount)}</p>
         </button>
+        <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Amount in hand</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.inHand || 0)}</p>
+        </button>
+        <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Amount in bank</p>
+          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button type="button" onClick={() => setSection('SELL')} className="card-3d p-5 text-left">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingAmount)}</p>
@@ -588,9 +600,42 @@ export default function PaddyKhataPage() {
       )}
 
       {section === 'AMOUNTS' && (
-        <Panel title="Add Amount" action={<Button onClick={() => setAmountOpen(true)}><Plus className="h-4 w-4" /> Add Amount</Button>}>
-          <MoneyTable rows={book.amounts} empty="No amount added yet. This cash stays in this Paddy Khata ID and is not mixed with shop cash." />
-        </Panel>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setAmountOpen(true)}><Plus className="h-4 w-4" /> Add Amount</Button>
+          </div>
+          <KhataTreasuryPanel
+            inHand={totals.inHand || 0}
+            banks={book.banks || []}
+            transfers={book.transfers || []}
+            saving={saving}
+            loadHeads={async () => {
+              const res = await paddyKhataApi.heads(book.id, secret)
+              return res.data.data || []
+            }}
+            onAddBank={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.addBank(book.id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onTransfer={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.transferTo(book.id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+          />
+          <Panel title="Add Amount">
+            <MoneyTable rows={book.amounts} empty="No amount added yet. Cash added here stays in this Paddy Khata ID and also updates Arhat Amount." />
+          </Panel>
+        </div>
       )}
 
       {section === 'PURCHASE' && (

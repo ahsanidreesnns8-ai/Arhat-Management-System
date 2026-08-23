@@ -1,9 +1,12 @@
 import { prisma } from '@/server/db'
+import { normalizeAccountKey } from '@/server/ids'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 import {
   accountPosition,
+  ensureRegisterPartyForAccount,
   findRegisterPartyByKey,
+  getAccountStatement,
   loadTradeIndex,
   tradeForKey,
   type LinkedTrade,
@@ -376,16 +379,66 @@ export async function createEntry(
     },
   })
   if (!party) throw new Error('Person not found for this register')
+  const farmer = await farmerForAccountKey(party.name, input.farmerId)
   const row = await prisma.registerEntry.create({
     data: {
       kind,
       partyId: party.id,
+      farmerId: farmer?.id ?? null,
       amount: amount.toFixed(2),
       notes,
     },
     include: { party: true, farmer: true },
   })
   return entryDto(row)
+}
+
+async function farmerForAccountKey(key: string, farmerId?: number | null) {
+  if (farmerId != null) {
+    const row = await prisma.farmer.findFirst({
+      where: { id: BigInt(farmerId), deleted: false },
+    })
+    if (row) return row
+  }
+  const norm = normalizeAccountKey(key)
+  if (!norm) return null
+  const farmers = await prisma.farmer.findMany({ where: { deleted: false } })
+  return farmers.find((row) => normalizeAccountKey(row.farmerId) === norm) ?? null
+}
+
+export async function getStatement(key: unknown) {
+  const raw = String(key ?? '').trim()
+  if (!raw) throw new Error('Enter an ID')
+  return getAccountStatement(raw)
+}
+
+export async function adjustAccount(
+  input: {
+    key?: unknown
+    kind?: unknown
+    amount?: number | string | null
+    notes?: string | null
+    farmerId?: number | null
+  },
+  userId?: bigint,
+) {
+  const key = String(input.key ?? '').trim()
+  if (!key) throw new Error('Enter the farmer ID')
+  const kind = parseKind(input.kind, [...MONEY_ENTRY_KINDS])
+  const party = await ensureRegisterPartyForAccount(key)
+  if (!party) throw new Error('Could not open this ID')
+  const farmer = await farmerForAccountKey(key, input.farmerId)
+  const entry = await createEntry({
+    kind,
+    partyId: Number(party.id),
+    farmerId: farmer ? Number(farmer.id) : null,
+    amount: input.amount,
+    notes: input.notes,
+  }, userId)
+  return {
+    entry,
+    statement: await getAccountStatement(key),
+  }
 }
 
 async function liveMoneyParty(id: number | bigint) {

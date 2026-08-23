@@ -268,6 +268,7 @@ export async function wipeShopData(userId?: bigint) {
       register_parties,
       wheat_khata_parties,
       wheat_khata_money,
+      khata_treasury,
       grain_khata_books,
       paddy_khata_parties,
       paddy_khata_amounts,

@@ -557,21 +557,47 @@ model RegisterEntry {
   @@map("register_entries")
 }
 
-/// Named grain book: Wheat, Barley, Maize, or a user-created Others khata
+/// Named grain book: a user's Wheat/Barley/Maize/Others khata with a secret code
 model GrainKhataBook {
-  id        BigInt   @id @default(autoincrement())
-  workspace String   @default("live") @db.VarChar(20)
-  key       String   @db.VarChar(80)
-  name      String   @db.VarChar(255)
-  crop      String   @db.VarChar(40)
-  builtin   Boolean  @default(false)
-  deleted   Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          BigInt   @id @default(autoincrement())
+  workspace   String   @default("live") @db.VarChar(20)
+  key         String   @db.VarChar(80)
+  publicId    String?  @map("public_id") @db.VarChar(40)
+  name        String   @db.VarChar(255)
+  crop        String   @db.VarChar(40)
+  secretHash  String?  @map("secret_hash") @db.VarChar(255)
+  createdById BigInt?  @map("created_by_id")
+  builtin     Boolean  @default(false)
+  deleted     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([workspace, key])
+  @@unique([workspace, publicId])
   @@index([workspace, deleted])
+  @@index([workspace, createdById, crop])
   @@map("grain_khata_books")
+}
+
+/// Bank deposits and borrowed transfers between khata heads
+model KhataTreasury {
+  id              BigInt   @id @default(autoincrement())
+  workspace       String   @default("live") @db.VarChar(20)
+  bookType        String   @map("book_type") @db.VarChar(20)
+  bookRef         String   @map("book_ref") @db.VarChar(80)
+  kind            String   @db.VarChar(20)
+  amount          Decimal  @db.Decimal(15, 2)
+  bankName        String?  @map("bank_name") @db.VarChar(255)
+  counterBookType String?  @map("counter_book_type") @db.VarChar(20)
+  counterBookRef  String?  @map("counter_book_ref") @db.VarChar(80)
+  counterName     String?  @map("counter_name") @db.VarChar(255)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([workspace, bookType, bookRef, createdAt])
+  @@index([workspace, kind, createdAt])
+  @@map("khata_treasury")
 }
 
 /// Cash deposited into a grain khata (Add Money)

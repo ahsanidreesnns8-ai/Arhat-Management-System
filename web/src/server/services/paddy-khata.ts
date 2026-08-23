@@ -1,6 +1,7 @@
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/server/db'
 import { d, roundRupee } from '@/server/money'
+import { addBank as parkInBank, listHeads, loadTreasury, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
 
 const RATE_UNIT_KG = 40
 
@@ -460,6 +461,10 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   const riceBags = riceRows.reduce((sum, row) => sum + row.bags, 0)
   const soldBags = saleRows.reduce((sum, row) => sum + row.bags, 0)
 
+  const cashTotal = moneyIn + receivedCash - givenCash - expenseTotal
+  const treasury = await loadTreasury('PADDY', String(Number(book.id)))
+  const cash = withTreasury(cashTotal, treasury)
+
   return {
     ...bookSummary(book),
     totals: {
@@ -469,9 +474,13 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       receivedCash,
       expenseTotal,
       saleTotal,
-      givingAmount: givenCash + expenseTotal,
-      receivingAmount: receivedCash,
-      totalAmount: moneyIn + receivedCash - givenCash - expenseTotal,
+      givingAmount: givenCash + expenseTotal + cash.borrowedOut,
+      receivingAmount: receivedCash + cash.borrowedIn,
+      totalAmount: cash.totalAmount,
+      bankTotal: cash.bankTotal,
+      inHand: cash.inHand,
+      borrowedIn: cash.borrowedIn,
+      borrowedOut: cash.borrowedOut,
       paddyBags,
       processingBags,
       processedBags,
@@ -480,6 +489,8 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       riceInStock: Math.max(0, riceBags - soldBags),
     },
     amounts: amountRows,
+    banks: treasury.banks,
+    transfers: treasury.transfers,
     purchaseParties,
     saleParties,
     purchases: purchaseRows,
@@ -610,8 +621,8 @@ export async function addCash(
   const amount = parseAmount(input.amount)
   const snapshot = await getBook(book.id, userId, input.secret)
   if (kind === 'GIVE') {
-    if (amount > snapshot.totals.totalAmount) {
-      throw new Error(`Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}`)
+    if (amount > snapshot.totals.inHand) {
+      throw new Error(`Amount in hand is ${snapshot.totals.inHand}. Give that or less.`)
     }
     const partySnap = snapshot.purchaseParties.find((row) => row.id === Number(party.id))
     const remaining = partySnap ? partySnap.remaining : 0
@@ -744,8 +755,8 @@ export async function addExpense(
   const snapshot = await getBook(book.id, userId, input.secret)
   const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
   if (!frame) throw new Error('This variety has no purchased stock')
-  if (amount > snapshot.totals.totalAmount) {
-    throw new Error(`Not enough Paddy Khata amount. Available ${snapshot.totals.totalAmount}`)
+  if (amount > snapshot.totals.inHand) {
+    throw new Error(`Amount in hand is ${snapshot.totals.inHand}. Pay that or less.`)
   }
   const row = await prisma.paddyKhataExpense.create({
     data: {
@@ -835,4 +846,35 @@ export async function addSale(
     partyName: party.name,
     partyAddress: party.address,
   }
+}
+
+export async function listKhataHeads(
+  bookId: number | bigint,
+  userId: bigint,
+  secret: unknown,
+) {
+  const book = await requireBook(bookId, userId, secret)
+  return listHeads({ bookType: 'PADDY', bookRef: String(Number(book.id)) })
+}
+
+export async function addBank(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; bankName?: unknown; amount?: unknown; notes?: unknown },
+) {
+  const snapshot = await getBook(bookId, userId, input.secret)
+  return parkInBank('PADDY', String(snapshot.id), snapshot.totals.inHand, input)
+}
+
+export async function transferTo(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; bookType?: unknown; bookRef?: unknown; amount?: unknown; notes?: unknown },
+) {
+  const snapshot = await getBook(bookId, userId, input.secret)
+  return sendToHead(
+    { bookType: 'PADDY', bookRef: String(snapshot.id), name: snapshot.name },
+    snapshot.totals.inHand,
+    input,
+  )
 }

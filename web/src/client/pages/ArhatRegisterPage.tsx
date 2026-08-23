@@ -128,6 +128,12 @@ function AccountBreakdown({ party }: { party: RegisterParty }) {
   return (
     <div className="rounded-xl border border-slate-200 dark:border-white/10 p-3 text-sm space-y-1">
       <p className="font-semibold">{side.kind ? `${side.label} ${formatCurrency(side.amount)}` : 'Settled'}</p>
+      {(party.remainingToGive || 0) > 0 ? (
+        <p className="text-rose-700 dark:text-rose-400">Remaining to give {formatCurrency(party.remainingToGive || 0)}</p>
+      ) : null}
+      {(party.remainingToReceive || 0) > 0 ? (
+        <p className="text-emerald-700 dark:text-emerald-400">Remaining to receive {formatCurrency(party.remainingToReceive || 0)}</p>
+      ) : null}
       <p className="text-slate-500">
         Cash received {formatCurrency(party.cashReceivedTotal || 0)} · Cash given {formatCurrency(party.cashGivenTotal || 0)}
       </p>
@@ -908,7 +914,7 @@ export default function ArhatRegisterPage() {
             required
             items={parties.map((p) => ({
               id: String(p.id),
-              name: p.name,
+              name: p.farmerCode ? `${p.name} · ${p.farmerCode}` : p.name,
               address: p.address,
               notes: sideNote(p, money.kind),
             }))}
@@ -918,12 +924,25 @@ export default function ArhatRegisterPage() {
             emptyLabel="Add a person first"
           />
           {selectedParty && (
-            <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
-              Current {money.kind === 'RECEIVING' ? 'received' : 'given'} for {selectedParty.name}: {formatCurrency(
-                money.kind === 'RECEIVING'
-                  ? (selectedParty.cashReceivedTotal ?? selectedParty.receivedTotal ?? 0)
-                  : (selectedParty.cashGivenTotal ?? selectedParty.givenTotal ?? 0),
-              )}
+            <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300 space-y-1">
+              <p>
+                {selectedParty.farmerCode
+                  ? `ID ${selectedParty.farmerCode}${selectedParty.farmerName ? ` · ${selectedParty.farmerName}` : ''}`
+                  : selectedParty.name}
+              </p>
+              <p>
+                Current {money.kind === 'RECEIVING' ? 'received' : 'given'} cash: {formatCurrency(
+                  money.kind === 'RECEIVING'
+                    ? (selectedParty.cashReceivedTotal ?? selectedParty.receivedTotal ?? 0)
+                    : (selectedParty.cashGivenTotal ?? selectedParty.givenTotal ?? 0),
+                )}
+              </p>
+              {(selectedParty.remainingToGive || 0) > 0 ? (
+                <p>Remaining to give {formatCurrency(selectedParty.remainingToGive || 0)}</p>
+              ) : null}
+              {(selectedParty.remainingToReceive || 0) > 0 ? (
+                <p>Remaining to receive {formatCurrency(selectedParty.remainingToReceive || 0)}</p>
+              ) : null}
             </div>
           )}
           <Input
