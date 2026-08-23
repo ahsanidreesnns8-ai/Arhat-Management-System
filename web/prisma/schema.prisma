@@ -557,23 +557,43 @@ model RegisterEntry {
   @@map("register_entries")
 }
 
-/// Cash deposited into Wheat Khata (Add Money)
+/// Named grain book: Wheat, Barley, Maize, or a user-created Others khata
+model GrainKhataBook {
+  id        BigInt   @id @default(autoincrement())
+  workspace String   @default("live") @db.VarChar(20)
+  key       String   @db.VarChar(80)
+  name      String   @db.VarChar(255)
+  crop      String   @db.VarChar(40)
+  builtin   Boolean  @default(false)
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspace, key])
+  @@index([workspace, deleted])
+  @@map("grain_khata_books")
+}
+
+/// Cash deposited into a grain khata (Add Money)
 model WheatKhataMoney {
   id        BigInt   @id @default(autoincrement())
   workspace String   @default("live") @db.VarChar(20)
+  bookKey   String   @default("WHEAT") @map("book_key") @db.VarChar(80)
   amount    Decimal  @db.Decimal(15, 2)
   notes     String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([workspace, createdAt])
+  @@index([workspace, bookKey, createdAt])
   @@map("wheat_khata_money")
 }
 
-/// Receiving party (owner buys wheat) or selling/giving party (owner sells wheat)
+/// Receiving party (owner buys) or selling/giving party (owner sells) in one grain book
 model WheatKhataParty {
   id        BigInt              @id @default(autoincrement())
   workspace String              @default("live") @db.VarChar(20)
+  bookKey   String              @default("WHEAT") @map("book_key") @db.VarChar(80)
   kind      String              @db.VarChar(20)
   name      String              @db.VarChar(255)
   address   String?
@@ -586,6 +606,7 @@ model WheatKhataParty {
 
   @@index([workspace, kind])
   @@index([workspace, name])
+  @@index([workspace, bookKey, kind])
   @@map("wheat_khata_parties")
 }
 

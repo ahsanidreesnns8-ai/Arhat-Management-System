@@ -32,6 +32,7 @@ import * as dailyTrade from '@/server/services/daily-trade'
 import * as dayBatches from '@/server/services/day-batches'
 import * as register from '@/server/services/register'
 import * as wheatKhata from '@/server/services/wheat-khata'
+import * as grainKhata from '@/server/services/grain-khata'
 import * as paddyKhata from '@/server/services/paddy-khata'
 import * as arhatAmount from '@/server/services/arhat-amount'
 import { isOwnerFinanceRole } from '@/lib/roles'
@@ -669,6 +670,37 @@ async function dispatch(
     }
   }
 
+  if (path[0] === 'grain-khata') {
+    if (path[1] === 'books' && path.length === 2 && method === 'GET') {
+      return result(await grainKhata.listBooks())
+    }
+    if (path[1] === 'books' && path.length === 2 && method === 'POST') {
+      return result(await grainKhata.createOtherBook(payload), 'Khata created', 201)
+    }
+    const bookKey = path[1]
+    if (path.length === 2 && method === 'GET') {
+      return result(await wheatKhata.getBook(bookKey))
+    }
+    if (path[2] === 'money' && method === 'POST') {
+      return result(await wheatKhata.addMoney(payload, bookKey), 'Money added', 201)
+    }
+    if (path[2] === 'parties' && path.length === 4 && method === 'GET') {
+      return result(await wheatKhata.getParty(numericId(path[3]), bookKey))
+    }
+    if (path[2] === 'parties' && method === 'POST') {
+      return result(await wheatKhata.createParty(payload, bookKey), 'Party saved', 201)
+    }
+    if (path[2] === 'products' && method === 'POST') {
+      return result(await wheatKhata.addProduct(payload, bookKey), 'Product saved', 201)
+    }
+    if (path[2] === 'payments' && method === 'POST') {
+      return result(await wheatKhata.addPayment(payload, bookKey), 'Amount saved', 201)
+    }
+    if (path[2] === 'preview' && method === 'POST') {
+      return result(wheatKhata.previewProduct(payload))
+    }
+  }
+
   if (path[0] === 'wheat-khata') {
     if (path.length === 1 && method === 'GET') {
       return result(await wheatKhata.getBook())
@@ -802,10 +834,16 @@ async function dispatch(
       return html(await bills.arhatAmountBillHtml(lang))
     }
     if (path[1] === 'wheat-khata' && path[2] === 'all' && path.length === 3) {
-      return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang))
+      return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang, url.searchParams.get('book')))
     }
     if (path[1] === 'wheat-khata' && path.length === 3) {
-      return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang))
+      return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang, url.searchParams.get('book')))
+    }
+    if (path[1] === 'grain-khata' && path[2] === 'all' && path.length === 3) {
+      return html(await bills.wheatKhataAllBillsHtml(url.searchParams.get('kind') ?? 'PARTY', lang, url.searchParams.get('book')))
+    }
+    if (path[1] === 'grain-khata' && path.length === 3) {
+      return html(await bills.wheatKhataBillHtml(numericId(path[2]), lang, url.searchParams.get('book')))
     }
     if (path[1] === 'paddy-khata' && path[3] === 'all' && path.length === 4) {
       return html(

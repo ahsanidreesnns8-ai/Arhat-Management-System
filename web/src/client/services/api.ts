@@ -5,6 +5,7 @@ import type {
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
+  GrainKhataBookMeta,
   PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataPurchase,
   ArhatAmountBook, ArhatAmountMergeReport,
 } from '../types'
@@ -225,10 +226,14 @@ export const billApi = {
   registerBalance: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/register/party/${id}/balance`, lang),
   registerBook: (lang: 'en' | 'ur' = 'en') => billRequest('/bills/register/book', lang),
-  wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en') =>
-    billRequest(`/bills/wheat-khata/${id}`, lang),
-  wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en') =>
-    billRequest('/bills/wheat-khata/all', lang, { kind }),
+  wheatKhataParty: (id: number, lang: 'en' | 'ur' = 'en', book = 'WHEAT') =>
+    book && book !== 'WHEAT'
+      ? billRequest(`/bills/grain-khata/${id}`, lang, { book })
+      : billRequest(`/bills/wheat-khata/${id}`, lang),
+  wheatKhataAll: (kind: 'PARTY' | 'COMPANY', lang: 'en' | 'ur' = 'en', book = 'WHEAT') =>
+    book && book !== 'WHEAT'
+      ? billRequest('/bills/grain-khata/all', lang, { kind, book })
+      : billRequest('/bills/wheat-khata/all', lang, { kind }),
   paddyKhata: (bookId: number, secret: string, module?: string, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/paddy-khata/${bookId}`, lang, {
       secret,
@@ -285,14 +290,23 @@ export const arhatAmountApi = {
     api.post('/arhat-amount/entries', data),
 }
 
-export const wheatKhataApi = {
-  book: () => api.get<ApiResponse<WheatKhataBook>>('/wheat-khata'),
-  addMoney: (data: { amount: number; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataMoney>>('/wheat-khata/money', data),
-  addParty: (data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataParty>>('/wheat-khata/parties', data),
-  getParty: (id: number) => api.get<ApiResponse<WheatKhataParty>>(`/wheat-khata/parties/${id}`),
-  previewProduct: (data: {
+function grainKhataPath(bookKey: string, suffix = '') {
+  return `/grain-khata/${encodeURIComponent(bookKey)}${suffix}`
+}
+
+export const grainKhataApi = {
+  books: () => api.get<ApiResponse<GrainKhataBookMeta[]>>('/grain-khata/books'),
+  createBook: (data: { name: string }) =>
+    api.post<ApiResponse<GrainKhataBookMeta>>('/grain-khata/books', data),
+  book: (bookKey: string) =>
+    api.get<ApiResponse<WheatKhataBook>>(grainKhataPath(bookKey)),
+  addMoney: (bookKey: string, data: { amount: number; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataMoney>>(grainKhataPath(bookKey, '/money'), data),
+  addParty: (bookKey: string, data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, '/parties'), data),
+  getParty: (bookKey: string, id: number) =>
+    api.get<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, `/parties/${id}`)),
+  previewProduct: (bookKey: string, data: {
     bags?: number
     trucks?: number
     ratePerBag: number
@@ -312,7 +326,35 @@ export const wheatKhataApi = {
       labourAmount: number
       totalPrice: number
       totalWeightKg: number
-    }>>('/wheat-khata/preview', data),
+    }>>(grainKhataPath(bookKey, '/preview'), data),
+  addProduct: (bookKey: string, data: {
+    partyId: number
+    bags?: number
+    trucks?: number
+    ratePerBag: number
+    bagWeightKg?: number
+    bagPricePerBag?: number
+    labourPerBag?: number
+    notes?: string
+  }) => api.post<ApiResponse<WheatKhataProduct>>(grainKhataPath(bookKey, '/products'), data),
+  addPayment: (bookKey: string, data: { partyId: number; amount: number; notes?: string }) =>
+    api.post<ApiResponse<WheatKhataPayment>>(grainKhataPath(bookKey, '/payments'), data),
+}
+
+export const wheatKhataApi = {
+  book: () => grainKhataApi.book('WHEAT'),
+  addMoney: (data: { amount: number; notes?: string }) => grainKhataApi.addMoney('WHEAT', data),
+  addParty: (data: { kind: 'RECEIVING' | 'GIVING' | 'PARTY' | 'COMPANY'; name: string; address?: string; notes?: string }) =>
+    grainKhataApi.addParty('WHEAT', data),
+  getParty: (id: number) => grainKhataApi.getParty('WHEAT', id),
+  previewProduct: (data: {
+    bags?: number
+    trucks?: number
+    ratePerBag: number
+    bagWeightKg?: number
+    bagPricePerBag?: number
+    labourPerBag?: number
+  }) => grainKhataApi.previewProduct('WHEAT', data),
   addProduct: (data: {
     partyId: number
     bags?: number
@@ -322,9 +364,9 @@ export const wheatKhataApi = {
     bagPricePerBag?: number
     labourPerBag?: number
     notes?: string
-  }) => api.post<ApiResponse<WheatKhataProduct>>('/wheat-khata/products', data),
+  }) => grainKhataApi.addProduct('WHEAT', data),
   addPayment: (data: { partyId: number; amount: number; notes?: string }) =>
-    api.post<ApiResponse<WheatKhataPayment>>('/wheat-khata/payments', data),
+    grainKhataApi.addPayment('WHEAT', data),
 }
 
 export const paddyKhataApi = {

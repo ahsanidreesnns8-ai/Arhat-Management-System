@@ -527,7 +527,7 @@ export default function OwnerPage() {
       <Modal open={wipeOpen} onClose={() => setWipeOpen(false)} title="Start brand new shop">
         <div className="space-y-2.5">
           <p className="text-[12px] text-slate-500">
-            This permanently deletes farmers, buyers, dheris, sales, payments, Wheat Khata, Paddy Khata, Arhat Register, and extra users. Owner and staff logins stay. Products and company settings stay. Type START NEW to confirm.
+            This permanently deletes farmers, buyers, dheris, sales, payments, Wheat Khata, Barley Khata, Maize Khata, Others Khata, Paddy Khata, Arhat Register, and extra users. Owner and staff logins stay. Products and company settings stay. Type START NEW to confirm.
           </p>
           <Input
             label='Type START NEW *'

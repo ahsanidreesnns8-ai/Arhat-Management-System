@@ -1,5 +1,6 @@
 import { prisma } from '@/server/db'
 import { normalizeAccountKey } from '@/server/ids'
+import { bookHref } from '@/server/services/grain-khata'
 import { getAccountStatement } from '@/server/services/linked-account'
 
 const PAGE_SHORTCUTS = [
@@ -12,7 +13,10 @@ const PAGE_SHORTCUTS = [
   { id: 'calculator', title: 'Price Calculator', titleUr: 'قیمت کیلکولیٹر', keywords: ['calculator', 'price', 'کیلکولیٹر'], link: '/calculator' },
   { id: 'farmer-product', title: 'Farmer Product', titleUr: 'کسان پروڈکٹ', keywords: ['farmer product', 'کسان پروڈکٹ'], link: '/farmer-product' },
   { id: 'daily-trade', title: 'Daily Trade', titleUr: 'روزانہ تجارت', keywords: ['daily trade', 'stock', 'extra kg', 'آرھٹ', 'روزانہ'], link: '/daily-trade' },
-  { id: 'wheat-khata', title: 'Wheat Khata', titleUr: 'گندم کھاتہ', keywords: ['wheat khata', 'wheat', 'khata', 'گندم', 'کھاتہ'], link: '/wheat-khata' },
+  { id: 'wheat-khata', title: 'Wheat Khata', titleUr: 'گندم کھاتہ', keywords: ['wheat khata', 'wheat', 'گندم', 'کھاتہ'], link: '/wheat-khata' },
+  { id: 'barley-khata', title: 'Barley Khata', titleUr: 'جو کھاتہ', keywords: ['barley khata', 'barley', 'جو', 'کھاتہ'], link: '/barley-khata' },
+  { id: 'maize-khata', title: 'Maize Khata', titleUr: 'مکئی کھاتہ', keywords: ['maize khata', 'maize', 'corn', 'مکئی', 'کھاتہ'], link: '/maize-khata' },
+  { id: 'others-khata', title: 'Others Khata', titleUr: 'دیگر کھاتہ', keywords: ['others khata', 'other khata', 'create khata', 'دیگر کھاتہ', 'کھاتہ'], link: '/others-khata' },
   { id: 'paddy-khata', title: 'Paddy Khata', titleUr: 'دھان کھاتہ', keywords: ['paddy khata', 'paddy', 'dhan', 'rice khata', 'دھان', 'کھاتہ'], link: '/paddy-khata' },
   { id: 'arhat-amount', title: 'Arhat Amount', titleUr: 'آرھٹ رقم', keywords: ['arhat amount', 'merge', 'آرھٹ رقم'], link: '/arhat-amount' },
   { id: 'queue', title: 'Queue', titleUr: 'قطار', keywords: ['queue', 'قطار'], link: '/queue' },
@@ -46,7 +50,7 @@ export async function search(query: string) {
   if (q.length < 2) return pages
 
   const contains = { contains: q, mode: 'insensitive' as const }
-  const [farmers, buyers, trucks, dheris, sales, products, wheatParties, registerParties] =
+  const [farmers, buyers, trucks, dheris, sales, products, wheatParties, grainBooks, registerParties] =
     await Promise.all([
       prisma.farmer.findMany({
         where: {
@@ -97,7 +101,11 @@ export async function search(query: string) {
           deleted: false,
           OR: [{ name: contains }, { address: contains }],
         },
-        take: 5,
+        take: 8,
+      }),
+      prisma.grainKhataBook.findMany({
+        where: { deleted: false },
+        take: 40,
       }),
       prisma.registerParty.findMany({
         where: { deleted: false, kind: { in: ['GIVING', 'RECEIVING', 'PERSON'] } },
@@ -180,12 +188,25 @@ export async function search(query: string) {
       subtitle: `Code: ${item.productCode}`,
       link: `/stock?product=${item.id}`,
     })),
-    ...wheatParties.map((item) => ({
-      id: `wheat-${item.id}`,
-      type: 'WHEAT_KHATA',
-      title: item.name,
-      subtitle: item.kind === 'GIVING' ? 'Wheat Khata company' : 'Wheat Khata party',
-      link: '/wheat-khata',
-    })),
+    ...grainBooks
+      .filter((item) => !item.builtin && item.name.toLowerCase().includes(q.toLowerCase()))
+      .map((item) => ({
+        id: `khata-book-${item.key}`,
+        type: 'PAGE',
+        title: item.name,
+        subtitle: 'Open khata',
+        link: bookHref(item.key),
+      })),
+    ...wheatParties.map((item) => {
+      const bookName = grainBooks.find((book) => book.key === item.bookKey)?.name
+        || (item.bookKey === 'WHEAT' ? 'Wheat Khata' : item.bookKey === 'BARLEY' ? 'Barley Khata' : item.bookKey === 'MAIZE' ? 'Maize Khata' : 'Khata')
+      return {
+        id: `grain-${item.id}`,
+        type: 'WHEAT_KHATA',
+        title: item.name,
+        subtitle: item.kind === 'GIVING' ? `${bookName} company` : `${bookName} party`,
+        link: bookHref(item.bookKey),
+      }
+    }),
   ]
 }
