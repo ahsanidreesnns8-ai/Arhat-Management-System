@@ -122,7 +122,7 @@ export async function createBuyer(input: PartyInput) {
     },
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(buyerId)
+  await ensureRegisterPartyForAccount(buyerId, input.name.trim())
   return buyerDto(row)
 }
 
@@ -151,7 +151,7 @@ export async function updateBuyer(id: number | bigint, input: PartyInput) {
     data,
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(row.buyerId)
+  await ensureRegisterPartyForAccount(row.buyerId, row.name)
   return buyerDto(row)
 }
 

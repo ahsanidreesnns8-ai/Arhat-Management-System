@@ -436,15 +436,14 @@ async function farmerForAccountKey(key: string, farmerId?: number | null) {
   const raw = String(key ?? '').trim()
   const norm = normalizeAccountKey(raw)
   if (!norm) return null
-  const direct = await prisma.farmer.findFirst({
-    where: { deleted: false, OR: [{ farmerId: raw }, { farmerId: norm }] },
-  })
-  if (direct) return direct
   const farmers = await prisma.farmer.findMany({
     where: { deleted: false },
-    select: { id: true, farmerId: true },
+    select: { id: true, farmerId: true, name: true },
   })
   const hit = farmers.find((row) => normalizeAccountKey(row.farmerId) === norm)
+    ?? (farmers.filter((row) => normalizeAccountKey(row.name) === norm).length === 1
+      ? farmers.find((row) => normalizeAccountKey(row.name) === norm)
+      : undefined)
   if (!hit) return null
   return prisma.farmer.findFirst({ where: { id: hit.id, deleted: false } })
 }
@@ -468,9 +467,9 @@ export async function adjustAccount(
   const key = String(input.key ?? '').trim()
   if (!key) throw new Error('Enter the farmer ID')
   const kind = parseKind(input.kind, [...MONEY_ENTRY_KINDS])
-  const party = await ensureRegisterPartyForAccount(key)
-  if (!party) throw new Error('Could not open this ID')
   const farmer = await farmerForAccountKey(key, input.farmerId)
+  const party = await ensureRegisterPartyForAccount(key, farmer?.name)
+  if (!party) throw new Error('Could not open this ID')
   const entry = await createEntry({
     kind,
     partyId: Number(party.id),

@@ -146,7 +146,7 @@ export default function FarmersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Farmer Management"
-        description="Eye opens product history only. Use the same ID as Arhat Register. Product bill and Balance bill are separate."
+        description="Eye opens the farmer page. Product bill is product only. Total balance on the farmer page shows Arhat Register given/received plus product."
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />

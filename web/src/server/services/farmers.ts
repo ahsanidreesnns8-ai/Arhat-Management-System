@@ -79,7 +79,7 @@ export function farmerDto(farmer: FarmerRow) {
 }
 
 async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
-  const cash = await registerCashForKey(dto.farmerId)
+  const cash = await registerCashForKey(dto.farmerId, dto.name)
   const productBalance = (dto.totalBilled || 0) - (dto.totalPaid || 0)
   return {
     ...dto,
@@ -160,7 +160,7 @@ export async function createFarmer(input: PartyInput) {
     },
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(farmerId)
+  await ensureRegisterPartyForAccount(farmerId, input.name.trim())
   return withRegisterAccount(farmerDto(row))
 }
 
@@ -189,7 +189,7 @@ export async function updateFarmer(id: number | bigint, input: PartyInput) {
     data,
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(row.farmerId)
+  await ensureRegisterPartyForAccount(row.farmerId, row.name)
   return withRegisterAccount(farmerDto(row))
 }
 

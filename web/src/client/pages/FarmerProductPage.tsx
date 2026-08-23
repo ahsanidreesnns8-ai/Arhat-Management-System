@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calculator, PackagePlus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Calculator, FileText, PackagePlus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
@@ -13,6 +13,7 @@ import FarmerDetailFields from '../components/forms/FarmerDetailFields'
 import { useLanguage } from '../context/LanguageContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
+import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import type { Dheri, Farmer, PriceCalculationResult, Product } from '../types'
 
@@ -186,6 +187,20 @@ export default function FarmerProductPage() {
     }
   }
 
+  const openProductBill = async () => {
+    const id = Number(farmerId)
+    if (!id) {
+      toast.error('Choose a farmer first')
+      return
+    }
+    try {
+      const res = await farmerApi.getBillHtml(id, 'en')
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Farmer product bill')
+    } catch (err) {
+      toast.error(billErrorMessage(err, 'Could not generate product bill'))
+    }
+  }
+
   const resultRows = [
     { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
@@ -199,7 +214,10 @@ export default function FarmerProductPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Farmer Product" description="Each save is a new product row. Use the same farmer ID as Arhat Register so the amount is added to that ID automatically." />
+      <PageHeader
+        title="Farmer Product"
+        description="Each save is a new product row. Generate bill here is product only. Register given/received is on Total balance on the farmer page."
+      />
 
       <div className="card-3d overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
@@ -345,6 +363,9 @@ export default function FarmerProductPage() {
             <div className="flex flex-wrap gap-3 pt-2">
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
               <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Calculate</Button>
+              <Button variant="secondary" onClick={() => void openProductBill()} disabled={!farmerId}>
+                <FileText className="h-4 w-4" /> Product bill
+              </Button>
               <Button onClick={handleSave} loading={saving}><Save className="h-4 w-4" /> Save</Button>
             </div>
           </div>
