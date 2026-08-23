@@ -60,20 +60,137 @@ function slot(map: Map<string, LinkedTrade>, raw: string) {
   return row
 }
 
-export async function loadTradeIndex(): Promise<Map<string, LinkedTrade>> {
+async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
+  const [farmers, buyers, dheriSums, farmerPays, saleSums, buyerPays] = await Promise.all([
+    prisma.farmer.findMany({
+      where: { deleted: false },
+      select: { id: true, farmerId: true, name: true },
+    }),
+    prisma.buyer.findMany({
+      where: { deleted: false },
+      select: { id: true, buyerId: true, name: true },
+    }),
+    prisma.dheri.groupBy({
+      by: ['farmerId'],
+      where: { deleted: false },
+      _sum: { farmerReceivable: true },
+      _count: { _all: true },
+    }),
+    prisma.payment.groupBy({
+      by: ['farmerId'],
+      where: { farmerId: { not: null } },
+      _sum: { amount: true },
+    }),
+    prisma.sale.groupBy({
+      by: ['buyerId'],
+      where: { deleted: false },
+      _sum: { totalAmount: true },
+      _count: { _all: true },
+    }),
+    prisma.payment.groupBy({
+      by: ['buyerId'],
+      where: { buyerId: { not: null } },
+      _sum: { amount: true },
+    }),
+  ])
+
+  const map = new Map<string, LinkedTrade>()
+  const dheriByFarmer = new Map(
+    dheriSums.map((row) => [
+      String(row.farmerId),
+      { total: row._sum.farmerReceivable?.toNumber() ?? 0, count: row._count._all },
+    ]),
+  )
+  const farmerPaidByFarmer = new Map(
+    farmerPays
+      .filter((row) => row.farmerId != null)
+      .map((row) => [String(row.farmerId), row._sum.amount?.toNumber() ?? 0]),
+  )
+  const soldByBuyer = new Map(
+    saleSums.map((row) => [
+      String(row.buyerId),
+      { total: row._sum.totalAmount?.toNumber() ?? 0, count: row._count._all },
+    ]),
+  )
+  const buyerPaidByBuyer = new Map(
+    buyerPays
+      .filter((row) => row.buyerId != null)
+      .map((row) => [String(row.buyerId), row._sum.amount?.toNumber() ?? 0]),
+  )
+
+  for (const farmer of farmers) {
+    const row = slot(map, farmer.farmerId)
+    if (!row) continue
+    const dheri = dheriByFarmer.get(String(farmer.id))
+    row.farmerId = Number(farmer.id)
+    row.farmerCode = farmer.farmerId
+    row.farmerName = farmer.name
+    row.productTotal = dheri?.total ?? 0
+    row.productCount = dheri?.count ?? 0
+    row.farmerPaid = farmerPaidByFarmer.get(String(farmer.id)) ?? 0
+  }
+
+  for (const buyer of buyers) {
+    const row = slot(map, buyer.buyerId)
+    if (!row) continue
+    const sold = soldByBuyer.get(String(buyer.id))
+    row.buyerId = Number(buyer.id)
+    row.buyerCode = buyer.buyerId
+    row.buyerName = buyer.name
+    row.soldTotal = sold?.total ?? 0
+    row.soldCount = sold?.count ?? 0
+    row.buyerPaid = buyerPaidByBuyer.get(String(buyer.id)) ?? 0
+  }
+
+  return map
+}
+
+export async function loadTradeIndex(includeLines = true): Promise<Map<string, LinkedTrade>> {
+  if (!includeLines) return loadTradeTotalsIndex()
   const [farmers, buyers] = await Promise.all([
     prisma.farmer.findMany({
       where: { deleted: false },
-      include: {
-        dheris: { where: { deleted: false }, include: { product: true } },
-        payments: true,
+      select: {
+        id: true,
+        farmerId: true,
+        name: true,
+        dheris: {
+          where: { deleted: false },
+          select: includeLines
+            ? {
+                id: true,
+                dheriId: true,
+                numberOfBags: true,
+                farmerReceivable: true,
+                createdAt: true,
+                product: { select: { name: true } },
+              }
+            : { farmerReceivable: true },
+        },
+        payments: {
+          select: includeLines
+            ? { id: true, amount: true, notes: true, createdAt: true }
+            : { amount: true },
+        },
       },
     }),
     prisma.buyer.findMany({
       where: { deleted: false },
-      include: {
-        sales: { where: { deleted: false } },
-        payments: true,
+      select: {
+        id: true,
+        buyerId: true,
+        name: true,
+        sales: {
+          where: { deleted: false },
+          select: includeLines
+            ? { id: true, invoiceNumber: true, totalAmount: true, createdAt: true }
+            : { totalAmount: true },
+        },
+        payments: {
+          select: includeLines
+            ? { id: true, amount: true, notes: true, createdAt: true }
+            : { amount: true },
+        },
       },
     }),
   ])
@@ -89,28 +206,32 @@ export async function loadTradeIndex(): Promise<Map<string, LinkedTrade>> {
       const amount = dheri.farmerReceivable.toNumber()
       row.productTotal += amount
       row.productCount += 1
-      row.lines.push({
-        id: Number(dheri.id),
-        kind: 'PRODUCT',
-        amount,
-        notes: `${dheri.product?.name || 'Product'} · ${dheri.numberOfBags} bags · dheri ${dheri.dheriId}`,
-        createdAt: dheri.createdAt,
-        farmerId: Number(farmer.id),
-        farmerCode: farmer.farmerId,
-      })
+      if (includeLines && 'id' in dheri) {
+        row.lines.push({
+          id: Number(dheri.id),
+          kind: 'PRODUCT',
+          amount,
+          notes: `${dheri.product?.name || 'Product'} · ${dheri.numberOfBags} bags · dheri ${dheri.dheriId}`,
+          createdAt: dheri.createdAt,
+          farmerId: Number(farmer.id),
+          farmerCode: farmer.farmerId,
+        })
+      }
     }
     for (const payment of farmer.payments) {
       const amount = payment.amount.toNumber()
       row.farmerPaid += amount
-      row.lines.push({
-        id: Number(payment.id),
-        kind: 'FARMER_PAID',
-        amount,
-        notes: payment.notes || 'Paid to farmer',
-        createdAt: payment.createdAt,
-        farmerId: Number(farmer.id),
-        farmerCode: farmer.farmerId,
-      })
+      if (includeLines && 'id' in payment) {
+        row.lines.push({
+          id: Number(payment.id),
+          kind: 'FARMER_PAID',
+          amount,
+          notes: payment.notes || 'Paid to farmer',
+          createdAt: payment.createdAt,
+          farmerId: Number(farmer.id),
+          farmerCode: farmer.farmerId,
+        })
+      }
     }
   }
 
@@ -124,35 +245,62 @@ export async function loadTradeIndex(): Promise<Map<string, LinkedTrade>> {
       const amount = sale.totalAmount.toNumber()
       row.soldTotal += amount
       row.soldCount += 1
-      row.lines.push({
-        id: Number(sale.id),
-        kind: 'SOLD',
-        amount,
-        notes: `Sold · invoice ${sale.invoiceNumber}`,
-        createdAt: sale.createdAt,
-        farmerId: null,
-        farmerCode: buyer.buyerId,
-      })
+      if (includeLines && 'id' in sale) {
+        row.lines.push({
+          id: Number(sale.id),
+          kind: 'SOLD',
+          amount,
+          notes: `Sold · invoice ${sale.invoiceNumber}`,
+          createdAt: sale.createdAt,
+          farmerId: null,
+          farmerCode: buyer.buyerId,
+        })
+      }
     }
     for (const payment of buyer.payments) {
       const amount = payment.amount.toNumber()
       row.buyerPaid += amount
-      row.lines.push({
-        id: Number(payment.id),
-        kind: 'BUYER_PAID',
-        amount,
-        notes: payment.notes || 'Paid by buyer',
-        createdAt: payment.createdAt,
-        farmerId: null,
-        farmerCode: buyer.buyerId,
-      })
+      if (includeLines && 'id' in payment) {
+        row.lines.push({
+          id: Number(payment.id),
+          kind: 'BUYER_PAID',
+          amount,
+          notes: payment.notes || 'Paid by buyer',
+          createdAt: payment.createdAt,
+          farmerId: null,
+          farmerCode: buyer.buyerId,
+        })
+      }
     }
   }
 
-  for (const row of map.values()) {
-    row.lines.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  if (includeLines) {
+    for (const row of map.values()) {
+      row.lines.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    }
   }
   return map
+}
+
+async function findPartyByNormalizedName(norm: string) {
+  const parties = await prisma.registerParty.findMany({
+    where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
+    select: { id: true, name: true },
+  })
+  return parties.find((row) => normalizeAccountKey(row.name) === norm) ?? null
+}
+
+export async function findRegisterPartyByKey(key: string) {
+  const norm = normalizeAccountKey(key)
+  if (!norm) return null
+  const hit = await findPartyByNormalizedName(norm)
+  if (!hit) return null
+  return prisma.registerParty.findFirst({
+    where: { id: hit.id, deleted: false },
+    include: {
+      entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
+    },
+  })
 }
 
 export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null | undefined) {
@@ -160,18 +308,6 @@ export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null
 }
 
 const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
-
-export async function findRegisterPartyByKey(key: string) {
-  const norm = normalizeAccountKey(key)
-  if (!norm) return null
-  const parties = await prisma.registerParty.findMany({
-    where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
-    include: {
-      entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
-    },
-  })
-  return parties.find((row) => normalizeAccountKey(row.name) === norm) ?? null
-}
 
 /** Reuse the Arhat Register person when farmer/buyer ID matches (R74.1 / r74.1 / "R 74.1"). */
 export async function ensureRegisterPartyForAccount(code: string) {
@@ -278,11 +414,141 @@ function stampLine(createdAt: Date, particular: string, addition: number, deduct
   return { createdAt, particular, addition, deduction, kind }
 }
 
+function matchByNormalizedCode<T extends { id: bigint; code: string; name: string }>(
+  rows: T[],
+  norm: string,
+) {
+  return rows.find((row) => normalizeAccountKey(row.code) === norm) ?? null
+}
+
+export async function loadTradeForKey(key: string): Promise<LinkedTrade> {
+  const raw = String(key ?? '').trim()
+  const norm = normalizeAccountKey(raw)
+  const row = emptyTrade(norm)
+  if (!norm) return row
+
+  const [farmers, buyers] = await Promise.all([
+    prisma.farmer.findMany({
+      where: { deleted: false },
+      select: { id: true, farmerId: true, name: true },
+    }),
+    prisma.buyer.findMany({
+      where: { deleted: false },
+      select: { id: true, buyerId: true, name: true },
+    }),
+  ])
+  const farmer = matchByNormalizedCode(
+    farmers.map((item) => ({ id: item.id, code: item.farmerId, name: item.name })),
+    norm,
+  )
+  const buyer = matchByNormalizedCode(
+    buyers.map((item) => ({ id: item.id, code: item.buyerId, name: item.name })),
+    norm,
+  )
+
+  if (farmer) {
+    row.farmerId = Number(farmer.id)
+    row.farmerCode = farmer.code
+    row.farmerName = farmer.name
+    const [dheris, payments] = await Promise.all([
+      prisma.dheri.findMany({
+        where: { farmerId: farmer.id, deleted: false },
+        select: {
+          id: true,
+          dheriId: true,
+          numberOfBags: true,
+          farmerReceivable: true,
+          createdAt: true,
+          product: { select: { name: true } },
+        },
+      }),
+      prisma.payment.findMany({
+        where: { farmerId: farmer.id },
+        select: { id: true, amount: true, notes: true, createdAt: true },
+      }),
+    ])
+    for (const dheri of dheris) {
+      const amount = dheri.farmerReceivable.toNumber()
+      row.productTotal += amount
+      row.productCount += 1
+      row.lines.push({
+        id: Number(dheri.id),
+        kind: 'PRODUCT',
+        amount,
+        notes: `${dheri.product?.name || 'Product'} · ${dheri.numberOfBags} bags · dheri ${dheri.dheriId}`,
+        createdAt: dheri.createdAt,
+        farmerId: Number(farmer.id),
+        farmerCode: farmer.code,
+      })
+    }
+    for (const payment of payments) {
+      const amount = payment.amount.toNumber()
+      row.farmerPaid += amount
+      row.lines.push({
+        id: Number(payment.id),
+        kind: 'FARMER_PAID',
+        amount,
+        notes: payment.notes || 'Paid to farmer',
+        createdAt: payment.createdAt,
+        farmerId: Number(farmer.id),
+        farmerCode: farmer.code,
+      })
+    }
+  }
+
+  if (buyer) {
+    row.buyerId = Number(buyer.id)
+    row.buyerCode = buyer.code
+    row.buyerName = buyer.name
+    const [sales, payments] = await Promise.all([
+      prisma.sale.findMany({
+        where: { buyerId: buyer.id, deleted: false },
+        select: { id: true, invoiceNumber: true, totalAmount: true, createdAt: true },
+      }),
+      prisma.payment.findMany({
+        where: { buyerId: buyer.id },
+        select: { id: true, amount: true, notes: true, createdAt: true },
+      }),
+    ])
+    for (const sale of sales) {
+      const amount = sale.totalAmount.toNumber()
+      row.soldTotal += amount
+      row.soldCount += 1
+      row.lines.push({
+        id: Number(sale.id),
+        kind: 'SOLD',
+        amount,
+        notes: `Sold · invoice ${sale.invoiceNumber}`,
+        createdAt: sale.createdAt,
+        farmerId: null,
+        farmerCode: buyer.code,
+      })
+    }
+    for (const payment of payments) {
+      const amount = payment.amount.toNumber()
+      row.buyerPaid += amount
+      row.lines.push({
+        id: Number(payment.id),
+        kind: 'BUYER_PAID',
+        amount,
+        notes: payment.notes || 'Paid by buyer',
+        createdAt: payment.createdAt,
+        farmerId: null,
+        farmerCode: buyer.code,
+      })
+    }
+  }
+
+  row.lines.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  return row
+}
+
 export async function getAccountStatement(key: string): Promise<AccountStatement> {
   const norm = normalizeAccountKey(key)
-  const party = await findRegisterPartyByKey(key)
-  const index = await loadTradeIndex()
-  const trade = tradeForKey(index, key)
+  const [party, trade] = await Promise.all([
+    findRegisterPartyByKey(key),
+    loadTradeForKey(key),
+  ])
   const cashReceived = (party?.entries || [])
     .filter((row) => row.kind === 'RECEIVING')
     .reduce((sum, row) => sum + row.amount.toNumber(), 0)

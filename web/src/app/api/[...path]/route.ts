@@ -15,25 +15,11 @@ import * as sales from '@/server/services/sales'
 import * as payments from '@/server/services/payments'
 import * as queue from '@/server/services/queue'
 import * as stock from '@/server/services/stock'
-import * as calculator from '@/server/services/calculator'
 import * as settings from '@/server/services/settings'
 import * as users from '@/server/services/users'
 import * as dashboard from '@/server/services/dashboard'
 import * as searchService from '@/server/services/search'
-import * as reports from '@/server/services/reports'
-import * as bills from '@/server/services/bills'
-import * as weather from '@/server/services/weather'
-import * as ai from '@/server/services/ai'
-import * as audit from '@/server/services/audit'
-import * as backup from '@/server/services/backup'
-import * as arhat from '@/server/services/arhat'
-import * as stockLots from '@/server/services/stock-lots'
-import * as dailyTrade from '@/server/services/daily-trade'
-import * as dayBatches from '@/server/services/day-batches'
 import * as register from '@/server/services/register'
-import * as wheatKhata from '@/server/services/wheat-khata'
-import * as grainKhata from '@/server/services/grain-khata'
-import * as paddyKhata from '@/server/services/paddy-khata'
 import * as arhatAmount from '@/server/services/arhat-amount'
 import { isOwnerFinanceRole } from '@/lib/roles'
 
@@ -388,6 +374,7 @@ async function dispatch(
   }
 
   if (path[0] === 'stock') {
+    const stockLots = await import('@/server/services/stock-lots')
     if (path.length === 1 && method === 'GET') {
       return result(await stock.listStock())
     }
@@ -429,6 +416,10 @@ async function dispatch(
   }
 
   if (path[0] === 'daily-trade') {
+    const [dailyTrade, dayBatches] = await Promise.all([
+      import('@/server/services/daily-trade'),
+      import('@/server/services/day-batches'),
+    ])
     if ((path.length === 1 || path[1] === 'board') && method === 'GET') {
       return result(
         await dailyTrade.getDailyBoard(
@@ -464,14 +455,14 @@ async function dispatch(
     }
     if (path[1] === 'receive' && method === 'POST') {
       const data = await dailyTrade.receiveManyIntoBatch(
-        payload as dailyTrade.ReceiveManyInput,
+        payload as Parameters<typeof dailyTrade.receiveManyIntoBatch>[0],
         user?.id,
       )
       return result(data, data.message)
     }
     if (path[1] === 'sell-dheri' && method === 'POST') {
       const data = await dayBatches.sellDheriAtAuctionRate(
-        payload as dayBatches.SellDheriAuctionInput,
+        payload as Parameters<typeof dayBatches.sellDheriAtAuctionRate>[0],
         user?.id,
       )
       return result(
@@ -493,7 +484,7 @@ async function dispatch(
     }
     if (path[1] === 'batch-sell' && method === 'POST') {
       const data = await dailyTrade.batchSellToBuyer(
-        payload as dailyTrade.BatchSellInput,
+        payload as Parameters<typeof dailyTrade.batchSellToBuyer>[0],
         user?.id,
       )
       return result(data, data.message)
@@ -512,14 +503,14 @@ async function dispatch(
     }
     if (path[1] === 'mark-sold' && method === 'POST') {
       const data = await dailyTrade.markDeskSold(
-        payload as dailyTrade.DeskSoldInput,
+        payload as Parameters<typeof dailyTrade.markDeskSold>[0],
         user?.id,
       )
       return result(data, data.message)
     }
     if (path[1] === 'edit-sold' && method === 'POST') {
       const data = await dailyTrade.updateDeskSold(
-        payload as dailyTrade.DeskSoldEditInput,
+        payload as Parameters<typeof dailyTrade.updateDeskSold>[0],
         user?.id,
       )
       return result(data, data.message)
@@ -527,21 +518,23 @@ async function dispatch(
   }
 
   if (path[0] === 'calculator') {
+    const calculator = await import('@/server/services/calculator')
     if (path[1] === 'calculate' && method === 'POST') {
       return result(
-        await calculator.calculatePrice(payload as calculator.PriceInput),
+        await calculator.calculatePrice(payload as Parameters<typeof calculator.calculatePrice>[0]),
       )
     }
     if (path[1] === 'save' && method === 'POST') {
       const id = numericId(path[2])
-      await calculator.saveCalculation(id, payload as calculator.PriceInput)
+      await calculator.saveCalculation(id, payload as Parameters<typeof calculator.saveCalculation>[1])
       return result(await dheris.getDheri(id), 'Calculation saved to dheri record')
     }
   }
 
   if (path[0] === 'arhat' && path[1] === 'settle' && method === 'POST') {
+    const arhat = await import('@/server/services/arhat')
     const data = await arhat.settle(
-      payload as arhat.ArhatSettlementInput,
+      payload as Parameters<typeof arhat.settle>[0],
       user?.id,
     )
     return result(data, data.message)
@@ -611,19 +604,23 @@ async function dispatch(
     return result(await searchService.search(url.searchParams.get('q') ?? '', user?.id))
   }
   if (path[0] === 'weather' && method === 'GET') {
+    const weather = await import('@/server/services/weather')
     return result(await weather.getWeather())
   }
   if (path[0] === 'sync' && path[1] === 'pulse' && method === 'GET') {
     return result(await getPulse())
   }
   if (path[0] === 'ai' && path[1] === 'chat' && method === 'POST') {
-    return result(await ai.chat(payload as ai.AiChatInput))
+    const ai = await import('@/server/services/ai')
+    return result(await ai.chat(payload as Parameters<typeof ai.chat>[0]))
   }
   if (path[0] === 'audit' && method === 'GET') {
+    const audit = await import('@/server/services/audit')
     return result(await audit.listAuditLogs())
   }
 
   if (path[0] === 'reports') {
+    const reports = await import('@/server/services/reports')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
     if (path[1] === 'sales' && method === 'GET') {
@@ -671,6 +668,10 @@ async function dispatch(
   }
 
   if (path[0] === 'grain-khata') {
+    const [grainKhata, wheatKhata] = await Promise.all([
+      import('@/server/services/grain-khata'),
+      import('@/server/services/wheat-khata'),
+    ])
     const userId = user!.id
     if (path[1] === 'books' && path.length === 2 && method === 'GET') {
       return result(await grainKhata.listBooks(userId, url.searchParams.get('crop') ?? payload.crop))
@@ -715,6 +716,7 @@ async function dispatch(
   }
 
   if (path[0] === 'wheat-khata') {
+    const wheatKhata = await import('@/server/services/wheat-khata')
     if (path.length === 1 && method === 'GET') {
       return result(await wheatKhata.getBook())
     }
@@ -739,6 +741,7 @@ async function dispatch(
   }
 
   if (path[0] === 'paddy-khata') {
+    const paddyKhata = await import('@/server/services/paddy-khata')
     const userId = user!.id
     if (path.length === 1 && method === 'GET') {
       return result(await paddyKhata.listBooks(userId))
@@ -857,6 +860,7 @@ async function dispatch(
   }
 
   if (path[0] === 'bills' && method === 'GET') {
+    const bills = await import('@/server/services/bills')
     const lang = url.searchParams.get('lang') ?? 'en'
     if (path[1] === 'arhat-amount' && path[2] === 'merge' && path.length === 3) {
       if (!isOwnerFinanceRole(user?.role)) throw new Error('Only the owner can merge Wheat Khata into Arhat Amount')
@@ -973,6 +977,7 @@ async function dispatch(
   }
 
   if (path[0] === 'backup') {
+    const backup = await import('@/server/services/backup')
     if (path[1] === 'export' && path[2] === 'json' && method === 'GET') {
       return result(await backup.exportBackupJson())
     }
@@ -1010,7 +1015,9 @@ async function handle(request: NextRequest, context: RouteContext) {
       )
     }
     try {
-      await ensureShopLogins()
+      if (path[0] === 'auth' && path[1] === 'login') {
+        await ensureShopLogins()
+      }
     } catch {
       // Login/data routes still run; they will surface a real DB error if needed.
     }

@@ -1,26 +1,33 @@
 import { prisma } from '@/server/db'
 import { getWorkspace, syncStateId } from '@/server/workspace'
 
-async function ensureState() {
+async function loadState() {
   const id = syncStateId()
   const workspace = getWorkspace()
-  return prisma.syncState.upsert({
-    where: { id },
-    update: {},
-    create: { id, workspace, revision: 1 },
-  })
+  const existing = await prisma.syncState.findUnique({ where: { id } })
+  if (existing) return existing
+  try {
+    return await prisma.syncState.create({
+      data: { id, workspace, revision: 1 },
+    })
+  } catch {
+    const again = await prisma.syncState.findUnique({ where: { id } })
+    if (again) return again
+    throw new Error('Could not read sync state')
+  }
 }
 
 export async function bumpRevision() {
-  await ensureState()
+  const id = syncStateId()
+  await loadState()
   return prisma.syncState.update({
-    where: { id: syncStateId() },
+    where: { id },
     data: { revision: { increment: 1 } },
   })
 }
 
 export async function getPulse() {
-  const state = await ensureState()
+  const state = await loadState()
   return {
     revision: Number(state.revision),
     serverTime: new Date().toISOString(),

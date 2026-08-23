@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { syncApi } from '../services/api'
+import { invalidateApiCache, syncApi } from '../services/api'
 import { useAuth } from './AuthContext'
 
 interface SyncContextType {
@@ -14,7 +14,7 @@ const SyncContext = createContext<SyncContextType>({
   live: false,
 })
 
-const POLL_MS = 15000
+const POLL_MS = 25000
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -41,7 +41,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         const res = await syncApi.pulse()
         if (cancelled) return
         const next = Number(res.data?.data?.revision || 0)
-        setRevision((prev) => (next !== prev ? next : prev))
+        setRevision((prev) => {
+          if (next !== prev) invalidateApiCache()
+          return next !== prev ? next : prev
+        })
         setLastSyncedAt(res.data?.data?.serverTime || new Date().toISOString())
         failStreak.current = 0
         setLive(true)

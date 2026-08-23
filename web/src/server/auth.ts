@@ -26,6 +26,9 @@ export type AuthUser = Pick<
   'id' | 'username' | 'email' | 'fullName' | 'role' | 'themePreference' | 'workspace'
 >
 
+const AUTH_TTL_MS = 60_000
+const authCache = new Map<string, { exp: number; user: AuthUser }>()
+
 export async function signToken(
   user: AuthUser,
   sessionId?: bigint | number | null,
@@ -63,9 +66,12 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
   if (!authorization?.startsWith('Bearer ')) {
     throw new Error('Authentication required')
   }
+  const token = authorization.slice(7)
+  const cached = authCache.get(token)
+  if (cached && cached.exp > Date.now()) return cached.user
 
   try {
-    const payload = await verifyToken(authorization.slice(7))
+    const payload = await verifyToken(token)
     if (!payload.sub) throw new Error('Invalid token')
     const user = await prisma.user.findFirst({
       where: { id: BigInt(payload.sub), deleted: false, active: true },
@@ -93,11 +99,32 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
       })
       if (!session) throw new Error('Invalid or expired token')
     }
+    authCache.set(token, { exp: Date.now() + AUTH_TTL_MS, user })
     return user
   } catch (error) {
+    authCache.delete(token)
     if (error instanceof Error && error.message === 'User not found or inactive') {
       throw error
     }
+    throw new Error('Invalid or expired token')
+  }
+}
+
+export function forgetAuth(token?: string | null) {
+  if (token) authCache.delete(token)
+}
+
+/** JWT only — used by the high-frequency sync pulse so it does not hit the user table. */
+export async function requireAuthPulse(request: NextRequest): Promise<{ workspace: string }> {
+  const authorization = request.headers.get('authorization')
+  if (!authorization?.startsWith('Bearer ')) {
+    throw new Error('Authentication required')
+  }
+  try {
+    const payload = await verifyToken(authorization.slice(7))
+    if (!payload.sub) throw new Error('Invalid token')
+    return { workspace: payload.workspace === 'demo' ? 'demo' : 'live' }
+  } catch {
     throw new Error('Invalid or expired token')
   }
 }

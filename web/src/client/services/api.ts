@@ -13,8 +13,7 @@ import type {
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-  // Cold starts on Vercel/Neon can exceed 20s; keep retries for GETs below
-  timeout: 45000,
+  timeout: 20000,
 })
 
 api.interceptors.request.use((config) => {
@@ -126,7 +125,14 @@ api.interceptors.response.use(
     }
 
     const retryCount = config?.__retryCount ?? 0
-    if (config && isRetryableMethod(config.method) && isRetryableError(error) && retryCount < 3) {
+    const isPulse = url.includes('/sync/pulse')
+    if (
+      config &&
+      !isPulse &&
+      isRetryableMethod(config.method) &&
+      isRetryableError(error) &&
+      retryCount < 1
+    ) {
       config.__retryCount = retryCount + 1
       await sleep(400 * 2 ** retryCount)
       return api.request(config)
@@ -135,6 +141,70 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+const GET_CACHE_MS = 4000
+const getCache = new Map<string, { exp: number; value: unknown }>()
+const getInflight = new Map<string, Promise<unknown>>()
+
+function currentToken() {
+  try {
+    const stored = localStorage.getItem('rehmani_user')
+    if (!stored) return ''
+    return String((JSON.parse(stored) as User)?.token || '')
+  } catch {
+    return ''
+  }
+}
+
+function cacheableGet(url: string) {
+  return (
+    !url.includes('/sync/pulse') &&
+    !url.includes('/bills/') &&
+    !url.includes('/auth/') &&
+    !url.includes('/search') &&
+    !url.includes('/backup')
+  )
+}
+
+function getCacheKey(url: string, config?: { params?: unknown }) {
+  return `${currentToken()}|${url}|${JSON.stringify(config?.params || {})}`
+}
+
+function clearGetCache() {
+  getCache.clear()
+}
+
+export function invalidateApiCache() {
+  clearGetCache()
+}
+
+const rawGet = api.get.bind(api)
+api.get = ((url: string, config?: object) => {
+  if (!cacheableGet(String(url))) return rawGet(url, config)
+  const key = getCacheKey(String(url), config as { params?: unknown } | undefined)
+  const hit = getCache.get(key)
+  if (hit && hit.exp > Date.now()) return Promise.resolve(hit.value)
+  const pending = getInflight.get(key)
+  if (pending) return pending
+  const req = rawGet(url, config).then((res) => {
+    getCache.set(key, { exp: Date.now() + GET_CACHE_MS, value: res })
+    getInflight.delete(key)
+    return res
+  }).catch((err) => {
+    getInflight.delete(key)
+    throw err
+  })
+  getInflight.set(key, req)
+  return req
+}) as typeof api.get
+
+api.interceptors.response.use((res) => {
+  const method = String(res.config?.method || 'get').toLowerCase()
+  if (method !== 'get' && method !== 'head' && method !== 'options') {
+    clearGetCache()
+  }
+  return res
+})
 
 const billRequest = (
   path: string,
@@ -145,6 +215,7 @@ const billRequest = (
     params: { lang, ...extraParams },
     responseType: 'text' as never,
     headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
+    timeout: 45000,
   })
 
 export const authApi = {
@@ -169,7 +240,7 @@ export const weatherApi = {
 }
 
 export const syncApi = {
-  pulse: () => api.get<ApiResponse<SyncPulse>>('/sync/pulse'),
+  pulse: () => api.get<ApiResponse<SyncPulse>>('/sync/pulse', { timeout: 8000 }),
 }
 
 export const dashboardApi = {

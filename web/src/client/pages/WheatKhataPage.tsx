@@ -146,6 +146,7 @@ export default function WheatKhataPage({
   const [productOpen, setProductOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [detailParty, setDetailParty] = useState<WheatKhataParty | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const [moneyForm, setMoneyForm] = useState({ amount: '', notes: '' })
   const [partyForm, setPartyForm] = useState({ name: '', address: '', notes: '' })
@@ -200,6 +201,20 @@ export default function WheatKhataPage({
     setSection(kind)
     setPartyForm({ name: '', address: '', notes: '' })
     setPartyOpen(true)
+  }
+
+  const openDetail = async (party: WheatKhataParty) => {
+    setDetailParty(party)
+    if (party.products && party.payments) return
+    setDetailLoading(true)
+    try {
+      const res = await grainKhataApi.getParty(bookKey, party.id, secret || undefined)
+      setDetailParty(res.data.data || party)
+    } catch (err) {
+      toast.error(apiMessage(err, 'Could not load details'))
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const openProduct = (kind: Section, partyId = '') => {
@@ -641,7 +656,7 @@ export default function WheatKhataPage({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {entities.map((p) => (
                 <div key={p.id} className="card-3d p-4 space-y-3">
-                  <button type="button" onClick={() => setDetailParty(p)} className="w-full text-left">
+                  <button type="button" onClick={() => void openDetail(p)} className="w-full text-left">
                     <p className="font-semibold truncate">{p.name}</p>
                     <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] mt-3">
@@ -681,7 +696,7 @@ export default function WheatKhataPage({
                     <button
                       type="button"
                       className="text-[11px] text-slate-500 underline-offset-2 hover:underline"
-                      onClick={() => setDetailParty(p)}
+                      onClick={() => void openDetail(p)}
                     >
                       Details
                     </button>
@@ -942,7 +957,9 @@ export default function WheatKhataPage({
 
             <div>
               <h4 className="text-sm font-semibold mb-2">Product</h4>
-              {!detailParty.products?.length ? (
+              {detailLoading ? (
+                <TableSkeleton rows={3} />
+              ) : !detailParty.products?.length ? (
                 <p className="text-sm text-slate-500">No product entries yet.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -981,7 +998,9 @@ export default function WheatKhataPage({
 
             <div>
               <h4 className="text-sm font-semibold mb-2">{detailParty.kind === 'GIVING' ? 'Amounts received' : 'Amounts given'}</h4>
-              {!detailParty.payments?.length ? (
+              {detailLoading ? (
+                <TableSkeleton rows={3} />
+              ) : !detailParty.payments?.length ? (
                 <p className="text-sm text-slate-500">No cash entries yet.</p>
               ) : (
                 <div className="overflow-x-auto">

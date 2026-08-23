@@ -4,10 +4,10 @@ import { nextDheriCode, nextDheriQueueNumber, normalizeOwnerCode } from '@/serve
 import { calculatePrice, type PriceInput } from '@/server/services/calculator'
 
 const dheriInclude = {
-  farmer: true,
-  truck: true,
-  product: true,
-  dayBatch: true,
+  farmer: { select: { id: true, name: true, farmerId: true } },
+  truck: { select: { id: true, truckId: true } },
+  product: { select: { id: true, name: true } },
+  dayBatch: { select: { id: true, batchNumber: true } },
 } as const
 
 type DheriRow = Prisma.DheriGetPayload<{ include: typeof dheriInclude }>

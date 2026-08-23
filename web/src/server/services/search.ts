@@ -129,24 +129,25 @@ export async function search(query: string, userId?: bigint) {
   for (const item of registerParties) remember(item.name)
   for (const item of farmers) remember(item.farmerId)
   for (const item of buyers) remember(item.buyerId)
-  const accounts = []
-  for (const key of [...keys.values()].slice(0, 6)) {
-    const statement = await getAccountStatement(key)
-    const remaining = statement.remainingToGive > 0
-      ? `Remaining to give Rs ${Math.round(statement.remainingToGive)}`
-      : statement.remainingToReceive > 0
-        ? `Remaining to receive Rs ${Math.round(statement.remainingToReceive)}`
-        : 'Settled'
-    accounts.push({
-      id: statement.key,
-      type: 'ACCOUNT',
-      title: statement.farmerName || statement.buyerName
-        ? `${statement.name} · ${statement.farmerName || statement.buyerName}`
-        : statement.name,
-      subtitle: `${remaining} · Product Rs ${Math.round(statement.productTotal)} · Given Rs ${Math.round(statement.cashGiven)} · Received Rs ${Math.round(statement.cashReceived)} · Sold Rs ${Math.round(statement.soldTotal)}`,
-      link: `/arhat-register?q=${encodeURIComponent(statement.name)}`,
-    })
-  }
+  const accounts = await Promise.all(
+    [...keys.values()].slice(0, 6).map(async (key) => {
+      const statement = await getAccountStatement(key)
+      const remaining = statement.remainingToGive > 0
+        ? `Remaining to give Rs ${Math.round(statement.remainingToGive)}`
+        : statement.remainingToReceive > 0
+          ? `Remaining to receive Rs ${Math.round(statement.remainingToReceive)}`
+          : 'Settled'
+      return {
+        id: statement.key,
+        type: 'ACCOUNT',
+        title: statement.farmerName || statement.buyerName
+          ? `${statement.name} · ${statement.farmerName || statement.buyerName}`
+          : statement.name,
+        subtitle: `${remaining} · Product Rs ${Math.round(statement.productTotal)} · Given Rs ${Math.round(statement.cashGiven)} · Received Rs ${Math.round(statement.cashReceived)} · Sold Rs ${Math.round(statement.soldTotal)}`,
+        link: `/arhat-register?q=${encodeURIComponent(statement.name)}`,
+      }
+    }),
+  )
 
   return [
     ...accounts,

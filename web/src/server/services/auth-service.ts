@@ -5,6 +5,7 @@ import {
   updateTheme as persistTheme,
   verifyPassword,
   verifyToken,
+  forgetAuth,
 } from '@/server/auth'
 import {
   isSharedShopLogin,
@@ -154,6 +155,7 @@ export async function login(
 
 export async function logout(token: string | null | undefined) {
   if (!token) return { closed: false }
+  forgetAuth(token)
   try {
     const payload = await verifyToken(token)
     const sid = payload.sid
