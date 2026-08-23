@@ -925,8 +925,8 @@ export async function registerPartyBill(id: number | bigint, lang = 'en') {
   return renderRegisterLedgerBill(ledger, lang)
 }
 
-export async function accountBalanceBillByKey(key: string, lang = 'en') {
-  const statement = await getAccountStatement(key)
+export async function accountBalanceBillByKey(key: string, lang = 'en', extraName?: string | null) {
+  const statement = await getAccountStatement(key, extraName)
   return renderAccountBalanceBill(statement, lang)
 }
 
@@ -935,7 +935,7 @@ export async function accountBalanceBillByFarmer(id: number | bigint, lang = 'en
     where: { id: BigInt(id), deleted: false },
   })
   if (!farmer) throw new Error('Farmer not found')
-  return accountBalanceBillByKey(farmer.farmerId, lang)
+  return accountBalanceBillByKey(farmer.farmerId, lang, farmer.name)
 }
 
 export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en') {
@@ -943,7 +943,7 @@ export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en'
     where: { id: BigInt(id), deleted: false },
   })
   if (!buyer) throw new Error('Buyer not found')
-  return accountBalanceBillByKey(buyer.buyerId, lang)
+  return accountBalanceBillByKey(buyer.buyerId, lang, buyer.name)
 }
 
 export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
@@ -974,8 +974,8 @@ function renderAccountBalanceBill(
       <div><span class="label">${urdu ? 'شناخت' : 'ID'}</span><div class="value">${escape(statement.name)}</div></div>
       <div><span class="label">${remainingLabel}</span><div class="value">PKR ${money(remainingAmount)}</div></div>
       <div><span class="label">${urdu ? 'مال' : 'Product in'}</span><div class="value">PKR ${money(statement.productTotal)}</div></div>
-      <div><span class="label">${urdu ? 'رجسٹر دی گئی' : 'Register given'}</span><div class="value">PKR ${money(statement.cashGiven)}</div></div>
-      <div><span class="label">${urdu ? 'رجسٹر وصول' : 'Register received'}</span><div class="value">PKR ${money(statement.cashReceived)}</div></div>
+      <div><span class="label">${urdu ? 'پہلے دی گئی' : 'Already given'}</span><div class="value">PKR ${money(statement.cashGiven)}</div></div>
+      <div><span class="label">${urdu ? 'پہلے وصول' : 'Already received'}</span><div class="value">PKR ${money(statement.cashReceived)}</div></div>
       <div><span class="label">${urdu ? 'فروخت' : 'Sold'}</span><div class="value">PKR ${money(statement.soldTotal)}</div></div>
     </div>
   </div>`

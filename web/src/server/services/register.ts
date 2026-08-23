@@ -436,23 +436,44 @@ async function farmerForAccountKey(key: string, farmerId?: number | null) {
   const raw = String(key ?? '').trim()
   const norm = normalizeAccountKey(raw)
   if (!norm) return null
-  const direct = await prisma.farmer.findFirst({
-    where: { deleted: false, OR: [{ farmerId: raw }, { farmerId: norm }] },
-  })
-  if (direct) return direct
   const farmers = await prisma.farmer.findMany({
     where: { deleted: false },
-    select: { id: true, farmerId: true },
+    select: { id: true, farmerId: true, name: true },
   })
-  const hit = farmers.find((row) => normalizeAccountKey(row.farmerId) === norm)
-  if (!hit) return null
-  return prisma.farmer.findFirst({ where: { id: hit.id, deleted: false } })
+  const byCode = farmers.find((row) => normalizeAccountKey(row.farmerId) === norm)
+  if (byCode) {
+    return prisma.farmer.findFirst({ where: { id: byCode.id, deleted: false } })
+  }
+  const byName = farmers.filter((row) => normalizeAccountKey(row.name) === norm)
+  if (byName.length === 1) {
+    return prisma.farmer.findFirst({ where: { id: byName[0].id, deleted: false } })
+  }
+  const token = String(raw).trim().split(/\s+/)[0] || raw
+  const tokenKey = normalizeAccountKey(token)
+  const byFirst = farmers.filter((row) => {
+    const first = row.name.trim().split(/\s+/)[0] || row.name
+    return normalizeAccountKey(first) === tokenKey || normalizeAccountKey(first) === norm
+  })
+  if (byFirst.length !== 1) return null
+  return prisma.farmer.findFirst({ where: { id: byFirst[0].id, deleted: false } })
 }
 
 export async function getStatement(key: unknown) {
   const raw = String(key ?? '').trim()
   if (!raw) throw new Error('Enter an ID')
-  return getAccountStatement(raw)
+  const farmer = await farmerForAccountKey(raw)
+  const buyer = farmer
+    ? null
+    : await prisma.buyer.findFirst({
+        where: {
+          deleted: false,
+          OR: [
+            { buyerId: { equals: raw, mode: 'insensitive' } },
+            { name: { equals: raw, mode: 'insensitive' } },
+          ],
+        },
+      })
+  return getAccountStatement(raw, farmer?.name || buyer?.name)
 }
 
 export async function adjustAccount(
@@ -462,15 +483,30 @@ export async function adjustAccount(
     amount?: number | string | null
     notes?: string | null
     farmerId?: number | null
+    buyerId?: number | null
   },
   userId?: bigint,
 ) {
   const key = String(input.key ?? '').trim()
-  if (!key) throw new Error('Enter the farmer ID')
+  if (!key) throw new Error('Enter the ID')
   const kind = parseKind(input.kind, [...MONEY_ENTRY_KINDS])
-  const party = await ensureRegisterPartyForAccount(key)
-  if (!party) throw new Error('Could not open this ID')
   const farmer = await farmerForAccountKey(key, input.farmerId)
+  const buyer = farmer
+    ? null
+    : input.buyerId != null
+      ? await prisma.buyer.findFirst({ where: { id: BigInt(input.buyerId), deleted: false } })
+      : await prisma.buyer.findFirst({
+          where: {
+            deleted: false,
+            OR: [
+              { buyerId: { equals: key, mode: 'insensitive' } },
+              { name: { equals: key, mode: 'insensitive' } },
+            ],
+          },
+        })
+  const extraName = farmer?.name || buyer?.name
+  const party = await ensureRegisterPartyForAccount(key, extraName)
+  if (!party) throw new Error('Could not open this ID')
   const entry = await createEntry({
     kind,
     partyId: Number(party.id),
@@ -480,7 +516,7 @@ export async function adjustAccount(
   }, userId)
   return {
     entry,
-    statement: await getAccountStatement(key),
+    statement: await getAccountStatement(key, extraName),
   }
 }
 

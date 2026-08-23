@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
+import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
 import { farmerApi, paymentApi, registerApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
@@ -30,6 +31,7 @@ export default function FarmerDetailPage() {
   const [idCashOpen, setIdCashOpen] = useState<'GIVING' | 'RECEIVING' | null>(null)
   const [idCashForm, setIdCashForm] = useState({ amount: '', notes: '' })
   const [savingIdCash, setSavingIdCash] = useState(false)
+  const [balanceOpen, setBalanceOpen] = useState(false)
 
   const load = useCallback(() => {
     if (!farmerId) return
@@ -46,14 +48,7 @@ export default function FarmerDetailPage() {
         setPayments(p.data.data || [])
         setDheris(d.data.data || [])
         setTrucks(t.data.data || [])
-        if (next?.farmerId) {
-          try {
-            const res = await registerApi.statement(next.farmerId)
-            setStatement(res.data.data)
-          } catch {
-            setStatement(null)
-          }
-        }
+        setStatement(next?.statement || null)
       })
       .catch(() => toast.error('Failed to load farmer'))
       .finally(() => setLoading(false))
@@ -92,8 +87,9 @@ export default function FarmerDetailPage() {
   const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
   const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
   const remainingToPay = Math.max(0, totalBilled - totalPaid)
-  const remainingToGive = statement?.remainingToGive ?? 0
-  const remainingToReceive = statement?.remainingToReceive ?? 0
+  const summary = statementSummary(statement)
+  const remainingToGive = summary.remainingToGive
+  const remainingToReceive = summary.remainingToReceive
   const settled = isPartySettled({
     outstandingBalance: remainingToPay,
     totalBilled,
@@ -118,10 +114,10 @@ export default function FarmerDetailPage() {
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {settled ? 'Paid' : 'Pay / Settle remaining'}
               </Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
-              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
-              <Button variant="secondary" onClick={() => void openBalance()}>Whole balance</Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill</Button>
+              <Button variant="secondary" onClick={() => openBill('ur')}>پروڈکٹ بل</Button>
+              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>Total balance</Button>
+              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print product bill</Button>
             </div>
           }
         />
@@ -137,69 +133,28 @@ export default function FarmerDetailPage() {
         />
       </div>
 
-      <div className="card-3d p-5 space-y-3">
-        <div>
-          <p className="text-sm font-semibold">Farmer ID {farmer.farmerId} · whole balance</p>
-          <p className="text-sm text-slate-500 mt-1">
-            Product bill is product calculation only. Give or receive on this ID is recorded on Arhat Register with this farmer ID. When product arrives it is added here separately. Search this ID on Arhat Register to adjust the same account.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <MoneyCard
-            label="Remaining to give"
-            value={remainingToGive}
-            tone={remainingToGive > 0 ? 'warn' : 'good'}
-          />
-          <MoneyCard
-            label="Remaining to receive"
-            value={remainingToReceive}
-            tone={remainingToReceive > 0 ? 'warn' : 'good'}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => {
-              setIdCashForm({ amount: remainingToGive > 0 ? String(remainingToGive) : '', notes: '' })
-              setIdCashOpen('GIVING')
-            }}
-          >
-            <Wallet className="h-4 w-4" /> Give on this ID
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setIdCashForm({ amount: remainingToReceive > 0 ? String(remainingToReceive) : '', notes: '' })
-              setIdCashOpen('RECEIVING')
-            }}
-          >
-            Receive on this ID
-          </Button>
-          <Button variant="secondary" onClick={() => void openBalance()}>Print whole balance</Button>
-        </div>
-        {statement?.lines?.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b border-slate-100 dark:border-white/10">
-                  <th className="px-2 py-2">Particular</th>
-                  <th className="px-2 py-2 text-right">Addition</th>
-                  <th className="px-2 py-2 text-right">Deduction</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statement.lines.map((row, index) => (
-                  <tr key={`${row.kind}-${index}`} className="border-b border-slate-50 dark:border-white/5">
-                    <td className="px-2 py-2">{row.particular}</td>
-                    <td className="px-2 py-2 text-right">{row.addition ? formatCurrency(row.addition) : '—'}</td>
-                    <td className="px-2 py-2 text-right">{row.deduction ? formatCurrency(row.deduction) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">No ID cash yet. Product lots still appear on the product bill below.</p>
-        )}
+      <TotalBalancePreview statement={statement} onOpen={() => setBalanceOpen(true)} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => {
+            setIdCashForm({ amount: remainingToGive > 0 ? String(remainingToGive) : '', notes: '' })
+            setIdCashOpen('GIVING')
+          }}
+        >
+          <Wallet className="h-4 w-4" /> Give on this ID
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setIdCashForm({ amount: remainingToReceive > 0 ? String(remainingToReceive) : '', notes: '' })
+            setIdCashOpen('RECEIVING')
+          }}
+        >
+          Receive on this ID
+        </Button>
+        <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
+          <FileText className="h-4 w-4" /> Open total balance
+        </Button>
       </div>
 
       <div className="card-3d p-5">
@@ -208,8 +163,7 @@ export default function FarmerDetailPage() {
         <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
         {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
         <p className="mt-2 text-sm text-slate-500">
-          This page is farmer product only for the product bill. Arhat Register cash is not mixed into the product bill.
-          Product bill prints these dheris. Whole balance prints product plus register given / received for ID {farmer.farmerId}.
+          Generate bill here or from Farmer Product prints these dheris only (product calculation). Tap Total balance for Arhat Register given/received plus product history.
         </p>
         {settled && (
           <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
@@ -278,6 +232,24 @@ export default function FarmerDetailPage() {
           </tr>
         ))}
       </Section>
+
+      <TotalBalancePanel
+        open={balanceOpen}
+        onClose={() => setBalanceOpen(false)}
+        title={`Total balance · ${farmer.name}`}
+        statement={statement}
+        onPrint={(lang) => void openBalance(lang)}
+        onGive={() => {
+          setBalanceOpen(false)
+          setIdCashForm({ amount: remainingToGive > 0 ? String(remainingToGive) : '', notes: '' })
+          setIdCashOpen('GIVING')
+        }}
+        onReceive={() => {
+          setBalanceOpen(false)
+          setIdCashForm({ amount: remainingToReceive > 0 ? String(remainingToReceive) : '', notes: '' })
+          setIdCashOpen('RECEIVING')
+        }}
+      />
 
       <PaymentModal
         open={payOpen}
