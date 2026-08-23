@@ -1,12 +1,12 @@
 import { prisma } from '@/server/db'
 import { roundRupee } from '@/server/money'
-import { getBook as getWheatKhataBook } from '@/server/services/wheat-khata'
+import { allTreasuryRows } from '@/server/services/khata-treasury'
 
 const MANUAL_KINDS = ['ADD', 'RECEIVING', 'GIVING'] as const
 export type ArhatAmountKind = (typeof MANUAL_KINDS)[number]
 
 export type LedgerKind = 'ADD' | 'RECEIVING' | 'GIVING'
-export type LedgerBook = 'ARHAT' | 'WHEAT_KHATA'
+export type LedgerBook = 'ARHAT' | 'WHEAT_KHATA' | 'KHATA'
 export type LedgerSource =
   | 'MANUAL'
   | 'BUYER'
@@ -14,6 +14,7 @@ export type LedgerSource =
   | 'REGISTER'
   | 'ZAKAT'
   | 'WHEAT_KHATA'
+  | 'KHATA'
 
 export type ArhatAmountLine = {
   id: string
@@ -285,93 +286,131 @@ async function arhatLines(): Promise<{
   }
 }
 
-function wheatLinesFromBook(book: Awaited<ReturnType<typeof getWheatKhataBook>>): ArhatAmountLine[] {
+async function khataCashLines(): Promise<ArhatAmountLine[]> {
+  const [grainBooks, paddyBooks, moneyRows, paymentRows, paddyAmounts, paddyCash, paddyExpenses, treasury] = await Promise.all([
+    prisma.grainKhataBook.findMany({ where: { deleted: false } }),
+    prisma.paddyKhataBook.findMany({ where: { deleted: false } }),
+    prisma.wheatKhataMoney.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.wheatKhataPayment.findMany({
+      include: { party: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.paddyKhataAmount.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.paddyKhataCash.findMany({
+      include: { party: true, book: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.paddyKhataExpense.findMany({ orderBy: { createdAt: 'desc' } }),
+    allTreasuryRows(),
+  ])
+  const grainName = new Map(grainBooks.map((row) => [row.key, row.name]))
+  const paddyName = new Map(paddyBooks.map((row) => [Number(row.id), row.name]))
   const lines: ArhatAmountLine[] = []
-  for (const row of book.money) {
+
+  for (const row of moneyRows) {
+    const who = grainName.get(row.bookKey) || row.bookKey
     lines.push(
       line(
-        `wk-money-${row.id}`,
-        'WHEAT_KHATA',
-        'WHEAT_KHATA',
+        `khata-add-${row.id}`,
+        'KHATA',
+        'KHATA',
         'ADD',
+        row.amount.toNumber(),
+        joinReason([`${who} added amount`, row.notes]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of paymentRows) {
+    if (row.party?.deleted) continue
+    const who = grainName.get(row.party.bookKey) || row.party.bookKey
+    const giving = row.party.kind === 'RECEIVING'
+    lines.push(
+      line(
+        `khata-pay-${row.id}`,
+        'KHATA',
+        'KHATA',
+        giving ? 'GIVING' : 'RECEIVING',
+        row.amount.toNumber(),
+        joinReason([
+          giving
+            ? `${who} given to party ${row.party.name}`
+            : `${who} received from company ${row.party.name}`,
+          row.notes,
+        ]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of paddyAmounts) {
+    const who = paddyName.get(Number(row.bookId)) || 'Paddy Khata'
+    lines.push(
+      line(
+        `paddy-add-${row.id}`,
+        'KHATA',
+        'KHATA',
+        'ADD',
+        row.amount.toNumber(),
+        joinReason([`${who} added amount`, row.notes]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of paddyCash) {
+    const who = row.book?.name || paddyName.get(Number(row.bookId)) || 'Paddy Khata'
+    const giving = row.kind === 'GIVE'
+    lines.push(
+      line(
+        `paddy-cash-${row.id}`,
+        'KHATA',
+        'KHATA',
+        giving ? 'GIVING' : 'RECEIVING',
+        row.amount.toNumber(),
+        joinReason([
+          giving
+            ? `${who} given to party ${row.party?.name || ''}`
+            : `${who} received from party ${row.party?.name || ''}`,
+          row.notes,
+        ]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of paddyExpenses) {
+    const who = paddyName.get(Number(row.bookId)) || 'Paddy Khata'
+    lines.push(
+      line(
+        `paddy-exp-${row.id}`,
+        'KHATA',
+        'KHATA',
+        'GIVING',
+        row.amount.toNumber(),
+        joinReason([`${who} paid bill`, row.reason, row.variety]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of treasury) {
+    if (row.kind === 'BANK') continue
+    const giving = row.kind === 'TRANSFER_OUT'
+    lines.push(
+      line(
+        `khata-move-${row.id}`,
+        'KHATA',
+        'KHATA',
+        giving ? 'GIVING' : 'RECEIVING',
         row.amount,
-        row.notes || 'Amount added to Wheat Khata',
+        joinReason([
+          giving
+            ? `Borrowed to ${row.counterName || 'another khata'}`
+            : `Borrowed from ${row.counterName || 'another khata'}`,
+          row.notes,
+        ]),
         new Date(row.createdAt),
       ),
     )
   }
-  for (const party of book.parties) {
-    for (const row of party.products || []) {
-      lines.push(
-        line(
-          `wk-prod-${row.id}`,
-          'WHEAT_KHATA',
-          'WHEAT_KHATA',
-          'GIVING',
-          row.totalPrice,
-          joinReason([
-            `Wheat Khata product from party ${party.name}`,
-            `${row.bags} bags`,
-            row.notes,
-          ]),
-          new Date(row.createdAt),
-        ),
-      )
-    }
-    for (const row of party.payments || []) {
-      lines.push(
-        line(
-          `wk-pay-${row.id}`,
-          'WHEAT_KHATA',
-          'WHEAT_KHATA',
-          'GIVING',
-          row.amount,
-          joinReason([`Wheat Khata cash given to party ${party.name}`, row.notes]),
-          new Date(row.createdAt),
-        ),
-      )
-    }
-  }
-  for (const company of book.companies) {
-    for (const row of company.products || []) {
-      lines.push(
-        line(
-          `wk-prod-${row.id}`,
-          'WHEAT_KHATA',
-          'WHEAT_KHATA',
-          'RECEIVING',
-          row.totalPrice,
-          joinReason([
-            `Wheat Khata product to company ${company.name}`,
-            `${row.bags} bags`,
-            row.notes,
-          ]),
-          new Date(row.createdAt),
-        ),
-      )
-    }
-    for (const row of company.payments || []) {
-      lines.push(
-        line(
-          `wk-pay-${row.id}`,
-          'WHEAT_KHATA',
-          'WHEAT_KHATA',
-          'RECEIVING',
-          row.amount,
-          joinReason([`Wheat Khata cash received from company ${company.name}`, row.notes]),
-          new Date(row.createdAt),
-        ),
-      )
-    }
-  }
   return sortLines(lines)
-}
-
-function wheatCommission(book: Awaited<ReturnType<typeof getWheatKhataBook>>) {
-  return [...book.parties, ...book.companies].reduce(
-    (sum, party) => sum + (party.bagAmount || 0) + (party.labourAmount || 0),
-    0,
-  )
 }
 
 function totalsFromLines(
@@ -392,44 +431,38 @@ function totalsFromLines(
 }
 
 export async function getBook() {
-  const arhat = await arhatLines()
-  const totals = totalsFromLines(arhat.lines, {
+  const [arhat, khataHistory] = await Promise.all([arhatLines(), khataCashLines()])
+  const history = sortLines([...arhat.lines, ...khataHistory])
+  const totals = totalsFromLines(history, {
     commission: arhat.commission,
     zakat: arhat.zakat,
   })
   return {
     totals,
     manual: arhat.manual,
-    history: arhat.lines,
+    history,
   }
 }
 
 export async function getMergeReport() {
-  const [arhat, wheatBook] = await Promise.all([arhatLines(), getWheatKhataBook()])
-  const wheatHistory = wheatLinesFromBook(wheatBook)
+  const [arhat, khataHistory] = await Promise.all([arhatLines(), khataCashLines()])
   const arhatTotals = totalsFromLines(arhat.lines, {
     commission: arhat.commission,
     zakat: arhat.zakat,
   })
-  const wheatTotals = {
-    added: wheatBook.totals.moneyIn,
-    receiving: wheatBook.totals.cashReceived,
-    giving: wheatBook.totals.cashGiven,
-    zakat: 0,
-    commission: wheatCommission(wheatBook),
-    totalAmount: wheatBook.totals.totalAmount,
-  }
+  const khataTotals = totalsFromLines(khataHistory, { commission: 0, zakat: 0 })
   return {
     arhat: arhatTotals,
-    wheatKhata: wheatTotals,
+    wheatKhata: khataTotals,
+    khatas: khataTotals,
     combined: {
-      added: arhatTotals.added + wheatTotals.added,
-      receiving: arhatTotals.receiving + wheatTotals.receiving,
-      giving: arhatTotals.giving + wheatTotals.giving,
+      added: arhatTotals.added + khataTotals.added,
+      receiving: arhatTotals.receiving + khataTotals.receiving,
+      giving: arhatTotals.giving + khataTotals.giving,
       zakat: arhatTotals.zakat,
-      commission: arhatTotals.commission + wheatTotals.commission,
-      totalAmount: arhatTotals.totalAmount + wheatTotals.totalAmount,
+      commission: arhatTotals.commission,
+      totalAmount: arhatTotals.totalAmount + khataTotals.totalAmount,
     },
-    history: sortLines([...arhat.lines, ...wheatHistory]),
+    history: sortLines([...arhat.lines, ...khataHistory]),
   }
 }

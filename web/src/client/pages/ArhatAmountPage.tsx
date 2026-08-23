@@ -168,7 +168,7 @@ export default function ArhatAmountPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Amount"
-        description="Shop cash book for farmer payouts, buyer receipts, register, and zakat. Wheat Khata stays separate until the owner taps Merge all amount."
+        description="End-of-day shop cash. Farmer payouts, buyer receipts, register, zakat, and every khata add / give / receive are counted here as they happen."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void openArhatBill()} loading={billing}>
@@ -239,7 +239,7 @@ export default function ArhatAmountPage() {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold px-1">Complete history</h3>
         <p className="text-[11px] text-slate-500 px-1">
-          Wheat Khata stays out of this list until the owner taps Merge all amount.
+          Wheat, Barley, Maize, Others, and Paddy khata cash is included in this list as it is saved.
         </p>
         {loading ? (
           <div className="card-3d p-4"><TableSkeleton rows={6} /></div>
@@ -283,15 +283,15 @@ export default function ArhatAmountPage() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-slate-500">
-              Owner-only. Wheat Khata stays out of Arhat Amount until this merge. Complete history includes money given to farmers, money received from buyers, register, zakat, and Wheat Khata cash and product lines.
+              Owner-only breakdown. Arhat Amount already includes every khata. Merge splits shop lines from Wheat, Barley, Maize, Others, and Paddy cash so you can check the same total two ways.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100 dark:border-white/10">
                     <th className="px-2 py-2">Particulars</th>
-                    <th className="px-2 py-2 text-right">Arhat Amount</th>
-                    <th className="px-2 py-2 text-right">Wheat Khata</th>
+                    <th className="px-2 py-2 text-right">Arhat shop</th>
+                    <th className="px-2 py-2 text-right">All khatas</th>
                     <th className="px-2 py-2 text-right">Total</th>
                   </tr>
                 </thead>
@@ -337,7 +337,7 @@ export default function ArhatAmountPage() {
 function HistoryTable({ rows }: { rows: ArhatAmountLine[] }) {
   const kindLabel = (kind: string) =>
     kind === 'ADD' ? 'Added' : kind === 'RECEIVING' ? 'Received' : kind === 'GIVING' ? 'Given' : kind
-  const bookLabel = (book: string) => (book === 'WHEAT_KHATA' ? 'Wheat Khata' : 'Arhat')
+  const bookLabel = (book: string) => (book === 'WHEAT_KHATA' || book === 'KHATA' ? 'Khata' : 'Arhat')
   return (
     <div className="card-3d overflow-hidden">
       <div className="overflow-x-auto">

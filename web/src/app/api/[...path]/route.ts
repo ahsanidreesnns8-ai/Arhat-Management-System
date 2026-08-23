@@ -703,6 +703,15 @@ async function dispatch(
     if (path[2] === 'preview' && method === 'POST') {
       return result(wheatKhata.previewProduct(payload))
     }
+    if (path[2] === 'heads' && method === 'GET') {
+      return result(await wheatKhata.listKhataHeads(bookKey, access))
+    }
+    if (path[2] === 'bank' && method === 'POST') {
+      return result(await wheatKhata.addBank(payload, bookKey, access), 'Bank amount saved', 201)
+    }
+    if (path[2] === 'transfer' && method === 'POST') {
+      return result(await wheatKhata.transferTo(payload, bookKey, access), 'Amount sent to khata', 201)
+    }
   }
 
   if (path[0] === 'wheat-khata') {
@@ -757,6 +766,15 @@ async function dispatch(
     }
     if (path[2] === 'cash' && method === 'POST') {
       return result(await paddyKhata.addCash(id, userId, payload), 'Amount saved', 201)
+    }
+    if (path[2] === 'heads' && method === 'GET') {
+      return result(await paddyKhata.listKhataHeads(id, userId, secret))
+    }
+    if (path[2] === 'bank' && method === 'POST') {
+      return result(await paddyKhata.addBank(id, userId, payload), 'Bank amount saved', 201)
+    }
+    if (path[2] === 'transfer' && method === 'POST') {
+      return result(await paddyKhata.transferTo(id, userId, payload), 'Amount sent to khata', 201)
     }
     if (path[2] === 'process' && path[3] === 'complete' && method === 'POST') {
       return result(await paddyKhata.completeProcess(id, userId, payload), 'Process complete. Rice is ready to sell.')
@@ -825,6 +843,16 @@ async function dispatch(
     }
     if (path[1] === 'zakat' && method === 'GET') {
       return result(await register.zakatSummary())
+    }
+    if (path[1] === 'statement' && method === 'GET') {
+      return result(await register.getStatement(url.searchParams.get('key')))
+    }
+    if (path[1] === 'adjust' && method === 'POST') {
+      return result(
+        await register.adjustAccount(payload as Parameters<typeof register.adjustAccount>[0], user?.id),
+        'Amount recorded',
+        201,
+      )
     }
   }
 

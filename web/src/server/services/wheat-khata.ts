@@ -1,6 +1,7 @@
 import { prisma } from '@/server/db'
 import { d, roundRupee, totalWeight } from '@/server/money'
 import { requireOwnedBook, resolveShopBook } from '@/server/services/grain-khata'
+import { addBank as parkInBank, listHeads, loadTreasury, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
 
 export type GrainBookAccess = { userId: bigint; secret?: unknown }
 
@@ -341,6 +342,9 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
     companies.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0)
   const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0)
+  const cashTotal = moneyIn + cashReceived - cashGiven
+  const treasury = await loadTreasury('GRAIN', book.key)
+  const cash = withTreasury(cashTotal, treasury)
   const bagsReceived = parties.reduce((sum, row) => sum + row.totalBags, 0)
   const bagsGiven = companies.reduce((sum, row) => sum + row.totalBags, 0)
 
@@ -352,13 +356,19 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
       givingToParty,
       cashGiven,
       cashReceived,
-      totalAmount: moneyIn + cashReceived - cashGiven,
+      totalAmount: cash.totalAmount,
+      bankTotal: cash.bankTotal,
+      inHand: cash.inHand,
+      borrowedIn: cash.borrowedIn,
+      borrowedOut: cash.borrowedOut,
       bagsReceived,
       bagsGiven,
       bagsInStock: bagsReceived - bagsGiven,
       bagsPerTruck: BAGS_PER_TRUCK,
     },
     money,
+    banks: treasury.banks,
+    transfers: treasury.transfers,
     parties,
     companies,
   }
@@ -491,6 +501,12 @@ export async function addPayment(input: { partyId?: unknown; amount?: unknown; n
   if (party.bookKey !== book.key) throw new Error('Party not found')
 
   const amount = parseAmount(input.amount)
+  if (party.kind === 'RECEIVING') {
+    const snapshot = await getBook(book.key, access)
+    if (amount > snapshot.totals.inHand) {
+      throw new Error(`Amount in hand is ${snapshot.totals.inHand}. Give that or less.`)
+    }
+  }
   const row = await prisma.wheatKhataPayment.create({
     data: {
       partyId: party.id,
@@ -502,4 +518,28 @@ export async function addPayment(input: { partyId?: unknown; amount?: unknown; n
     ...row,
     party: { name: party.name, kind: party.kind },
   })
+}
+
+export async function listKhataHeads(bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
+  return listHeads({ bookType: 'GRAIN', bookRef: book.key })
+}
+
+export async function addBank(input: { bankName?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
+  const snapshot = await getBook(bookKey, access)
+  return parkInBank('GRAIN', snapshot.book.key, snapshot.totals.inHand, input)
+}
+
+export async function transferTo(input: {
+  bookType?: unknown
+  bookRef?: unknown
+  amount?: unknown
+  notes?: unknown
+}, bookKey?: unknown, access?: GrainBookAccess) {
+  const snapshot = await getBook(bookKey, access)
+  return sendToHead(
+    { bookType: 'GRAIN', bookRef: snapshot.book.key, name: snapshot.book.name },
+    snapshot.totals.inHand,
+    input,
+  )
 }

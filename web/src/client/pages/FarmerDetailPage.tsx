@@ -4,14 +4,16 @@ import { ArrowLeft, CheckCircle2, FileText, Pencil, Printer, Trash2, Wallet } fr
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
-import { farmerApi, paymentApi } from '../services/api'
+import { farmerApi, paymentApi, registerApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
-import type { Dheri, Farmer, Payment, Truck } from '../types'
+import type { AccountStatement, Dheri, Farmer, Payment, Truck } from '../types'
 
 export default function FarmerDetailPage() {
   const { t } = useLanguage()
@@ -21,9 +23,13 @@ export default function FarmerDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [dheris, setDheris] = useState<Dheri[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
+  const [statement, setStatement] = useState<AccountStatement | null>(null)
   const [loading, setLoading] = useState(true)
   const [payOpen, setPayOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
+  const [idCashOpen, setIdCashOpen] = useState<'GIVING' | 'RECEIVING' | null>(null)
+  const [idCashForm, setIdCashForm] = useState({ amount: '', notes: '' })
+  const [savingIdCash, setSavingIdCash] = useState(false)
 
   const load = useCallback(() => {
     if (!farmerId) return
@@ -34,11 +40,20 @@ export default function FarmerDetailPage() {
       farmerApi.getDheris(farmerId).catch(() => ({ data: { data: [] } })),
       farmerApi.getTrucks(farmerId).catch(() => ({ data: { data: [] } })),
     ])
-      .then(([f, p, d, t]) => {
-        setFarmer(f.data.data)
+      .then(async ([f, p, d, t]) => {
+        const next = f.data.data
+        setFarmer(next)
         setPayments(p.data.data || [])
         setDheris(d.data.data || [])
         setTrucks(t.data.data || [])
+        if (next?.farmerId) {
+          try {
+            const res = await registerApi.statement(next.farmerId)
+            setStatement(res.data.data)
+          } catch {
+            setStatement(null)
+          }
+        }
       })
       .catch(() => toast.error('Failed to load farmer'))
       .finally(() => setLoading(false))
@@ -77,6 +92,8 @@ export default function FarmerDetailPage() {
   const totalBilled = farmer.totalBilled ?? dheris.reduce((s, d) => s + (d.farmerReceivable || 0), 0)
   const totalPaid = farmer.totalPaid ?? payments.reduce((s, p) => s + (p.amount || 0), 0)
   const remainingToPay = Math.max(0, totalBilled - totalPaid)
+  const remainingToGive = statement?.remainingToGive ?? 0
+  const remainingToReceive = statement?.remainingToReceive ?? 0
   const settled = isPartySettled({
     outstandingBalance: remainingToPay,
     totalBilled,
@@ -103,7 +120,7 @@ export default function FarmerDetailPage() {
               </Button>
               <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
               <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
-              <Button variant="secondary" onClick={() => void openBalance()}>Balance</Button>
+              <Button variant="secondary" onClick={() => void openBalance()}>Whole balance</Button>
               <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print</Button>
             </div>
           }
@@ -119,14 +136,80 @@ export default function FarmerDetailPage() {
           tone={settled ? 'good' : 'warn'}
         />
       </div>
+
+      <div className="card-3d p-5 space-y-3">
+        <div>
+          <p className="text-sm font-semibold">Farmer ID {farmer.farmerId} · whole balance</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Product bill is product calculation only. Give or receive on this ID is recorded on Arhat Register with this farmer ID. When product arrives it is added here separately. Search this ID on Arhat Register to adjust the same account.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <MoneyCard
+            label="Remaining to give"
+            value={remainingToGive}
+            tone={remainingToGive > 0 ? 'warn' : 'good'}
+          />
+          <MoneyCard
+            label="Remaining to receive"
+            value={remainingToReceive}
+            tone={remainingToReceive > 0 ? 'warn' : 'good'}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => {
+              setIdCashForm({ amount: remainingToGive > 0 ? String(remainingToGive) : '', notes: '' })
+              setIdCashOpen('GIVING')
+            }}
+          >
+            <Wallet className="h-4 w-4" /> Give on this ID
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setIdCashForm({ amount: remainingToReceive > 0 ? String(remainingToReceive) : '', notes: '' })
+              setIdCashOpen('RECEIVING')
+            }}
+          >
+            Receive on this ID
+          </Button>
+          <Button variant="secondary" onClick={() => void openBalance()}>Print whole balance</Button>
+        </div>
+        {statement?.lines?.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-100 dark:border-white/10">
+                  <th className="px-2 py-2">Particular</th>
+                  <th className="px-2 py-2 text-right">Addition</th>
+                  <th className="px-2 py-2 text-right">Deduction</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statement.lines.map((row, index) => (
+                  <tr key={`${row.kind}-${index}`} className="border-b border-slate-50 dark:border-white/5">
+                    <td className="px-2 py-2">{row.particular}</td>
+                    <td className="px-2 py-2 text-right">{row.addition ? formatCurrency(row.addition) : '—'}</td>
+                    <td className="px-2 py-2 text-right">{row.deduction ? formatCurrency(row.deduction) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">No ID cash yet. Product lots still appear on the product bill below.</p>
+        )}
+      </div>
+
       <div className="card-3d p-5">
         <p className="text-sm text-gray-500">Father / address</p>
         <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
         <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
         {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
         <p className="mt-2 text-sm text-slate-500">
-          This page is farmer product only. Arhat Register cash is not mixed here.
-          Product bill prints these dheris. Balance prints product plus register given / received for ID {farmer.farmerId}.
+          This page is farmer product only for the product bill. Arhat Register cash is not mixed into the product bill.
+          Product bill prints these dheris. Whole balance prints product plus register given / received for ID {farmer.farmerId}.
         </p>
         {settled && (
           <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
@@ -206,6 +289,65 @@ export default function FarmerDetailPage() {
         outstanding={remainingToPay}
         editingPayment={editingPayment}
       />
+
+      <Modal
+        open={!!idCashOpen}
+        onClose={() => setIdCashOpen(null)}
+        title={idCashOpen === 'RECEIVING' ? `Receive on ID ${farmer.farmerId}` : `Give on ID ${farmer.farmerId}`}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            {idCashOpen === 'RECEIVING'
+              ? `Record money received from ${farmer.name} (${farmer.farmerId}). Product bill is not changed.`
+              : `Record money given to ${farmer.name} (${farmer.farmerId}). Product bill is not changed.`}
+          </p>
+          <Input
+            label="Amount (PKR) *"
+            type="number"
+            min="0"
+            value={idCashForm.amount}
+            onChange={(e) => setIdCashForm({ ...idCashForm, amount: e.target.value })}
+          />
+          <Input
+            label="Note (optional)"
+            value={idCashForm.notes}
+            onChange={(e) => setIdCashForm({ ...idCashForm, notes: e.target.value })}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setIdCashOpen(null)}>Cancel</Button>
+            <Button
+              loading={savingIdCash}
+              onClick={async () => {
+                const amount = Number(idCashForm.amount)
+                if (!idCashOpen || !amount || amount <= 0) {
+                  toast.error('Enter the amount')
+                  return
+                }
+                setSavingIdCash(true)
+                try {
+                  await registerApi.adjust({
+                    key: farmer.farmerId,
+                    kind: idCashOpen,
+                    amount,
+                    notes: idCashForm.notes.trim() || undefined,
+                    farmerId: farmer.id,
+                  })
+                  toast.success(idCashOpen === 'RECEIVING' ? 'Received on this farmer ID' : 'Given on this farmer ID')
+                  setIdCashOpen(null)
+                  load()
+                } catch (err: unknown) {
+                  const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                  toast.error(msg || 'Could not save amount')
+                } finally {
+                  setSavingIdCash(false)
+                }
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -579,6 +579,27 @@ model GrainKhataBook {
   @@map("grain_khata_books")
 }
 
+/// Bank deposits and borrowed transfers between khata heads
+model KhataTreasury {
+  id              BigInt   @id @default(autoincrement())
+  workspace       String   @default("live") @db.VarChar(20)
+  bookType        String   @map("book_type") @db.VarChar(20)
+  bookRef         String   @map("book_ref") @db.VarChar(80)
+  kind            String   @db.VarChar(20)
+  amount          Decimal  @db.Decimal(15, 2)
+  bankName        String?  @map("bank_name") @db.VarChar(255)
+  counterBookType String?  @map("counter_book_type") @db.VarChar(20)
+  counterBookRef  String?  @map("counter_book_ref") @db.VarChar(80)
+  counterName     String?  @map("counter_name") @db.VarChar(255)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([workspace, bookType, bookRef, createdAt])
+  @@index([workspace, kind, createdAt])
+  @@map("khata_treasury")
+}
+
 /// Cash deposited into a grain khata (Add Money)
 model WheatKhataMoney {
   id        BigInt   @id @default(autoincrement())

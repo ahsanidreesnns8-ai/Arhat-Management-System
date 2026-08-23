@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext'
 import { isOwnerFinanceRole } from '../../lib/roles'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
+import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
 import type { WheatKhataBook, WheatKhataParty } from '../types'
 
 type Section = 'MONEY' | 'PARTY' | 'COMPANY'
@@ -29,12 +30,18 @@ const emptyBook: WheatKhataBook = {
     cashGiven: 0,
     cashReceived: 0,
     totalAmount: 0,
+    bankTotal: 0,
+    inHand: 0,
+    borrowedIn: 0,
+    borrowedOut: 0,
     bagsReceived: 0,
     bagsGiven: 0,
     bagsInStock: 0,
     bagsPerTruck: BAGS_PER_TRUCK,
   },
   money: [],
+  banks: [],
+  transfers: [],
   parties: [],
   companies: [],
 }
@@ -442,9 +449,7 @@ export default function WheatKhataPage({
       />
 
       <div className="rounded-xl border border-amber-300/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-        {isShopWheat
-          ? 'This shop Wheat Khata stays in this book only. Farmer payouts and buyer receipts in Arhat Amount are not mixed here. Only the owner can open Merge all amount to see the combined history.'
-          : `${title} stays in this ID only. Use the secret code to open it. It is not mixed with other khatas or Arhat Amount.`}
+        Cash added, given, received, or borrowed on {title} also updates Arhat Amount. Bank money stays in this khata. Amount in hand is what is left after bank, parties, companies, and borrowed transfers.
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -453,8 +458,24 @@ export default function WheatKhataPage({
           <p className="text-2xl font-bold text-primary mt-1">{formatCurrency(totals.totalAmount)}</p>
           <p className="text-[11px] text-slate-500 mt-1">
             Add money {formatCurrency(totals.moneyIn)} + from companies {formatCurrency(totals.cashReceived)} − to parties {formatCurrency(totals.cashGiven)}
+            {(totals.borrowedIn || 0) > 0 || (totals.borrowedOut || 0) > 0
+              ? ` · borrowed in ${formatCurrency(totals.borrowedIn || 0)} − borrowed out ${formatCurrency(totals.borrowedOut || 0)}`
+              : ''}
           </p>
         </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Amount in hand</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.inHand || 0)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Left after bank, party/company cash, and borrowed money</p>
+        </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Amount in bank</p>
+          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Still this khata. Parked in a named bank frame</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount from company</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingFromCompany)}</p>
@@ -513,6 +534,34 @@ export default function WheatKhataPage({
               <Plus className="h-4 w-4" /> Add Money
             </Button>
           </div>
+          <KhataTreasuryPanel
+            inHand={totals.inHand || 0}
+            banks={book.banks || []}
+            transfers={book.transfers || []}
+            saving={saving}
+            loadHeads={async () => {
+              const res = await grainKhataApi.heads(bookKey, secret || undefined)
+              return res.data.data || []
+            }}
+            onAddBank={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.addBank(bookKey, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onTransfer={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.transferTo(bookKey, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+          />
           <div className="card-3d overflow-hidden">
             <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
               <Wallet className="h-4 w-4 text-[#C5A059]" />
@@ -646,7 +695,7 @@ export default function WheatKhataPage({
 
       <Modal open={moneyOpen} onClose={() => setMoneyOpen(false)} title="Add Money">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Cash deposited here increases the {title} total amount.</p>
+          <p className="text-sm text-slate-500">Cash deposited here increases this khata total and Arhat Amount.</p>
           <Input
             label="Amount (PKR) *"
             type="number"

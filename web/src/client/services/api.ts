@@ -5,7 +5,7 @@ import type {
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
-  GrainKhataBookMeta,
+  GrainKhataBookMeta, KhataHead, KhataTreasuryLine, AccountStatement,
   PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataPurchase,
   ArhatAmountBook, ArhatAmountMergeReport,
 } from '../types'
@@ -283,6 +283,10 @@ export const registerApi = {
     notes?: string
   }) => api.post('/register/person-amounts', data),
   zakat: () => api.get<ApiResponse<ZakatSummary>>('/register/zakat'),
+  statement: (key: string) =>
+    api.get<ApiResponse<AccountStatement>>('/register/statement', { params: { key } }),
+  adjust: (data: { key: string; kind: 'GIVING' | 'RECEIVING'; amount: number; notes?: string; farmerId?: number }) =>
+    api.post<ApiResponse<{ entry: RegisterEntry; statement: AccountStatement }>>('/register/adjust', data),
 }
 
 export const arhatAmountApi = {
@@ -346,6 +350,12 @@ export const grainKhataApi = {
   }, secret?: string) => api.post<ApiResponse<WheatKhataProduct>>(grainKhataPath(bookKey, '/products'), withSecret(data, secret)),
   addPayment: (bookKey: string, data: { partyId: number; amount: number; notes?: string }, secret?: string) =>
     api.post<ApiResponse<WheatKhataPayment>>(grainKhataPath(bookKey, '/payments'), withSecret(data, secret)),
+  heads: (bookKey: string, secret?: string) =>
+    api.get<ApiResponse<KhataHead[]>>(grainKhataPath(bookKey, '/heads'), { params: secret ? { secret } : {} }),
+  addBank: (bookKey: string, data: { bankName: string; amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/bank'), withSecret(data, secret)),
+  transferTo: (bookKey: string, data: { bookType: string; bookRef: string; amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/transfer'), withSecret(data, secret)),
 }
 
 export const wheatKhataApi = {
@@ -421,6 +431,12 @@ export const paddyKhataApi = {
     api.post(`/paddy-khata/${id}/rice`, data),
   addSale: (id: number, data: Record<string, unknown>) =>
     api.post(`/paddy-khata/${id}/sales`, data),
+  heads: (id: number, secret: string) =>
+    api.get<ApiResponse<KhataHead[]>>(`/paddy-khata/${id}/heads`, { params: { secret } }),
+  addBank: (id: number, data: { secret: string; bankName: string; amount: number; notes?: string }) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/bank`, data),
+  transferTo: (id: number, data: { secret: string; bookType: string; bookRef: string; amount: number; notes?: string }) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/transfer`, data),
 }
 
 export const truckApi = {

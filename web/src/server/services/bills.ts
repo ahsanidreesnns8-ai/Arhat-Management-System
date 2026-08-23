@@ -572,9 +572,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         include: { product: true },
         orderBy: { createdAt: 'asc' },
       },
-      payments: {
-        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
-      },
     },
   })
   if (!farmer) throw new Error('Farmer not found')
@@ -622,52 +619,6 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
   const gross = sum(lines.map((x) => x.gross))
   const commission = sum(lines.map((x) => x.commission))
   const payable = sum(lines.map((x) => x.payable))
-  const paid = farmer.payments.reduce((s, item) => s + item.amount.toNumber(), 0)
-  const paidNotes = farmer.payments
-    .map((p) => String(p.notes ?? '').trim())
-    .filter(Boolean)
-
-  const recentPayments = farmer.payments.slice(0, 12)
-  const paymentRows = recentPayments.map((p) => [
-    p.paymentDate.toISOString().slice(0, 10),
-    money(p.amount),
-    String(p.paymentMethod || 'CASH'),
-    p.referenceNumber === 'ADVANCE' ? (urdu ? 'ایڈوانس' : 'Advance') : (p.referenceNumber || '—'),
-    String(p.notes || '—'),
-  ])
-
-  const latestPaidNote = paidNotes.join(' · ')
-  const remaining = farmer.outstandingBalance.toNumber()
-  const remainingLabel = remaining < 0
-    ? (urdu ? 'ایڈوانس باقی' : 'Advance credit')
-    : (urdu ? 'باقی رقم' : 'Remaining balance')
-
-  const paymentBox = `<div class="payment-box">
-    <div class="head ${urdu ? 'urdu' : ''}">${urdu ? 'ادائیگیوں کا ریکارڈ (حالیہ)' : 'Payment record (recent)'}</div>
-    <div class="body">
-      ${
-        recentPayments.length === 0
-          ? `<p style="margin:0;color:#64748b">${urdu ? 'ابھی کوئی ادائیگی درج نہیں۔' : 'No payments recorded yet.'}</p>`
-          : table(
-              urdu
-                ? ['تاریخ', 'رقم', 'طریقہ', 'حوالہ', 'نوٹ']
-                : ['Date', 'Amount (PKR)', 'Method', 'Reference', 'Note'],
-              paymentRows,
-              undefined,
-              { compactCols: [0, 2], moneyCols: [1] },
-            )
-      }
-      <div class="payment-totals">
-        <div><div class="label">${urdu ? 'کل قابل ادائیگی' : 'Total payable'}</div><div class="value">PKR ${money(payable)}</div></div>
-        <div>
-          <div class="label">${urdu ? 'ادا شدہ (کل)' : 'Total paid'}</div>
-          <div class="value">PKR ${money(paid)}</div>
-          ${latestPaidNote ? `<div class="paid-note">${escape(latestPaidNote)}</div>` : ''}
-        </div>
-        <div><div class="label">${remainingLabel}</div><div class="value">PKR ${money(Math.abs(remaining))}${remaining < 0 ? (urdu ? ' (کریڈٹ)' : ' (credit)') : ''}</div></div>
-      </div>
-    </div>
-  </div>`
 
   const partyHtml = partyDetailsCard({
     title: farmer.name,
@@ -705,7 +656,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         colWidths: FARMER_COL_WIDTHS,
         overlabel: { text: uniqueProductNames(lines.map((item) => item.product)), span: 2 },
       },
-    ) + paymentBox,
+    ),
     urdu,
   )
 }
@@ -1441,12 +1392,12 @@ export async function arhatAmountMergeBillHtml(lang = 'en') {
   const partyHtml = `<div class="party-card">
     <div class="party-grid">
       <div><span class="label">${urdu ? 'آرھٹ رقم' : 'Arhat Amount'}</span><div class="value">PKR ${money(report.arhat.totalAmount)}</div></div>
-      <div><span class="label">${urdu ? 'گندم کھاتہ' : 'Wheat Khata'}</span><div class="value">PKR ${money(report.wheatKhata.totalAmount)}</div></div>
+      <div><span class="label">${urdu ? 'تمام کھاتے' : 'All khatas'}</span><div class="value">PKR ${money(report.wheatKhata.totalAmount)}</div></div>
       <div style="grid-column:1/-1"><span class="label">${urdu ? 'کل رقم' : 'Total amount'}</span><div class="value">PKR ${money(report.combined.totalAmount)}</div></div>
     </div>
   </div>`
   const summary = table(
-    urdu ? ['تفصیل', 'آرھٹ', 'گندم کھاتہ', 'کل'] : ['Particulars', 'Arhat Amount', 'Wheat Khata', 'Total'],
+    urdu ? ['تفصیل', 'آرھٹ', 'تمام کھاتے', 'کل'] : ['Particulars', 'Arhat shop', 'All khatas', 'Total'],
     [
       [urdu ? 'جمع رقم' : 'Added amount', money(report.arhat.added), money(report.wheatKhata.added), money(report.combined.added)],
       [urdu ? 'وصول رقم' : 'Receiving amount', money(report.arhat.receiving), money(report.wheatKhata.receiving), money(report.combined.receiving)],
