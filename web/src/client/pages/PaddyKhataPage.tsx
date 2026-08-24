@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Trash2, Truck, Wallet,
+  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Truck, Wallet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -47,6 +47,7 @@ function secretKey(bookId: number) {
 
 export default function PaddyKhataPage() {
   const [books, setBooks] = useState<PaddyKhataBookSummary[]>([])
+  const [archivedBooks, setArchivedBooks] = useState<PaddyKhataBookSummary[]>([])
   const [book, setBook] = useState<PaddyKhataBook | null>(null)
   const [secret, setSecret] = useState('')
   const [section, setSection] = useState<Section>('HOME')
@@ -56,9 +57,10 @@ export default function PaddyKhataPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState<PaddyKhataBookSummary | null>(null)
-  const [createForm, setCreateForm] = useState({ name: '', secret: '' })
+  const [createForm, setCreateForm] = useState({ name: '', secret: '', keepInArchive: true })
   const [unlockSecret, setUnlockSecret] = useState('')
   const [deleteBookId, setDeleteBookId] = useState<PaddyKhataBookSummary | null>(null)
+  const [completeOpen, setCompleteOpen] = useState<string | null>(null)
 
   const [amountOpen, setAmountOpen] = useState(false)
   const [partyOpen, setPartyOpen] = useState<'PURCHASE' | 'SALE' | null>(null)
@@ -89,8 +91,12 @@ export default function PaddyKhataPage() {
   const loadList = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
     try {
-      const res = await paddyKhataApi.list()
-      setBooks(res.data.data || [])
+      const [live, archived] = await Promise.all([
+        paddyKhataApi.list(),
+        paddyKhataApi.listArchived().catch(() => ({ data: { data: [] as PaddyKhataBookSummary[] } })),
+      ])
+      setBooks(live.data.data || [])
+      setArchivedBooks(archived.data.data || [])
     } catch (err) {
       toast.error(apiMessage(err, 'Could not load Paddy Khata'))
     } finally {
@@ -148,10 +154,11 @@ export default function PaddyKhataPage() {
       const res = await paddyKhataApi.create({
         name: createForm.name.trim() || undefined,
         secret: code,
+        keepInArchive: createForm.keepInArchive,
       })
-      toast.success('Paddy Khata ID created')
+      toast.success(createForm.keepInArchive ? 'Paddy Khata ID created. Extra IDs are in archive.' : 'Paddy Khata ID created')
       setCreateOpen(false)
-      setCreateForm({ name: '', secret: '' })
+      setCreateForm({ name: '', secret: '', keepInArchive: true })
       const created = res.data.data
       if (created?.id) {
         await loadBook(created.id, code)
@@ -320,7 +327,7 @@ export default function PaddyKhataPage() {
         bags: Number(processForm.bags),
         notes: processForm.notes.trim() || undefined,
       })
-      toast.success(`${processForm.bags} bags are ready in Sell Rice`)
+      toast.success(`${processForm.bags} bags of ${processOpen} are now processing. Tap Processing complete to move them to Sell Rice.`)
       setProcessOpen(null)
       setProcessForm({ riceVariety: '', bags: '', notes: '' })
       refresh()
@@ -335,11 +342,15 @@ export default function PaddyKhataPage() {
     if (!book) return
     setSaving(true)
     try {
-      await paddyKhataApi.completeProcess(book.id, { secret, variety })
-      toast.success('Process complete. Those bags are now ready rice.')
+      const res = await paddyKhataApi.completeProcess(book.id, { secret, variety })
+      const moved = res.data.data
+      const bags = moved?.bags || 0
+      toast.success(`${formatNumber(bags, 0)} bags moved to Sell Rice. You can sell only this ready stock.`)
+      setCompleteOpen(null)
+      setSection('SELL')
       refresh()
     } catch (err) {
-      toast.error(apiMessage(err, 'Could not complete process'))
+      toast.error(apiMessage(err, 'Could not complete processing'))
     } finally {
       setSaving(false)
     }
@@ -366,11 +377,14 @@ export default function PaddyKhataPage() {
     }
   }
 
-  const openSell = () => {
+  const openSell = (variety?: string) => {
     const ready = (book?.riceVarieties || []).filter((item) => item.remainingBags > 0)
+    const picked = variety
+      ? ready.find((item) => item.variety.toLowerCase() === variety.trim().toLowerCase()) || ready[0]
+      : ready[0]
     setSellForm({
       partyId: '',
-      variety: ready[0]?.variety || '',
+      variety: picked?.variety || variety || '',
       bags: '',
       bagWeightKg: '40',
       ratePer40Kg: '',
@@ -452,45 +466,95 @@ export default function PaddyKhataPage() {
         />
         {loading ? (
           <TableSkeleton rows={4} />
-        ) : !books.length ? (
-          <div className="card-3d p-8 text-center">
-            <Leaf className="h-8 w-8 mx-auto text-[#C5A059] mb-3" />
-            <p className="font-semibold">No Paddy Khata ID yet</p>
-            <p className="text-sm text-slate-500 mt-1">Tap the plus button to create one and set a secret code.</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {books.map((item) => (
-              <div key={item.id} className="card-3d p-5 text-left space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const stored = sessionStorage.getItem(secretKey(item.id))
-                    if (stored) {
-                      void loadBook(item.id, stored)
-                      setSection('HOME')
-                      return
-                    }
-                    setUnlockOpen(item)
-                    setUnlockSecret('')
-                  }}
-                  className="w-full text-left"
-                >
-                  <p className="text-xs uppercase tracking-wide text-slate-500">{item.publicId}</p>
-                  <p className="text-lg font-semibold mt-1">{item.name}</p>
-                  <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Secret code required
-                  </p>
-                </button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => setDeleteBookId(item)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </Button>
+          <div className="space-y-8">
+            {!books.length ? (
+              <div className="card-3d p-8 text-center">
+                <Leaf className="h-8 w-8 mx-auto text-[#C5A059] mb-3" />
+                <p className="font-semibold">No live Paddy Khata ID</p>
+                <p className="text-sm text-slate-500 mt-1">Create a new ID to start. Extra IDs stay in archive unless you restore them.</p>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {books.map((item) => (
+                  <div key={item.id} className="card-3d p-5 text-left space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const stored = sessionStorage.getItem(secretKey(item.id))
+                        if (stored) {
+                          void loadBook(item.id, stored)
+                          setSection('HOME')
+                          return
+                        }
+                        setUnlockOpen(item)
+                        setUnlockSecret('')
+                      }}
+                      className="w-full text-left"
+                    >
+                      <p className="text-xs uppercase tracking-wide text-slate-500">{item.publicId}</p>
+                      <p className="text-lg font-semibold mt-1">{item.name}</p>
+                      <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                        <Lock className="h-3 w-3" /> Secret code required
+                      </p>
+                    </button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setDeleteBookId(item)}
+                    >
+                      <Archive className="h-3.5 w-3.5" /> Keep in archive
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Archive className="h-4 w-4 text-[#C5A059]" />
+                <h2 className="font-semibold">Archive</h2>
+              </div>
+              <p className="text-sm text-slate-500">
+                Extra IDs are stored here permanently. Restore one to use it again. ZAFAR TRADERS and Abdul Hadi Traders stay on the live list.
+              </p>
+              {!archivedBooks.length ? (
+                <p className="text-sm text-slate-500 card-3d p-4">Archive is empty.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {archivedBooks.map((item) => (
+                    <div key={item.id} className="card-3d p-5 text-left space-y-3 border border-slate-200/80 dark:border-white/10">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">{item.publicId}</p>
+                        <p className="text-lg font-semibold mt-1">{item.name}</p>
+                        {item.archivedAt && (
+                          <p className="text-[11px] text-slate-500 mt-1">Archived {new Date(item.archivedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={saving}
+                        onClick={async () => {
+                          setSaving(true)
+                          try {
+                            await paddyKhataApi.restoreBook(item.id)
+                            toast.success(`${item.name} restored`)
+                            await loadList(true)
+                          } catch (err) {
+                            toast.error(apiMessage(err, 'Could not restore Paddy Khata ID'))
+                          } finally {
+                            setSaving(false)
+                          }
+                        }}
+                      >
+                        <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -498,6 +562,20 @@ export default function PaddyKhataPage() {
           <div className="space-y-3">
             <Input label="Name" value={createForm.name} onChange={(e) => setCreateForm((s) => ({ ...s, name: e.target.value }))} placeholder="Paddy Khata" />
             <Input label="Secret code" type="password" value={createForm.secret} onChange={(e) => setCreateForm((s) => ({ ...s, secret: e.target.value }))} placeholder="At least 4 characters" />
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-white/10 p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+                checked={createForm.keepInArchive}
+                onChange={(e) => setCreateForm((s) => ({ ...s, keepInArchive: e.target.checked }))}
+              />
+              <span>
+                <span className="font-medium">Keep extra IDs in archive</span>
+                <span className="block text-slate-500 mt-1">
+                  Other IDs leave this list and stay stored in Archive. ZAFAR TRADERS and Abdul Hadi Traders stay live.
+                </span>
+              </span>
+            </label>
             <Button className="w-full" loading={saving} onClick={() => void saveCreate()}>Save ID</Button>
           </div>
         </Modal>
@@ -510,20 +588,20 @@ export default function PaddyKhataPage() {
         <ConfirmDialog
           open={!!deleteBookId}
           onClose={() => setDeleteBookId(null)}
-          title="Delete this Paddy Khata ID?"
-          message={`${deleteBookId?.name || ''} will leave this list. The ID and its records stay stored permanently.`}
-          confirmLabel="Delete"
+          title="Keep this ID in archive?"
+          message={`${deleteBookId?.name || ''} will leave the live list. Records stay stored in Archive and can be restored.`}
+          confirmLabel="Keep in archive"
           loading={saving}
           onConfirm={async () => {
             if (!deleteBookId) return
             setSaving(true)
             try {
               await paddyKhataApi.deleteBook(deleteBookId.id)
-              toast.success('Paddy Khata ID deleted. Record is kept.')
+              toast.success('Moved to archive')
               setDeleteBookId(null)
               await loadList(true)
             } catch (err) {
-              toast.error(apiMessage(err, 'Could not delete Paddy Khata ID'))
+              toast.error(apiMessage(err, 'Could not archive Paddy Khata ID'))
             } finally {
               setSaving(false)
             }
@@ -586,12 +664,12 @@ export default function PaddyKhataPage() {
 
       <button
         type="button"
-        onClick={() => setSection('RICE')}
-        className={`card-3d p-5 text-left w-full ${section === 'RICE' ? 'ring-2 ring-[#C5A059]' : ''}`}
+        onClick={() => setSection('SELL')}
+        className={`card-3d p-5 text-left w-full ${section === 'SELL' || section === 'RICE' ? 'ring-2 ring-[#C5A059]' : ''}`}
       >
         <p className="text-xs uppercase tracking-wide text-slate-500">Rice</p>
-        <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatNumber(totals.riceInStock, 0)} bags ready</p>
-        <p className="text-xs text-slate-500 mt-1">Tap for every rice variety that is ready to sell from Process. You cannot sell more bags than are ready.</p>
+        <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatNumber(totals.riceInStock, 0)} bags in Sell Rice</p>
+        <p className="text-xs text-slate-500 mt-1">Rice appears here only after Processing complete. You can sell only the bags in these frames.</p>
       </button>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -633,7 +711,11 @@ export default function PaddyKhataPage() {
             <p className="text-xl font-semibold mt-1">{formatNumber(totals.processedBags, 0)}</p>
           </div>
           <div className="card-3d p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Rice in stock</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">In mill</p>
+            <p className="text-xl font-semibold mt-1">{formatNumber(totals.processingBags, 0)}</p>
+          </div>
+          <div className="card-3d p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Sell Rice</p>
             <p className="text-xl font-semibold mt-1">{formatNumber(totals.riceInStock, 0)}</p>
           </div>
           <div className="card-3d p-4">
@@ -806,49 +888,79 @@ export default function PaddyKhataPage() {
       {section === 'VARIETY' && (
         <div className="space-y-3">
           {!book.varieties.length ? (
-            <p className="text-sm text-slate-500">Varieties appear here after Purchase Product. Each variety gets its own frame.</p>
+            <p className="text-sm text-slate-500">Varieties appear here after Purchase Product. Process starts the mill. Processing complete moves that variety into Sell Rice frames.</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {book.varieties.map((item) => (
-                <div key={item.variety} className="card-3d p-5 space-y-3">
-                  <div>
-                    <p className="text-lg font-semibold">{item.variety}</p>
-                    <p className="text-xs text-slate-500">
-                      Processed bags go to Sell Rice. You can sell only the bags ready for this variety.
-                    </p>
+              {book.varieties.map((item) => {
+                const milling = item.processingBags > 0
+                const readyToMove = milling
+                return (
+                  <div key={item.variety} className="card-3d p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold">{item.variety}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Process starts milling. Processing complete moves these bags to a Sell Rice frame.
+                        </p>
+                      </div>
+                      {milling ? (
+                        <span className="shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                          Processing
+                        </span>
+                      ) : item.remainingBags > 0 ? (
+                        <span className="shrink-0 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                          In stock
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                          In Sell Rice
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={item.remainingBags <= 0}
+                        onClick={() => {
+                          setProcessOpen(item.variety)
+                          setProcessForm({ riceVariety: item.variety, bags: String(item.remainingBags || ''), notes: '' })
+                        }}
+                      >
+                        Process
+                      </Button>
+                      {readyToMove && (
+                        <Button size="sm" variant="secondary" onClick={() => setCompleteOpen(item.variety)}>
+                          Processing complete
+                        </Button>
+                      )}
+                      <Button size="sm" variant="secondary" onClick={() => { setExpenseOpen(item.variety); setExpenseForm({ amount: '', reason: '' }) }}>Pay Bill/Amount</Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <p>Total bags {formatNumber(item.bags, 0)}</p>
+                      <p className={milling ? 'font-semibold text-amber-800 dark:text-amber-300' : ''}>Processing {formatNumber(item.processingBags, 0)}</p>
+                      <p>Moved to Sell Rice {formatNumber(item.completedBags, 0)}</p>
+                      <p>Left on variety {formatNumber(item.remainingBags, 0)}</p>
+                      <p>Product {formatCurrency(item.totalPrice)}</p>
+                      <p className="font-medium">Total amount {formatCurrency(item.runningAmount)}</p>
+                    </div>
+                    {item.lines.map((row) => (
+                      <p key={row.id} className="text-xs text-slate-500">
+                        {row.day} · {row.partyName} · {formatNumber(row.bags, 0)} bags · {formatNumber(row.bagWeightKg, 2)} kg/bag · rate {formatCurrency(row.ratePer40Kg)} / 40 kg · {formatCurrency(row.totalPrice)}
+                      </p>
+                    ))}
+                    {book.processes.filter((row) => row.variety === item.variety).map((row) => (
+                      <p key={row.id} className={`text-xs ${row.status === 'PROCESSING' ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                        {row.status === 'PROCESSING' ? 'In mill' : 'Moved to Sell Rice'} {formatNumber(row.bags, 0)} bags as {row.riceVariety} · {row.date}
+                      </p>
+                    ))}
+                    {item.expenses.map((row) => (
+                      <p key={row.id} className="text-xs text-rose-700 dark:text-rose-400">
+                        Bill {formatCurrency(row.amount)} · {row.reason} · {row.date}
+                      </p>
+                    ))}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => { setProcessOpen(item.variety); setProcessForm({ riceVariety: item.variety, bags: String(item.remainingBags || ''), notes: '' }) }}>Process</Button>
-                    {item.processingBags > 0 && (
-                      <Button size="sm" variant="secondary" loading={saving} onClick={() => void saveComplete(item.variety)}>Process Complete</Button>
-                    )}
-                    <Button size="sm" variant="secondary" onClick={() => { setExpenseOpen(item.variety); setExpenseForm({ amount: '', reason: '' }) }}>Pay Bill/Amount</Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p>Total bags {formatNumber(item.bags, 0)}</p>
-                    <p>Processing {formatNumber(item.processingBags, 0)}</p>
-                    <p>Ready rice {formatNumber(item.completedBags, 0)}</p>
-                    <p>Left {formatNumber(item.remainingBags, 0)}</p>
-                    <p>Product {formatCurrency(item.totalPrice)}</p>
-                    <p className="font-medium">Total amount {formatCurrency(item.runningAmount)}</p>
-                  </div>
-                  {item.lines.map((row) => (
-                    <p key={row.id} className="text-xs text-slate-500">
-                      {row.day} · {row.partyName} · {formatNumber(row.bags, 0)} bags · {formatNumber(row.bagWeightKg, 2)} kg/bag · rate {formatCurrency(row.ratePer40Kg)} / 40 kg · {formatCurrency(row.totalPrice)}
-                    </p>
-                  ))}
-                  {book.processes.filter((row) => row.variety === item.variety).map((row) => (
-                    <p key={row.id} className={`text-xs ${row.status === 'PROCESSING' ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                      {row.status === 'PROCESSING' ? 'Processing' : 'Ready to sell'} {formatNumber(row.bags, 0)} bags as {row.riceVariety} · {row.date}
-                    </p>
-                  ))}
-                  {item.expenses.map((row) => (
-                    <p key={row.id} className="text-xs text-rose-700 dark:text-rose-400">
-                      Bill {formatCurrency(row.amount)} · {row.reason} · {row.date}
-                    </p>
-                  ))}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -856,19 +968,17 @@ export default function PaddyKhataPage() {
 
       {section === 'RICE' && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Ready rice {formatNumber(totals.riceInStock, 0)} bags · sold {formatNumber(totals.soldBags, 0)}. Process a variety to send bags here, then sell them in Sell Rice. You cannot sell more than the bags ready for that variety.</p>
+          <p className="text-sm text-slate-500">Ready rice in Sell Rice: {formatNumber(totals.riceInStock, 0)} bags · sold {formatNumber(totals.soldBags, 0)}. Tap Processing complete on a variety to move bags here. You cannot sell more than the bags in these frames.</p>
           {!book.riceVarieties.length ? (
-            <p className="text-sm text-slate-500">No rice is ready yet.</p>
+            <p className="text-sm text-slate-500">No rice is in Sell Rice yet. Process a variety, then tap Processing complete.</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {book.riceVarieties.map((item) => (
-                <div key={item.variety} className="card-3d p-5 space-y-2">
-                  <p className="text-lg font-semibold">{item.variety}</p>
-                  <p className="text-sm">Rice bags {formatNumber(item.bags, 0)} · sold {formatNumber(item.soldBags, 0)} · ready {formatNumber(item.remainingBags, 0)}</p>
-                  {item.lines.map((row) => (
-                    <p key={row.id} className="text-xs text-slate-500">{row.day} · {row.date} · {formatNumber(row.bags, 0)} bags{row.notes ? ` · ${row.notes}` : ''}</p>
-                  ))}
-                </div>
+                <RiceSellFrame
+                  key={item.variety}
+                  item={item}
+                  onSell={() => openSell(item.variety)}
+                />
               ))}
             </div>
           )}
@@ -876,16 +986,33 @@ export default function PaddyKhataPage() {
       )}
 
       {section === 'SELL' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold mb-1">Sell Rice</h3>
+            <p className="text-sm text-slate-500 mb-3">Sell only the bags that have been moved here from Variety. Each frame is a processed rice variety.</p>
+            {!book.riceVarieties.length ? (
+              <p className="text-sm text-slate-500 card-3d p-4">No rice is ready. Open Variety, tap Process, then Processing complete.</p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {book.riceVarieties.map((item) => (
+                  <RiceSellFrame
+                    key={item.variety}
+                    item={item}
+                    onSell={() => openSell(item.variety)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
-            <Button onClick={() => openSell()}><ShoppingBag className="h-4 w-4" /> Sell Rice</Button>
+            <Button onClick={() => openSell()} disabled={!book.riceVarieties.some((item) => item.remainingBags > 0)}><ShoppingBag className="h-4 w-4" /> Sell Rice</Button>
             <Button variant="secondary" onClick={() => { setReceiveForm({ partyId: '', amount: '', notes: '' }); setReceiveOpen(true) }}><Wallet className="h-4 w-4" /> Receive Amount</Button>
           </div>
           <PartyCards
             parties={book.saleParties}
             mode="SALE"
-            empty="Add a rice party, then sell rice. Receive Amount is inside this screen, party by party."
+            empty="Add a rice party, then sell rice from the frames above. Receive Amount is inside this screen, party by party."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setReceiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setReceiveOpen(true) }}
             cashLabel="Receive Amount"
@@ -956,11 +1083,31 @@ export default function PaddyKhataPage() {
 
       <Modal open={!!processOpen} onClose={() => setProcessOpen(null)} title={`Process ${processOpen || ''}`}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">These bags become ready rice and can be sold in Sell Rice. You cannot sell more bags than you process for this variety.</p>
+          <p className="text-sm text-slate-500">This starts milling. Bags stay on this variety until you tap Processing complete, which moves them into a Sell Rice frame. You cannot sell them before that.</p>
           <Input label="Variety of rice" value={processForm.riceVariety} onChange={(e) => setProcessForm((s) => ({ ...s, riceVariety: e.target.value }))} />
           <Input label="No. of bags" type="number" min="1" value={processForm.bags} onChange={(e) => setProcessForm((s) => ({ ...s, bags: e.target.value }))} />
           <Input label="Note (optional)" value={processForm.notes} onChange={(e) => setProcessForm((s) => ({ ...s, notes: e.target.value }))} />
-          <Button className="w-full" loading={saving} onClick={() => void saveProcess()}>Process</Button>
+          <Button className="w-full" loading={saving} onClick={() => void saveProcess()}>Start processing</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!completeOpen} onClose={() => setCompleteOpen(null)} title="Processing complete">
+        <div className="space-y-3">
+          {(() => {
+            const frame = book.varieties.find((row) => row.variety === completeOpen)
+            return (
+              <>
+                <p className="text-sm text-slate-500">
+                  {frame
+                    ? `${formatNumber(frame.processingBags, 0)} bags of ${frame.variety} will move from Variety to a Sell Rice frame. You can then sell only that ready stock.`
+                    : 'This variety will move to Sell Rice.'}
+                </p>
+                <Button className="w-full" loading={saving} onClick={() => completeOpen && void saveComplete(completeOpen)}>
+                  Move to Sell Rice
+                </Button>
+              </>
+            )
+          })()}
         </div>
       </Modal>
 
@@ -1011,7 +1158,7 @@ export default function PaddyKhataPage() {
             onChange={(e) => setSellForm((s) => ({ ...s, bags: e.target.value }))}
           />
           {selectedRiceStock && (
-            <p className="text-sm text-slate-500">Ready to sell: {formatNumber(riceReady, 0)} bags of {selectedRiceStock.variety}. You cannot sell more than this.</p>
+            <p className="text-sm text-slate-500">Ready to sell: {formatNumber(riceReady, 0)} bags of {selectedRiceStock.variety} in Sell Rice. You cannot sell more than this.</p>
           )}
           <Input label="Weight of one bag" type="number" value={sellForm.bagWeightKg} onChange={(e) => setSellForm((s) => ({ ...s, bagWeightKg: e.target.value }))} />
           <Input label="Rate per 40 KG" type="number" value={sellForm.ratePer40Kg} onChange={(e) => setSellForm((s) => ({ ...s, ratePer40Kg: e.target.value }))} />
@@ -1034,6 +1181,49 @@ export default function PaddyKhataPage() {
           <Button className="w-full" loading={saving} onClick={() => void saveReceive()}>Save</Button>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+function RiceSellFrame({
+  item,
+  onSell,
+}: {
+  item: PaddyKhataBook['riceVarieties'][number]
+  onSell: () => void
+}) {
+  const ready = item.remainingBags > 0
+  return (
+    <div className="card-3d p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-[#C5A059]">Sell Rice</p>
+          <p className="text-lg font-semibold mt-0.5">{item.variety}</p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${ready ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10'}`}>
+          {ready ? 'Ready' : 'Sold'}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Processed</p>
+          <p className="font-semibold">{formatNumber(item.bags, 0)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Sold</p>
+          <p className="font-semibold">{formatNumber(item.soldBags, 0)}</p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Can sell</p>
+          <p className="font-semibold text-emerald-700 dark:text-emerald-400">{formatNumber(item.remainingBags, 0)}</p>
+        </div>
+      </div>
+      {item.lines.map((row) => (
+        <p key={row.id} className="text-xs text-slate-500">{row.day} · {row.date} · {formatNumber(row.bags, 0)} bags{row.notes ? ` · ${row.notes}` : ''}</p>
+      ))}
+      <Button size="sm" disabled={!ready} onClick={onSell}>
+        <ShoppingBag className="h-3.5 w-3.5" /> Sell {formatNumber(item.remainingBags, 0)} bags
+      </Button>
     </div>
   )
 }

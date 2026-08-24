@@ -142,6 +142,7 @@ model BusinessSettings {
   hijriAdjustmentDays          Int      @default(0) @map("hijri_adjustment_days")
   stockZeroedAt                DateTime? @map("stock_zeroed_at")
   paddyExtraIdsPrunedAt        DateTime? @map("paddy_extra_ids_pruned_at")
+  paddyLegacyIdsArchivedAt     DateTime? @map("paddy_legacy_ids_archived_at")
   createdAt                    DateTime @default(now()) @map("created_at")
   updatedAt                    DateTime @updatedAt @map("updated_at")
 
@@ -704,9 +705,10 @@ model PaddyKhataBook {
   publicId    String   @map("public_id") @db.VarChar(40)
   name        String   @db.VarChar(255)
   secretHash  String   @map("secret_hash") @db.VarChar(255)
-  createdById BigInt   @map("created_by_id")
-  deleted     Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdById BigInt    @map("created_by_id")
+  deleted     Boolean   @default(false)
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   amounts     PaddyKhataAmount[]
   parties     PaddyKhataParty[]

@@ -767,6 +767,9 @@ async function dispatch(
     if (path.length === 1 && method === 'POST') {
       return result(await paddyKhata.createBook(userId, payload), 'Paddy Khata ID created', 201)
     }
+    if (path[1] === 'archive' && path.length === 2 && method === 'GET') {
+      return result(await paddyKhata.listArchivedBooks(userId))
+    }
     if (path[1] === 'preview' && method === 'POST') {
       return result(paddyKhata.previewPurchase(payload))
     }
@@ -777,7 +780,10 @@ async function dispatch(
       return result(await paddyKhata.getBook(id, userId, secret))
     }
     if (path.length === 2 && method === 'DELETE') {
-      return result(await paddyKhata.deleteBook(id, userId), 'Paddy Khata ID deleted')
+      return result(await paddyKhata.deleteBook(id, userId), 'Paddy Khata ID moved to archive')
+    }
+    if (path[2] === 'restore' && method === 'POST') {
+      return result(await paddyKhata.restoreBook(id, userId), 'Paddy Khata ID restored')
     }
     if (path[2] === 'amounts' && method === 'POST') {
       return result(await paddyKhata.addAmount(id, userId, payload), 'Amount added', 201)
@@ -819,10 +825,10 @@ async function dispatch(
       return result(await paddyKhata.transferTo(id, userId, payload), 'Amount sent to khata', 201)
     }
     if (path[2] === 'process' && path[3] === 'complete' && method === 'POST') {
-      return result(await paddyKhata.completeProcess(id, userId, payload), 'Process complete. Rice is ready to sell.')
+      return result(await paddyKhata.completeProcess(id, userId, payload), 'Processing complete. Rice moved to Sell Rice.')
     }
     if (path[2] === 'process' && method === 'POST') {
-      return result(await paddyKhata.addProcess(id, userId, payload), 'Processed. Those bags are ready in Sell Rice.', 201)
+      return result(await paddyKhata.addProcess(id, userId, payload), 'Processing started. Tap Processing complete to move this variety to Sell Rice.', 201)
     }
     if (path[2] === 'expenses' && method === 'POST') {
       return result(await paddyKhata.addExpense(id, userId, payload), 'Bill paid', 201)

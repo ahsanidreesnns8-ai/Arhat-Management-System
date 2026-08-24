@@ -138,12 +138,16 @@ function bookSummary(row: {
   publicId: string
   name: string
   createdAt: Date
+  archivedAt?: Date | null
+  deleted?: boolean
 }) {
   return {
     id: Number(row.id),
     publicId: row.publicId,
     name: row.name,
     createdAt: row.createdAt.toISOString(),
+    archived: Boolean(row.deleted),
+    archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
   }
 }
 
@@ -168,37 +172,75 @@ export async function requireBook(
 
 const KEEP_PADDY_NAMES = new Set(['ZAFAR TRADERS', 'ABDUL HADI TRADERS'])
 
-function keepPaddyName(name: string) {
-  return KEEP_PADDY_NAMES.has(name.trim().replace(/\s+/g, ' ').toUpperCase())
+function normalizePaddyName(name: string) {
+  return name
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
 }
 
-async function pruneExtraPaddyBooks(userId: bigint) {
+function keepPaddyName(name: string) {
+  return KEEP_PADDY_NAMES.has(normalizePaddyName(name))
+}
+
+function sameVariety(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
+}
+
+async function archiveLegacyExtraPaddyBooks() {
   const settings = await prisma.businessSettings.findFirst()
-  if (!settings || settings.paddyExtraIdsPrunedAt) return
+  if (!settings || settings.paddyLegacyIdsArchivedAt) return
+  const rows = await prisma.paddyKhataBook.findMany({
+    where: { deleted: false },
+    select: { id: true, name: true },
+  })
+  const extras = rows.filter((row) => !keepPaddyName(row.name))
+  const now = new Date()
+  if (extras.length) {
+    await prisma.paddyKhataBook.updateMany({
+      where: { id: { in: extras.map((row) => row.id) } },
+      data: { deleted: true, archivedAt: now },
+    })
+  }
+  await prisma.businessSettings.update({
+    where: { id: settings.id },
+    data: { paddyLegacyIdsArchivedAt: now, paddyExtraIdsPrunedAt: settings.paddyExtraIdsPrunedAt ?? now },
+  })
+}
+
+async function archiveExtraPaddyBooks(userId: bigint, exceptId?: bigint) {
   const rows = await prisma.paddyKhataBook.findMany({
     where: { deleted: false, createdById: userId },
     select: { id: true, name: true },
   })
-  const extras = rows.filter((row) => !keepPaddyName(row.name))
-  if (extras.length) {
-    await prisma.paddyKhataBook.updateMany({
-      where: { id: { in: extras.map((row) => row.id) } },
-      data: { deleted: true },
-    })
-  }
-  if (settings) {
-    await prisma.businessSettings.update({
-      where: { id: settings.id },
-      data: { paddyExtraIdsPrunedAt: new Date() },
-    })
-  }
+  const extras = rows.filter((row) => {
+    if (exceptId && row.id === exceptId) return false
+    return !keepPaddyName(row.name)
+  })
+  if (!extras.length) return extras.length
+  await prisma.paddyKhataBook.updateMany({
+    where: { id: { in: extras.map((row) => row.id) } },
+    data: { deleted: true, archivedAt: new Date() },
+  })
+  return extras.length
 }
 
 export async function listBooks(userId: bigint) {
-  await pruneExtraPaddyBooks(userId)
+  await archiveLegacyExtraPaddyBooks()
   const rows = await prisma.paddyKhataBook.findMany({
     where: { deleted: false, createdById: userId },
     orderBy: { createdAt: 'desc' },
+  })
+  return rows.map(bookSummary)
+}
+
+export async function listArchivedBooks(userId: bigint) {
+  await archiveLegacyExtraPaddyBooks()
+  const rows = await prisma.paddyKhataBook.findMany({
+    where: { deleted: true, createdById: userId },
+    orderBy: { archivedAt: 'desc' },
   })
   return rows.map(bookSummary)
 }
@@ -207,19 +249,32 @@ export async function deleteBook(bookId: number | bigint, userId: bigint) {
   const book = await findOwnedBook(bookId, userId)
   await prisma.paddyKhataBook.update({
     where: { id: book.id },
-    data: { deleted: true },
+    data: { deleted: true, archivedAt: new Date() },
   })
-  return { id: Number(book.id), publicId: book.publicId, name: book.name, deleted: true }
+  return { id: Number(book.id), publicId: book.publicId, name: book.name, archived: true }
+}
+
+export async function restoreBook(bookId: number | bigint, userId: bigint) {
+  const book = await prisma.paddyKhataBook.findFirst({
+    where: { id: BigInt(bookId), deleted: true, createdById: userId },
+  })
+  if (!book) throw new Error('Archived Paddy Khata ID not found')
+  const row = await prisma.paddyKhataBook.update({
+    where: { id: book.id },
+    data: { deleted: false, archivedAt: null },
+  })
+  return bookSummary(row)
 }
 
 export async function createBook(
   userId: bigint,
-  input: { name?: unknown; secret?: unknown },
+  input: { name?: unknown; secret?: unknown; keepInArchive?: unknown },
 ) {
   const name = String(input.name ?? '').trim() || 'Paddy Khata'
   const secret = parseSecret(input.secret)
   const secretHash = await hash(secret, 10)
   const publicId = `PK-${Date.now().toString(36).toUpperCase()}`
+  const keepInArchive = input.keepInArchive !== false && input.keepInArchive !== 'false'
   const row = await prisma.paddyKhataBook.create({
     data: {
       publicId,
@@ -228,6 +283,9 @@ export async function createBook(
       createdById: userId,
     },
   })
+  if (keepInArchive) {
+    await archiveExtraPaddyBooks(userId, row.id)
+  }
   return bookSummary(row)
 }
 
@@ -749,32 +807,24 @@ export async function addProcess(
   const riceVariety = String(input.riceVariety ?? '').trim() || variety
   const bags = parseCount(input.bags, 'number of bags')
   const snapshot = await getBook(book.id, userId, input.secret)
-  const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
+  const frame = snapshot.varieties.find((row) => sameVariety(row.variety, variety))
   if (!frame) throw new Error('This variety has no purchased stock')
+  if (frame.remainingBags <= 0) {
+    throw new Error(`${frame.variety} is already in mill or in Sell Rice`)
+  }
   if (bags > frame.remainingBags) {
     throw new Error(`Only ${frame.remainingBags} bags of ${frame.variety} are left to process`)
   }
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.paddyKhataProcess.create({
-      data: {
-        bookId: book.id,
-        variety: frame.variety,
-        riceVariety,
-        partyName: '',
-        bags,
-        status: 'COMPLETE',
-        notes: parseOptionalText(input.notes),
-      },
-    })
-    await tx.paddyKhataRice.create({
-      data: {
-        bookId: book.id,
-        variety: riceVariety,
-        bags,
-        notes: parseOptionalText(input.notes) || `Processed from ${frame.variety}`,
-      },
-    })
-    return row
+  const created = await prisma.paddyKhataProcess.create({
+    data: {
+      bookId: book.id,
+      variety: frame.variety,
+      riceVariety,
+      partyName: '',
+      bags,
+      status: 'PROCESSING',
+      notes: parseOptionalText(input.notes),
+    },
   })
   return {
     id: Number(created.id),
@@ -794,12 +844,13 @@ export async function completeProcess(
   const variety = String(input.variety ?? '').trim()
   if (!variety) throw new Error('Choose a variety')
   const snapshot = await getBook(book.id, userId, input.secret)
-  const frame = snapshot.varieties.find((row) => row.variety.toLowerCase() === variety.toLowerCase())
+  const frame = snapshot.varieties.find((row) => sameVariety(row.variety, variety))
   if (!frame) throw new Error('This variety has no purchased stock')
-  const open = await prisma.paddyKhataProcess.findMany({
-    where: { bookId: book.id, variety: frame.variety, status: 'PROCESSING' },
+  const openRows = await prisma.paddyKhataProcess.findMany({
+    where: { bookId: book.id, status: 'PROCESSING' },
     orderBy: { createdAt: 'asc' },
   })
+  const open = openRows.filter((row) => sameVariety(row.variety, frame.variety))
   if (!open.length) throw new Error('Nothing is processing for this variety')
   const created = await prisma.$transaction(async (tx) => {
     const lots = []
@@ -810,18 +861,19 @@ export async function completeProcess(
           bookId: book.id,
           variety: riceVariety,
           bags: job.bags,
-          notes: `Processed from ${frame.variety}`,
+          notes: `Moved from ${frame.variety} to Sell Rice`,
         },
       })
       await tx.paddyKhataProcess.update({
         where: { id: job.id },
         data: { status: 'COMPLETE', riceVariety },
       })
-      lots.push({ riceVariety, bags: job.bags, partyName: job.partyName })
+      lots.push({ riceVariety, bags: job.bags })
     }
     return lots
   })
-  return { variety: frame.variety, lots: created }
+  const movedBags = created.reduce((sum, lot) => sum + lot.bags, 0)
+  return { variety: frame.variety, bags: movedBags, lots: created }
 }
 
 export async function addExpense(
@@ -906,7 +958,7 @@ export async function addSale(
   const riceLeft = riceFrame ? riceFrame.remainingBags : 0
   if (preview.bags > riceLeft) {
     throw new Error(
-      `Only ${riceLeft} bags of ${riceFrame?.variety || variety} are ready to sell. Process that variety first.`,
+      `Only ${riceLeft} bags of ${riceFrame?.variety || variety} are in Sell Rice. Complete processing before selling more.`,
     )
   }
   const row = await prisma.paddyKhataSale.create({
