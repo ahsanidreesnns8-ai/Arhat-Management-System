@@ -488,7 +488,7 @@ export interface RegisterEntry {
 
 export interface KhataTreasuryLine {
   id: number
-  kind: 'BANK' | 'TRANSFER_IN' | 'TRANSFER_OUT' | string
+  kind: 'BANK' | 'BANK_OUT' | 'EXPENSE' | 'TRANSFER_IN' | 'TRANSFER_OUT' | string
   amount: number
   bankName?: string | null
   counterBookType?: string | null
@@ -499,6 +499,52 @@ export interface KhataTreasuryLine {
   day: string
   date: string
   time: string
+}
+
+export interface KhataBankGroup {
+  bankName: string
+  deposited: number
+  withdrawn: number
+  remaining: number
+}
+
+export interface KhataLedgerEntry {
+  id: number
+  kind: 'GIVING' | 'RECEIVING' | string
+  amount: number
+  notes?: string | null
+  createdAt: string
+  day: string
+  date: string
+  time: string
+}
+
+export interface KhataLedgerPerson {
+  id: number
+  name: string
+  address?: string | null
+  notes?: string | null
+  createdAt: string
+  cashGiven: number
+  cashReceived: number
+  givenCount?: number
+  receivedCount?: number
+  productIn: number
+  productOut: number
+  remainingToGive: number
+  remainingToReceive: number
+  displayLabel: string
+  entries?: KhataLedgerEntry[]
+  lines?: Array<{
+    createdAt: string
+    particular: string
+    addition: number
+    deduction: number
+    kind: string
+    day?: string
+    date?: string
+    time?: string
+  }>
 }
 
 export interface KhataHead {
@@ -636,6 +682,9 @@ export interface WheatKhataBook {
     inHand: number
     borrowedIn: number
     borrowedOut: number
+    givingToPerson?: number
+    receivingFromPerson?: number
+    otherExpenseTotal?: number
     bagsReceived: number
     bagsGiven: number
     bagsInStock: number
@@ -643,7 +692,11 @@ export interface WheatKhataBook {
   }
   money: WheatKhataMoney[]
   banks: KhataTreasuryLine[]
+  bankGroups?: KhataBankGroup[]
+  withdrawals?: KhataTreasuryLine[]
+  otherExpenses?: KhataTreasuryLine[]
   transfers: KhataTreasuryLine[]
+  people?: KhataLedgerPerson[]
   parties: WheatKhataParty[]
   companies: WheatKhataParty[]
 }
@@ -752,6 +805,8 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
     inHand: number
     borrowedIn: number
     borrowedOut: number
+    givingToPerson?: number
+    receivingFromPerson?: number
     paddyBags: number
     processingBags: number
     processedBags: number
@@ -762,7 +817,11 @@ export interface PaddyKhataBook extends PaddyKhataBookSummary {
   }
   amounts: PaddyKhataMoneyLine[]
   banks: KhataTreasuryLine[]
+  bankGroups?: KhataBankGroup[]
+  withdrawals?: KhataTreasuryLine[]
+  otherExpenses?: KhataTreasuryLine[]
   transfers: KhataTreasuryLine[]
+  people?: KhataLedgerPerson[]
   purchaseParties: PaddyKhataParty[]
   saleParties: PaddyKhataParty[]
   purchases: PaddyKhataPurchase[]

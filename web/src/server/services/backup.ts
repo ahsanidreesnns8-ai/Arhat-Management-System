@@ -249,6 +249,8 @@ export async function getShopStorage() {
 export async function wipeShopData(userId?: bigint) {
   await basePrisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      khata_ledger_entries,
+      khata_ledger_people,
       sale_items,
       queue_entries,
       payments,

@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Truck, Wallet,
+  ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Trash2, Truck, Wallet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { billApi, paddyKhataApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useLiveReload } from '../context/SyncContext'
 import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
+import KhataPersonLedger from '../components/khata/KhataPersonLedger'
 import type { PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataParty } from '../types'
 
 type Section =
@@ -56,6 +58,7 @@ export default function PaddyKhataPage() {
   const [unlockOpen, setUnlockOpen] = useState<PaddyKhataBookSummary | null>(null)
   const [createForm, setCreateForm] = useState({ name: '', secret: '' })
   const [unlockSecret, setUnlockSecret] = useState('')
+  const [deleteBookId, setDeleteBookId] = useState<PaddyKhataBookSummary | null>(null)
 
   const [amountOpen, setAmountOpen] = useState(false)
   const [partyOpen, setPartyOpen] = useState<'PURCHASE' | 'SALE' | null>(null)
@@ -458,27 +461,35 @@ export default function PaddyKhataPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {books.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  const stored = sessionStorage.getItem(secretKey(item.id))
-                  if (stored) {
-                    void loadBook(item.id, stored)
-                    setSection('HOME')
-                    return
-                  }
-                  setUnlockOpen(item)
-                  setUnlockSecret('')
-                }}
-                className="card-3d p-5 text-left hover:bg-slate-50 dark:hover:bg-white/5"
-              >
-                <p className="text-xs uppercase tracking-wide text-slate-500">{item.publicId}</p>
-                <p className="text-lg font-semibold mt-1">{item.name}</p>
-                <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-                  <Lock className="h-3 w-3" /> Secret code required
-                </p>
-              </button>
+              <div key={item.id} className="card-3d p-5 text-left space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const stored = sessionStorage.getItem(secretKey(item.id))
+                    if (stored) {
+                      void loadBook(item.id, stored)
+                      setSection('HOME')
+                      return
+                    }
+                    setUnlockOpen(item)
+                    setUnlockSecret('')
+                  }}
+                  className="w-full text-left"
+                >
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{item.publicId}</p>
+                  <p className="text-lg font-semibold mt-1">{item.name}</p>
+                  <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Secret code required
+                  </p>
+                </button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => setDeleteBookId(item)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </Button>
+              </div>
             ))}
           </div>
         )}
@@ -496,6 +507,28 @@ export default function PaddyKhataPage() {
             <Button className="w-full" loading={saving} onClick={() => void saveUnlock()}>Open</Button>
           </div>
         </Modal>
+        <ConfirmDialog
+          open={!!deleteBookId}
+          onClose={() => setDeleteBookId(null)}
+          title="Delete this Paddy Khata ID?"
+          message={`${deleteBookId?.name || ''} will leave this list. The ID and its records stay stored permanently.`}
+          confirmLabel="Delete"
+          loading={saving}
+          onConfirm={async () => {
+            if (!deleteBookId) return
+            setSaving(true)
+            try {
+              await paddyKhataApi.deleteBook(deleteBookId.id)
+              toast.success('Paddy Khata ID deleted. Record is kept.')
+              setDeleteBookId(null)
+              await loadList(true)
+            } catch (err) {
+              toast.error(apiMessage(err, 'Could not delete Paddy Khata ID'))
+            } finally {
+              setSaving(false)
+            }
+          }}
+        />
       </div>
     )
   }
@@ -537,6 +570,17 @@ export default function PaddyKhataPage() {
         <button type="button" onClick={() => setSection('PURCHASE')} className="card-3d p-5 text-left">
           <p className="text-xs uppercase tracking-wide text-slate-500">Giving amount</p>
           <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingAmount)}</p>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Giving to person</p>
+          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingToPerson || 0)}</p>
+        </button>
+        <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving from person</p>
+          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
         </button>
       </div>
 
@@ -607,6 +651,8 @@ export default function PaddyKhataPage() {
           <KhataTreasuryPanel
             inHand={totals.inHand || 0}
             banks={book.banks || []}
+            bankGroups={book.bankGroups}
+            expenses={book.otherExpenses}
             transfers={book.transfers || []}
             saving={saving}
             loadHeads={async () => {
@@ -622,10 +668,75 @@ export default function PaddyKhataPage() {
                 setSaving(false)
               }
             }}
+            onReceiveBank={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.receiveBank(book.id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onExpense={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.addOtherExpense(book.id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
             onTransfer={async (input) => {
               setSaving(true)
               try {
                 await paddyKhataApi.transferTo(book.id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+          />
+          <KhataPersonLedger
+            inHand={totals.inHand || 0}
+            people={book.people || []}
+            givingToPerson={totals.givingToPerson || 0}
+            receivingFromPerson={totals.receivingFromPerson || 0}
+            saving={saving}
+            onGive={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.addPersonCash(book.id, { secret, ...input, kind: 'GIVING' })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onReceive={async (input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.addPersonCash(book.id, { secret, ...input, kind: 'RECEIVING' })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onLoadPerson={async (id) => {
+              const res = await paddyKhataApi.getPerson(book.id, id, secret)
+              return res.data.data
+            }}
+            onUpdate={async (id, input) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.updatePerson(book.id, id, { secret, ...input })
+                refresh()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onDelete={async (id) => {
+              setSaving(true)
+              try {
+                await paddyKhataApi.deletePerson(book.id, id, secret)
                 refresh()
               } finally {
                 setSaving(false)

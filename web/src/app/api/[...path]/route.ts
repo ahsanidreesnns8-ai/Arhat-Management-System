@@ -710,6 +710,24 @@ async function dispatch(
     if (path[2] === 'bank' && method === 'POST') {
       return result(await wheatKhata.addBank(payload, bookKey, access), 'Bank amount saved', 201)
     }
+    if (path[2] === 'bank-receive' && method === 'POST') {
+      return result(await wheatKhata.receiveBank(payload, bookKey, access), 'Received from bank', 201)
+    }
+    if (path[2] === 'other-expense' && method === 'POST') {
+      return result(await wheatKhata.addOtherExpense(payload, bookKey, access), 'Other expense saved', 201)
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'GET') {
+      return result(await wheatKhata.getLedgerPerson(numericId(path[3]), bookKey, access))
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'PUT') {
+      return result(await wheatKhata.updateLedgerPerson(numericId(path[3]), payload, bookKey, access), 'Person updated')
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'DELETE') {
+      return result(await wheatKhata.deleteLedgerPerson(numericId(path[3]), bookKey, access), 'Person deleted')
+    }
+    if (path[2] === 'people' && method === 'POST') {
+      return result(await wheatKhata.addLedgerCash(payload, bookKey, access), 'Amount saved', 201)
+    }
     if (path[2] === 'transfer' && method === 'POST') {
       return result(await wheatKhata.transferTo(payload, bookKey, access), 'Amount sent to khata', 201)
     }
@@ -758,6 +776,9 @@ async function dispatch(
     if (path.length === 2 && method === 'GET') {
       return result(await paddyKhata.getBook(id, userId, secret))
     }
+    if (path.length === 2 && method === 'DELETE') {
+      return result(await paddyKhata.deleteBook(id, userId), 'Paddy Khata ID deleted')
+    }
     if (path[2] === 'amounts' && method === 'POST') {
       return result(await paddyKhata.addAmount(id, userId, payload), 'Amount added', 201)
     }
@@ -775,6 +796,24 @@ async function dispatch(
     }
     if (path[2] === 'bank' && method === 'POST') {
       return result(await paddyKhata.addBank(id, userId, payload), 'Bank amount saved', 201)
+    }
+    if (path[2] === 'bank-receive' && method === 'POST') {
+      return result(await paddyKhata.receiveBank(id, userId, payload), 'Received from bank', 201)
+    }
+    if (path[2] === 'other-expense' && method === 'POST') {
+      return result(await paddyKhata.addOtherExpense(id, userId, payload), 'Other expense saved', 201)
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'GET') {
+      return result(await paddyKhata.getLedgerPerson(id, userId, numericId(path[3]), secret))
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'PUT') {
+      return result(await paddyKhata.updateLedgerPerson(id, userId, numericId(path[3]), payload), 'Person updated')
+    }
+    if (path[2] === 'people' && path.length === 4 && method === 'DELETE') {
+      return result(await paddyKhata.deleteLedgerPerson(id, userId, numericId(path[3]), secret), 'Person deleted')
+    }
+    if (path[2] === 'people' && method === 'POST') {
+      return result(await paddyKhata.addLedgerCash(id, userId, payload), 'Amount saved', 201)
     }
     if (path[2] === 'transfer' && method === 'POST') {
       return result(await paddyKhata.transferTo(id, userId, payload), 'Amount sent to khata', 201)

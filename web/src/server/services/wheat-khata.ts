@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { d, roundRupee, totalWeight } from '@/server/money'
 import { requireOwnedBook, resolveShopBook } from '@/server/services/grain-khata'
-import { addBank as parkInBank, listHeads, loadTreasury, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
+import { addBank as parkInBank, addOtherExpense as parkExpense, listHeads, loadTreasury, receiveFromBank as takeFromBank, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
+import { addPersonCash, deletePerson, getPerson, listPeople, updatePerson } from '@/server/services/khata-ledger'
 import { getWorkspace } from '@/server/workspace'
 
 export type GrainBookAccess = { userId: bigint; secret?: unknown }
@@ -382,7 +383,7 @@ type ProductStatRow = {
 export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
   const book = await openBook(bookKey, access)
   const workspace = getWorkspace()
-  const [moneySum, moneyRows, receivingRows, givingRows, productStats, paymentSums, treasury] = await Promise.all([
+  const [moneySum, moneyRows, receivingRows, givingRows, productStats, paymentSums, treasury, ledger] = await Promise.all([
     prisma.wheatKhataMoney.aggregate({
       where: { bookKey: book.key },
       _sum: { amount: true },
@@ -424,6 +425,7 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
       _count: { _all: true },
     }),
     loadTreasury('GRAIN', book.key),
+    listPeople('GRAIN', book.key),
   ])
 
   const productByParty = new Map(
@@ -476,8 +478,8 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
   const receivingFromCompany =
     companies.reduce((sum, row) => sum + row.productTotal, 0) +
     companies.reduce((sum, row) => sum + row.cashTotal, 0)
-  const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0)
-  const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0)
+  const cashGiven = parties.reduce((sum, row) => sum + row.cashTotal, 0) + ledger.cashGiven
+  const cashReceived = companies.reduce((sum, row) => sum + row.cashTotal, 0) + ledger.cashReceived
   const cashTotal = moneyIn + cashReceived - cashGiven
   const cash = withTreasury(cashTotal, treasury)
   const bagsReceived = parties.reduce((sum, row) => sum + row.totalBags, 0)
@@ -496,6 +498,9 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
       inHand: cash.inHand,
       borrowedIn: cash.borrowedIn,
       borrowedOut: cash.borrowedOut,
+      givingToPerson: ledger.givingToPerson,
+      receivingFromPerson: ledger.receivingFromPerson,
+      otherExpenseTotal: cash.expenseTotal,
       bagsReceived,
       bagsGiven,
       bagsInStock: bagsReceived - bagsGiven,
@@ -503,7 +508,11 @@ export async function getBook(bookKey?: unknown, access?: GrainBookAccess) {
     },
     money,
     banks: treasury.banks,
+    bankGroups: treasury.bankGroups,
+    withdrawals: treasury.withdrawals,
+    otherExpenses: treasury.expenses,
     transfers: treasury.transfers,
+    people: ledger.people,
     parties,
     companies,
   }
@@ -663,6 +672,36 @@ export async function listKhataHeads(bookKey?: unknown, access?: GrainBookAccess
 export async function addBank(input: { bankName?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
   const snapshot = await getBook(bookKey, access)
   return parkInBank('GRAIN', snapshot.book.key, snapshot.totals.inHand, input)
+}
+
+export async function receiveBank(input: { bankName?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
+  return takeFromBank('GRAIN', book.key, input)
+}
+
+export async function addOtherExpense(input: { reason?: unknown; amount?: unknown; notes?: unknown }, bookKey?: unknown, access?: GrainBookAccess) {
+  const snapshot = await getBook(bookKey, access)
+  return parkExpense('GRAIN', snapshot.book.key, snapshot.totals.inHand, input)
+}
+
+export async function addLedgerCash(input: Record<string, unknown>, bookKey?: unknown, access?: GrainBookAccess) {
+  const snapshot = await getBook(bookKey, access)
+  return addPersonCash('GRAIN', snapshot.book.key, snapshot.totals.inHand, input)
+}
+
+export async function getLedgerPerson(id: number | bigint, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
+  return getPerson('GRAIN', book.key, id)
+}
+
+export async function updateLedgerPerson(id: number | bigint, input: Record<string, unknown>, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
+  return updatePerson('GRAIN', book.key, id, input)
+}
+
+export async function deleteLedgerPerson(id: number | bigint, bookKey?: unknown, access?: GrainBookAccess) {
+  const book = await openBook(bookKey, access)
+  return deletePerson('GRAIN', book.key, id)
 }
 
 export async function transferTo(input: {

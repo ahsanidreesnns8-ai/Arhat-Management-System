@@ -1,7 +1,8 @@
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/server/db'
 import { d, roundRupee } from '@/server/money'
-import { addBank as parkInBank, listHeads, loadTreasury, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
+import { addBank as parkInBank, addOtherExpense as parkExpense, listHeads, loadTreasury, receiveFromBank as takeFromBank, transferTo as sendToHead, withTreasury } from '@/server/services/khata-treasury'
+import { addPersonCash, deletePerson, getPerson, listPeople, updatePerson } from '@/server/services/khata-ledger'
 
 const RATE_UNIT_KG = 40
 
@@ -165,12 +166,50 @@ export async function requireBook(
   return book
 }
 
+const KEEP_PADDY_NAMES = new Set(['ZAFAR TRADERS', 'ABDUL HADI TRADERS'])
+
+function keepPaddyName(name: string) {
+  return KEEP_PADDY_NAMES.has(name.trim().replace(/\s+/g, ' ').toUpperCase())
+}
+
+async function pruneExtraPaddyBooks(userId: bigint) {
+  const settings = await prisma.businessSettings.findFirst()
+  if (!settings || settings.paddyExtraIdsPrunedAt) return
+  const rows = await prisma.paddyKhataBook.findMany({
+    where: { deleted: false, createdById: userId },
+    select: { id: true, name: true },
+  })
+  const extras = rows.filter((row) => !keepPaddyName(row.name))
+  if (extras.length) {
+    await prisma.paddyKhataBook.updateMany({
+      where: { id: { in: extras.map((row) => row.id) } },
+      data: { deleted: true },
+    })
+  }
+  if (settings) {
+    await prisma.businessSettings.update({
+      where: { id: settings.id },
+      data: { paddyExtraIdsPrunedAt: new Date() },
+    })
+  }
+}
+
 export async function listBooks(userId: bigint) {
+  await pruneExtraPaddyBooks(userId)
   const rows = await prisma.paddyKhataBook.findMany({
     where: { deleted: false, createdById: userId },
     orderBy: { createdAt: 'desc' },
   })
   return rows.map(bookSummary)
+}
+
+export async function deleteBook(bookId: number | bigint, userId: bigint) {
+  const book = await findOwnedBook(bookId, userId)
+  await prisma.paddyKhataBook.update({
+    where: { id: book.id },
+    data: { deleted: true },
+  })
+  return { id: Number(book.id), publicId: book.publicId, name: book.name, deleted: true }
 }
 
 export async function createBook(
@@ -497,8 +536,9 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
   const processedBags = processRows.reduce((sum, row) => sum + row.bags, 0)
   const riceBags = riceRows.reduce((sum, row) => sum + row.bags, 0)
   const soldBags = saleRows.reduce((sum, row) => sum + row.bags, 0)
+  const ledger = await listPeople('PADDY', String(Number(book.id)))
 
-  const cashTotal = moneyIn + receivedCash - givenCash - expenseTotal
+  const cashTotal = moneyIn + receivedCash - givenCash - expenseTotal + ledger.cashReceived - ledger.cashGiven
   const treasury = await loadTreasury('PADDY', String(Number(book.id)))
   const cash = withTreasury(cashTotal, treasury)
 
@@ -509,15 +549,17 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
       purchaseTotal,
       givenCash,
       receivedCash,
-      expenseTotal,
+      expenseTotal: expenseTotal + cash.expenseTotal,
       saleTotal,
-      givingAmount: givenCash + expenseTotal + cash.borrowedOut,
-      receivingAmount: receivedCash + cash.borrowedIn,
+      givingAmount: givenCash + expenseTotal + cash.borrowedOut + ledger.cashGiven + cash.expenseTotal,
+      receivingAmount: receivedCash + cash.borrowedIn + ledger.cashReceived,
       totalAmount: cash.totalAmount,
       bankTotal: cash.bankTotal,
       inHand: cash.inHand,
       borrowedIn: cash.borrowedIn,
       borrowedOut: cash.borrowedOut,
+      givingToPerson: ledger.givingToPerson,
+      receivingFromPerson: ledger.receivingFromPerson,
       paddyBags,
       processingBags,
       processedBags,
@@ -527,7 +569,11 @@ export async function getBook(bookId: number | bigint, userId: bigint, secret: u
     },
     amounts: amountRows,
     banks: treasury.banks,
+    bankGroups: treasury.bankGroups,
+    withdrawals: treasury.withdrawals,
+    otherExpenses: treasury.expenses,
     transfers: treasury.transfers,
+    people: ledger.people,
     purchaseParties,
     saleParties,
     purchases: purchaseRows,
@@ -901,6 +947,63 @@ export async function addBank(
 ) {
   const snapshot = await getBook(bookId, userId, input.secret)
   return parkInBank('PADDY', String(snapshot.id), snapshot.totals.inHand, input)
+}
+
+export async function receiveBank(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; bankName?: unknown; amount?: unknown; notes?: unknown },
+) {
+  await requireBook(bookId, userId, input.secret)
+  return takeFromBank('PADDY', String(Number(bookId)), input)
+}
+
+export async function addOtherExpense(
+  bookId: number | bigint,
+  userId: bigint,
+  input: { secret?: unknown; reason?: unknown; amount?: unknown; notes?: unknown },
+) {
+  const snapshot = await getBook(bookId, userId, input.secret)
+  return parkExpense('PADDY', String(snapshot.id), snapshot.totals.inHand, input)
+}
+
+export async function addLedgerCash(
+  bookId: number | bigint,
+  userId: bigint,
+  input: Record<string, unknown>,
+) {
+  const snapshot = await getBook(bookId, userId, input.secret)
+  return addPersonCash('PADDY', String(snapshot.id), snapshot.totals.inHand, input)
+}
+
+export async function getLedgerPerson(
+  bookId: number | bigint,
+  userId: bigint,
+  personId: number | bigint,
+  secret: unknown,
+) {
+  const book = await requireBook(bookId, userId, secret)
+  return getPerson('PADDY', String(Number(book.id)), personId)
+}
+
+export async function updateLedgerPerson(
+  bookId: number | bigint,
+  userId: bigint,
+  personId: number | bigint,
+  input: Record<string, unknown>,
+) {
+  const book = await requireBook(bookId, userId, input.secret)
+  return updatePerson('PADDY', String(Number(book.id)), personId, input)
+}
+
+export async function deleteLedgerPerson(
+  bookId: number | bigint,
+  userId: bigint,
+  personId: number | bigint,
+  secret: unknown,
+) {
+  const book = await requireBook(bookId, userId, secret)
+  return deletePerson('PADDY', String(Number(book.id)), personId)
 }
 
 export async function transferTo(

@@ -140,6 +140,8 @@ model BusinessSettings {
   weatherLocationLabel         String   @default("Lahore") @map("weather_location_label") @db.VarChar(120)
   weatherTimezone              String   @default("Asia/Karachi") @map("weather_timezone") @db.VarChar(64)
   hijriAdjustmentDays          Int      @default(0) @map("hijri_adjustment_days")
+  stockZeroedAt                DateTime? @map("stock_zeroed_at")
+  paddyExtraIdsPrunedAt        DateTime? @map("paddy_extra_ids_pruned_at")
   createdAt                    DateTime @default(now()) @map("created_at")
   updatedAt                    DateTime @updatedAt @map("updated_at")
 
@@ -864,4 +866,38 @@ model PaddyKhataCash {
 
   @@index([workspace, bookId, partyId, createdAt])
   @@map("paddy_khata_cash")
+}
+
+/// Give / receive person on a khata head (Arhat Register-style frames)
+model KhataLedgerPerson {
+  id        BigInt              @id @default(autoincrement())
+  workspace String              @default("live") @db.VarChar(20)
+  bookType  String              @map("book_type") @db.VarChar(20)
+  bookRef   String              @map("book_ref") @db.VarChar(80)
+  name      String              @db.VarChar(255)
+  address   String?
+  notes     String?
+  deleted   Boolean             @default(false)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  entries   KhataLedgerEntry[]
+
+  @@index([workspace, bookType, bookRef, deleted])
+  @@index([workspace, bookType, bookRef, name])
+  @@map("khata_ledger_people")
+}
+
+model KhataLedgerEntry {
+  id        BigInt            @id @default(autoincrement())
+  workspace String            @default("live") @db.VarChar(20)
+  personId  BigInt            @map("person_id")
+  kind      String            @db.VarChar(20)
+  amount    Decimal           @db.Decimal(15, 2)
+  notes     String?
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  person    KhataLedgerPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([workspace, personId, createdAt])
+  @@map("khata_ledger_entries")
 }

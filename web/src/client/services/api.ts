@@ -5,7 +5,7 @@ import type {
   ReportSummary, Sale, SearchResult, StaffUsageSummary, StockItem, StockLot, StockTransaction,
   SyncPulse, SystemUser, Truck, User, WeatherCalendar, RegisterParty, RegisterEntry, ZakatSummary,
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
-  GrainKhataBookMeta, KhataHead, KhataTreasuryLine, AccountStatement,
+  GrainKhataBookMeta, KhataHead, KhataTreasuryLine, KhataLedgerPerson, AccountStatement,
   PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataPurchase,
   ArhatAmountBook, ArhatAmountMergeReport,
 } from '../types'
@@ -425,6 +425,25 @@ export const grainKhataApi = {
     api.get<ApiResponse<KhataHead[]>>(grainKhataPath(bookKey, '/heads'), { params: secret ? { secret } : {} }),
   addBank: (bookKey: string, data: { bankName: string; amount: number; notes?: string }, secret?: string) =>
     api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/bank'), withSecret(data, secret)),
+  receiveBank: (bookKey: string, data: { bankName: string; amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/bank-receive'), withSecret(data, secret)),
+  addOtherExpense: (bookKey: string, data: { reason: string; amount: number; notes?: string }, secret?: string) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/other-expense'), withSecret(data, secret)),
+  addPersonCash: (bookKey: string, data: {
+    name?: string
+    personId?: number
+    kind: 'GIVING' | 'RECEIVING'
+    amount: number
+    notes?: string
+    address?: string
+  }, secret?: string) =>
+    api.post<ApiResponse<KhataLedgerPerson>>(grainKhataPath(bookKey, '/people'), withSecret(data, secret)),
+  getPerson: (bookKey: string, id: number, secret?: string) =>
+    api.get<ApiResponse<KhataLedgerPerson>>(grainKhataPath(bookKey, `/people/${id}`), { params: secret ? { secret } : {} }),
+  updatePerson: (bookKey: string, id: number, data: Record<string, unknown>, secret?: string) =>
+    api.put<ApiResponse<KhataLedgerPerson>>(grainKhataPath(bookKey, `/people/${id}`), withSecret(data, secret)),
+  deletePerson: (bookKey: string, id: number, secret?: string) =>
+    api.delete<ApiResponse<{ id: number }>>(grainKhataPath(bookKey, `/people/${id}`), { params: secret ? { secret } : {} }),
   transferTo: (bookKey: string, data: { bookType: string; bookRef: string; amount: number; notes?: string }, secret?: string) =>
     api.post<ApiResponse<KhataTreasuryLine>>(grainKhataPath(bookKey, '/transfer'), withSecret(data, secret)),
 }
@@ -506,6 +525,26 @@ export const paddyKhataApi = {
     api.get<ApiResponse<KhataHead[]>>(`/paddy-khata/${id}/heads`, { params: { secret } }),
   addBank: (id: number, data: { secret: string; bankName: string; amount: number; notes?: string }) =>
     api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/bank`, data),
+  receiveBank: (id: number, data: { secret: string; bankName: string; amount: number; notes?: string }) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/bank-receive`, data),
+  addOtherExpense: (id: number, data: { secret: string; reason: string; amount: number; notes?: string }) =>
+    api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/other-expense`, data),
+  addPersonCash: (id: number, data: {
+    secret: string
+    name?: string
+    personId?: number
+    kind: 'GIVING' | 'RECEIVING'
+    amount: number
+    notes?: string
+    address?: string
+  }) => api.post<ApiResponse<KhataLedgerPerson>>(`/paddy-khata/${id}/people`, data),
+  getPerson: (id: number, personId: number, secret: string) =>
+    api.get<ApiResponse<KhataLedgerPerson>>(`/paddy-khata/${id}/people/${personId}`, { params: { secret } }),
+  updatePerson: (id: number, personId: number, data: Record<string, unknown>) =>
+    api.put<ApiResponse<KhataLedgerPerson>>(`/paddy-khata/${id}/people/${personId}`, data),
+  deletePerson: (id: number, personId: number, secret: string) =>
+    api.delete<ApiResponse<{ id: number }>>(`/paddy-khata/${id}/people/${personId}`, { params: { secret } }),
+  deleteBook: (id: number) => api.delete<ApiResponse<{ id: number }>>(`/paddy-khata/${id}`),
   transferTo: (id: number, data: { secret: string; bookType: string; bookRef: string; amount: number; notes?: string }) =>
     api.post<ApiResponse<KhataTreasuryLine>>(`/paddy-khata/${id}/transfer`, data),
 }
