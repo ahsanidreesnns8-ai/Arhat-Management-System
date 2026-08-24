@@ -301,7 +301,7 @@ async function createSaleOnce(input: SaleInput, createdById?: bigint) {
             newQuantity: next.toFixed(2),
             referenceType: 'SALE',
             referenceId: sale.id,
-            notes: `Sale ${invoiceNumber}`,
+            notes: `${item.product.name} · ${item.weight.toFixed(2)} kg sold · invoice ${invoiceNumber}`,
           },
         })
       }

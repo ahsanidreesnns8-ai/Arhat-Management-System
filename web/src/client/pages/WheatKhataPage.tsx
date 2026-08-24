@@ -16,6 +16,7 @@ import { isOwnerFinanceRole } from '../../lib/roles'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
+import KhataPersonLedger from '../components/khata/KhataPersonLedger'
 import type { WheatKhataBook, WheatKhataParty } from '../types'
 
 type Section = 'MONEY' | 'PARTY' | 'COMPANY'
@@ -34,6 +35,8 @@ const emptyBook: WheatKhataBook = {
     inHand: 0,
     borrowedIn: 0,
     borrowedOut: 0,
+    givingToPerson: 0,
+    receivingFromPerson: 0,
     bagsReceived: 0,
     bagsGiven: 0,
     bagsInStock: 0,
@@ -41,7 +44,10 @@ const emptyBook: WheatKhataBook = {
   },
   money: [],
   banks: [],
+  bankGroups: [],
+  otherExpenses: [],
   transfers: [],
+  people: [],
   parties: [],
   companies: [],
 }
@@ -492,6 +498,17 @@ export default function WheatKhataPage({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Giving to person</p>
+          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1">{formatCurrency(totals.givingToPerson || 0)}</p>
+        </div>
+        <div className="card-3d p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Receiving from person</p>
+          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving amount from company</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{formatCurrency(totals.receivingFromCompany)}</p>
           <p className="text-[11px] text-slate-500 mt-1">Product given to companies ({crop} + bag + labour) plus money received from them</p>
@@ -552,6 +569,8 @@ export default function WheatKhataPage({
           <KhataTreasuryPanel
             inHand={totals.inHand || 0}
             banks={book.banks || []}
+            bankGroups={book.bankGroups}
+            expenses={book.otherExpenses}
             transfers={book.transfers || []}
             saving={saving}
             loadHeads={async () => {
@@ -567,10 +586,75 @@ export default function WheatKhataPage({
                 setSaving(false)
               }
             }}
+            onReceiveBank={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.receiveBank(bookKey, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onExpense={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.addOtherExpense(bookKey, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
             onTransfer={async (input) => {
               setSaving(true)
               try {
                 await grainKhataApi.transferTo(bookKey, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+          />
+          <KhataPersonLedger
+            inHand={totals.inHand || 0}
+            people={book.people || []}
+            givingToPerson={totals.givingToPerson || 0}
+            receivingFromPerson={totals.receivingFromPerson || 0}
+            saving={saving}
+            onGive={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.addPersonCash(bookKey, { ...input, kind: 'GIVING' }, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onReceive={async (input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.addPersonCash(bookKey, { ...input, kind: 'RECEIVING' }, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onLoadPerson={async (id) => {
+              const res = await grainKhataApi.getPerson(bookKey, id, secret || undefined)
+              return res.data.data
+            }}
+            onUpdate={async (id, input) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.updatePerson(bookKey, id, input, secret || undefined)
+                await load(true)
+              } finally {
+                setSaving(false)
+              }
+            }}
+            onDelete={async (id) => {
+              setSaving(true)
+              try {
+                await grainKhataApi.deletePerson(bookKey, id, secret || undefined)
                 await load(true)
               } finally {
                 setSaving(false)

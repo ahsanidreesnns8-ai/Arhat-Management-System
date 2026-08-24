@@ -108,26 +108,75 @@ export async function listHeads(exclude?: { bookType: KhataBookType; bookRef: st
   })
 }
 
+function bankKey(name: string | null | undefined) {
+  return String(name ?? '').trim().replace(/\s+/g, ' ').toUpperCase()
+}
+
 export async function loadTreasury(bookType: KhataBookType, bookRef: string) {
   const rows = await prisma.khataTreasury.findMany({
     where: { bookType, bookRef },
     orderBy: { createdAt: 'desc' },
   })
   const items = rows.map(rowDto)
-  const bankTotal = items.filter((row) => row.kind === 'BANK').reduce((sum, row) => sum + row.amount, 0)
+  const deposits = items.filter((row) => row.kind === 'BANK')
+  const withdrawals = items.filter((row) => row.kind === 'BANK_OUT')
+  const expenses = items.filter((row) => row.kind === 'EXPENSE')
+  const bankIn = deposits.reduce((sum, row) => sum + row.amount, 0)
+  const bankOut = withdrawals.reduce((sum, row) => sum + row.amount, 0)
+  const expenseTotal = expenses.reduce((sum, row) => sum + row.amount, 0)
   const transferIn = items.filter((row) => row.kind === 'TRANSFER_IN').reduce((sum, row) => sum + row.amount, 0)
   const transferOut = items.filter((row) => row.kind === 'TRANSFER_OUT').reduce((sum, row) => sum + row.amount, 0)
+
+  const grouped = new Map<string, {
+    bankName: string
+    deposited: number
+    withdrawn: number
+    remaining: number
+  }>()
+  for (const row of deposits) {
+    const key = bankKey(row.bankName) || 'BANK'
+    const current = grouped.get(key) || {
+      bankName: row.bankName?.trim() || 'Bank',
+      deposited: 0,
+      withdrawn: 0,
+      remaining: 0,
+    }
+    current.deposited += row.amount
+    grouped.set(key, current)
+  }
+  for (const row of withdrawals) {
+    const key = bankKey(row.bankName) || 'BANK'
+    const current = grouped.get(key) || {
+      bankName: row.bankName?.trim() || 'Bank',
+      deposited: 0,
+      withdrawn: 0,
+      remaining: 0,
+    }
+    current.withdrawn += row.amount
+    grouped.set(key, current)
+  }
+  const bankGroups = [...grouped.values()].map((row) => ({
+    ...row,
+    remaining: Math.max(0, row.deposited - row.withdrawn),
+  }))
+
   return {
-    banks: items.filter((row) => row.kind === 'BANK'),
+    banks: deposits,
+    withdrawals,
+    expenses,
     transfers: items.filter((row) => row.kind === 'TRANSFER_IN' || row.kind === 'TRANSFER_OUT'),
-    bankTotal,
+    bankGroups,
+    bankTotal: Math.max(0, bankIn - bankOut),
+    bankIn,
+    bankOut,
+    expenseTotal,
     transferIn,
     transferOut,
   }
 }
 
 export function withTreasury(cashTotal: number, treasury: Awaited<ReturnType<typeof loadTreasury>>) {
-  const totalAmount = cashTotal + treasury.transferIn - treasury.transferOut
+  const totalAmount = cashTotal + treasury.transferIn - treasury.transferOut - treasury.expenseTotal
   const inHand = totalAmount - treasury.bankTotal
   return {
     totalAmount,
@@ -135,6 +184,7 @@ export function withTreasury(cashTotal: number, treasury: Awaited<ReturnType<typ
     inHand,
     borrowedIn: treasury.transferIn,
     borrowedOut: treasury.transferOut,
+    expenseTotal: treasury.expenseTotal,
   }
 }
 
@@ -200,6 +250,60 @@ export async function addBank(
       amount,
       bankName,
       notes: String(input.notes ?? '').trim() || null,
+    },
+  })
+  return rowDto(row)
+}
+
+export async function receiveFromBank(
+  bookType: KhataBookType,
+  bookRef: string,
+  input: { bankName?: unknown; amount?: unknown; notes?: unknown },
+) {
+  const bankName = String(input.bankName ?? '').trim()
+  if (!bankName) throw new Error('Enter the bank name')
+  const amount = parseAmount(input.amount)
+  const treasury = await loadTreasury(bookType, bookRef)
+  const group = treasury.bankGroups.find((row) => bankKey(row.bankName) === bankKey(bankName))
+  const remaining = group?.remaining ?? 0
+  if (!group || remaining <= 0) {
+    throw new Error(`No amount in ${bankName}. Add money in bank first.`)
+  }
+  if (amount > remaining) {
+    throw new Error(`${bankName} has ${remaining}. Receive that or less.`)
+  }
+  const row = await prisma.khataTreasury.create({
+    data: {
+      bookType,
+      bookRef,
+      kind: 'BANK_OUT',
+      amount,
+      bankName: group.bankName,
+      notes: String(input.notes ?? '').trim() || 'Received from bank to amount in hand',
+    },
+  })
+  return rowDto(row)
+}
+
+export async function addOtherExpense(
+  bookType: KhataBookType,
+  bookRef: string,
+  inHand: number,
+  input: { reason?: unknown; amount?: unknown; notes?: unknown },
+) {
+  const reason = String(input.reason ?? input.notes ?? '').trim()
+  if (!reason) throw new Error('Enter the reason')
+  const amount = parseAmount(input.amount)
+  if (amount > inHand) {
+    throw new Error(`Amount in hand is ${inHand}. Spend that or less.`)
+  }
+  const row = await prisma.khataTreasury.create({
+    data: {
+      bookType,
+      bookRef,
+      kind: 'EXPENSE',
+      amount,
+      notes: reason,
     },
   })
   return rowDto(row)

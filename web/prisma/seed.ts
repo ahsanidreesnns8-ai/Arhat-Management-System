@@ -114,6 +114,39 @@ async function main() {
   for (const login of DEFAULT_SHOP_LOGINS) {
     await upsertShopLogin(login)
   }
+
+  const liveSettings = await prisma.businessSettings.findFirst({ where: { workspace: 'live' } })
+  if (liveSettings && !liveSettings.stockZeroedAt) {
+    const stocks = await prisma.stock.findMany({ where: { workspace: 'live' }, include: { product: true } })
+    for (const row of stocks) {
+      const previous = row.quantity.toString()
+      if (previous === '0' || previous === '0.00') continue
+      await prisma.stock.update({
+        where: { id: row.id },
+        data: { quantity: '0.00', lowStockAlert: false },
+      })
+      await prisma.stockTransaction.create({
+        data: {
+          workspace: 'live',
+          productId: row.productId,
+          transactionType: 'ADJUSTMENT',
+          quantity: '0.00',
+          previousQuantity: previous,
+          newQuantity: '0.00',
+          notes: `Opening stock reset to zero · ${row.product.name}`,
+          referenceType: 'OPENING_RESET',
+        },
+      })
+    }
+    await prisma.stockLot.updateMany({
+      where: { workspace: 'live', remainingKg: { gt: 0 } },
+      data: { remainingKg: '0.00' },
+    })
+    await prisma.businessSettings.update({
+      where: { id: liveSettings.id },
+      data: { stockZeroedAt: new Date() },
+    })
+  }
 }
 
 main()

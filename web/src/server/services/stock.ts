@@ -32,7 +32,50 @@ export function stockTransactionDto(row: TransactionRow) {
   }
 }
 
+const STOCK_ZERO_NOTE = 'Opening stock reset to zero'
+
+export async function resetAllStockToZero() {
+  const settings = await prisma.businessSettings.findFirst()
+  if (settings?.stockZeroedAt) return { already: true, zeroed: 0 }
+  const rows = await prisma.stock.findMany({ include: { product: true } })
+  let zeroed = 0
+  await prisma.$transaction(async (tx) => {
+    for (const row of rows) {
+      const previous = d(row.quantity.toString())
+      if (previous.eq(0)) continue
+      await tx.stock.update({
+        where: { id: row.id },
+        data: { quantity: '0.00', lowStockAlert: false },
+      })
+      await tx.stockTransaction.create({
+        data: {
+          productId: row.productId,
+          transactionType: 'ADJUSTMENT',
+          quantity: '0.00',
+          previousQuantity: previous.toFixed(2),
+          newQuantity: '0.00',
+          notes: `${STOCK_ZERO_NOTE} · ${row.product.name}`,
+          referenceType: 'OPENING_RESET',
+        },
+      })
+      zeroed += 1
+    }
+    await tx.stockLot.updateMany({
+      where: { remainingKg: { gt: 0 } },
+      data: { remainingKg: '0.00' },
+    })
+    if (settings) {
+      await tx.businessSettings.update({
+        where: { id: settings.id },
+        data: { stockZeroedAt: new Date() },
+      })
+    }
+  })
+  return { already: false, zeroed }
+}
+
 export async function listStock() {
+  await resetAllStockToZero().catch(() => null)
   const rows = await prisma.stock.findMany({
     include: { product: true },
     orderBy: { product: { name: 'asc' } },

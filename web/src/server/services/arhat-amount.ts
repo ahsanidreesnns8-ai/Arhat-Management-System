@@ -402,6 +402,28 @@ async function khataCashLines(): Promise<{ lines: ArhatAmountLine[]; totals: { a
   ])
   const grainName = new Map(grainBooks.map((row) => [row.key, row.name]))
   const paddyName = new Map(paddyBooks.map((row) => [Number(row.id), row.name]))
+  const [otherExpenses, otherExpenseSum, ledgerEntries, ledgerGive, ledgerReceive] = await Promise.all([
+    prisma.khataTreasury.findMany({
+      where: { kind: 'EXPENSE' },
+      orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
+    }),
+    prisma.khataTreasury.aggregate({ where: { kind: 'EXPENSE' }, _sum: { amount: true } }),
+    prisma.khataLedgerEntry.findMany({
+      where: { person: { deleted: false } },
+      include: { person: { select: { name: true, bookType: true, bookRef: true, deleted: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: HISTORY_TAKE,
+    }),
+    prisma.khataLedgerEntry.aggregate({
+      where: { kind: 'GIVING', person: { deleted: false } },
+      _sum: { amount: true },
+    }),
+    prisma.khataLedgerEntry.aggregate({
+      where: { kind: 'RECEIVING', person: { deleted: false } },
+      _sum: { amount: true },
+    }),
+  ])
   const lines: ArhatAmountLine[] = []
 
   for (const row of moneyRows) {
@@ -487,6 +509,45 @@ async function khataCashLines(): Promise<{ lines: ArhatAmountLine[]; totals: { a
       ),
     )
   }
+  for (const row of otherExpenses) {
+    const who = row.bookType === 'PADDY'
+      ? (paddyName.get(Number(row.bookRef)) || 'Paddy Khata')
+      : (grainName.get(row.bookRef) || row.bookRef)
+    lines.push(
+      line(
+        `khata-exp-${row.id}`,
+        'KHATA',
+        'KHATA',
+        'GIVING',
+        row.amount.toNumber(),
+        joinReason([`${who} other expense`, row.notes]),
+        row.createdAt,
+      ),
+    )
+  }
+  for (const row of ledgerEntries) {
+    if (row.person?.deleted) continue
+    const who = row.person.bookType === 'PADDY'
+      ? (paddyName.get(Number(row.person.bookRef)) || 'Paddy Khata')
+      : (grainName.get(row.person.bookRef) || row.person.bookRef)
+    const giving = row.kind === 'GIVING'
+    lines.push(
+      line(
+        `khata-person-${row.id}`,
+        'KHATA',
+        'KHATA',
+        giving ? 'GIVING' : 'RECEIVING',
+        row.amount.toNumber(),
+        joinReason([
+          giving
+            ? `${who} given to ${row.person.name}`
+            : `${who} received from ${row.person.name}`,
+          row.notes,
+        ]),
+        row.createdAt,
+      ),
+    )
+  }
   for (const row of treasury) {
     if (row.kind === 'BANK') continue
     const giving = row.kind === 'TRANSFER_OUT'
@@ -512,8 +573,8 @@ async function khataCashLines(): Promise<{ lines: ArhatAmountLine[]; totals: { a
     lines: sortLines(lines),
     totals: {
       added: n(moneySum._sum.amount) + n(paddyAdd._sum.amount),
-      receiving: n(payReceive._sum.amount) + n(paddyReceive._sum.amount) + n(transferIn._sum.amount),
-      giving: n(payGive._sum.amount) + n(paddyGive._sum.amount) + n(paddyExp._sum.amount) + n(transferOut._sum.amount),
+      receiving: n(payReceive._sum.amount) + n(paddyReceive._sum.amount) + n(transferIn._sum.amount) + n(ledgerReceive._sum.amount),
+      giving: n(payGive._sum.amount) + n(paddyGive._sum.amount) + n(paddyExp._sum.amount) + n(transferOut._sum.amount) + n(otherExpenseSum._sum.amount) + n(ledgerGive._sum.amount),
     },
   }
 }
