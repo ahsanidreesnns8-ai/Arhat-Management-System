@@ -1502,7 +1502,7 @@ function paddyVarietySlip(book: PaddyBook, urdu: boolean): BillSlip {
 
 function paddyProcessSlip(book: PaddyBook, urdu: boolean): BillSlip {
   const rows = book.processes.length
-    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.riceVariety, String(row.bags), row.status === 'PROCESSING' ? (urdu ? 'پروسیس' : 'Processing') : (urdu ? 'تیار' : 'Ready')])
+    ? book.processes.map((row) => [`${row.date} ${row.time}`, row.variety, row.riceVariety, String(row.bags), row.status === 'PROCESSING' ? (urdu ? 'پروسیس' : 'Processing') : (urdu ? 'سیل رائس' : 'Sell Rice')])
     : [[urdu ? 'کوئی پروسیس نہیں' : 'No processing yet', '', '', '0', '—']]
   return {
     title: '',

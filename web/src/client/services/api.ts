@@ -478,8 +478,10 @@ export const wheatKhataApi = {
 
 export const paddyKhataApi = {
   list: () => api.get<ApiResponse<PaddyKhataBookSummary[]>>('/paddy-khata'),
-  create: (data: { name?: string; secret: string }) =>
+  listArchived: () => api.get<ApiResponse<PaddyKhataBookSummary[]>>('/paddy-khata/archive'),
+  create: (data: { name?: string; secret: string; keepInArchive?: boolean }) =>
     api.post<ApiResponse<PaddyKhataBookSummary>>('/paddy-khata', data),
+  restoreBook: (id: number) => api.post<ApiResponse<PaddyKhataBookSummary>>(`/paddy-khata/${id}/restore`),
   get: (id: number, secret: string) =>
     api.get<ApiResponse<PaddyKhataBook>>(`/paddy-khata/${id}`, { params: { secret } }),
   previewPurchase: (data: {
@@ -514,7 +516,10 @@ export const paddyKhataApi = {
   addProcess: (id: number, data: { secret: string; variety: string; riceVariety: string; bags: number; notes?: string }) =>
     api.post(`/paddy-khata/${id}/process`, data),
   completeProcess: (id: number, data: { secret: string; variety: string }) =>
-    api.post(`/paddy-khata/${id}/process/complete`, data),
+    api.post<ApiResponse<{ variety: string; bags: number; lots: Array<{ riceVariety: string; bags: number }> }>>(
+      `/paddy-khata/${id}/process/complete`,
+      data,
+    ),
   addExpense: (id: number, data: { secret: string; variety: string; amount: number; reason: string }) =>
     api.post(`/paddy-khata/${id}/expenses`, data),
   addRice: (id: number, data: { secret: string; bags: number; variety: string; notes?: string }) =>

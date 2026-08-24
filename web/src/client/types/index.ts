@@ -706,6 +706,8 @@ export interface PaddyKhataBookSummary {
   publicId: string
   name: string
   createdAt: string
+  archived?: boolean
+  archivedAt?: string | null
 }
 
 export interface PaddyKhataMoneyLine {
