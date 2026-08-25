@@ -572,6 +572,56 @@ export async function createParty(input: {
   return partyDto(row)
 }
 
+export async function updateParty(
+  id: number | bigint,
+  input: { name?: unknown; address?: unknown; notes?: unknown },
+  bookKey?: unknown,
+  access?: GrainBookAccess,
+) {
+  const existing = await prisma.wheatKhataParty.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!existing) throw new Error('Party not found')
+  const book = await openBook(bookKey ?? existing.bookKey, access)
+  if (existing.bookKey !== book.key) throw new Error('Party not found')
+  const name = String(input.name ?? existing.name).trim()
+  if (!name) throw new Error(existing.kind === 'GIVING' ? 'Company name is required' : 'Party name is required')
+  const clash = await prisma.wheatKhataParty.findFirst({
+    where: {
+      deleted: false,
+      bookKey: book.key,
+      kind: existing.kind,
+      name: { equals: name, mode: 'insensitive' },
+      NOT: { id: existing.id },
+    },
+  })
+  if (clash) throw new Error(`${existing.kind === 'GIVING' ? 'Company' : 'Party'} ${name} is already used`)
+  const row = await prisma.wheatKhataParty.update({
+    where: { id: existing.id },
+    data: {
+      name,
+      address: parseOptionalText(input.address),
+      notes: parseOptionalText(input.notes),
+    },
+    include: partyInclude,
+  })
+  return partyDto(row)
+}
+
+export async function deleteParty(id: number | bigint, bookKey?: unknown, access?: GrainBookAccess) {
+  const existing = await prisma.wheatKhataParty.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!existing) throw new Error('Party not found')
+  const book = await openBook(bookKey ?? existing.bookKey, access)
+  if (existing.bookKey !== book.key) throw new Error('Party not found')
+  await prisma.wheatKhataParty.update({
+    where: { id: existing.id },
+    data: { deleted: true },
+  })
+  return { id: Number(existing.id), deleted: true }
+}
+
 export async function getParty(id: number | bigint, bookKey?: unknown, access?: GrainBookAccess) {
   const party = await prisma.wheatKhataParty.findFirst({
     where: { id: BigInt(id), deleted: false },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Trash2, Truck, Wallet,
+  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Pencil, Plus, ShoppingBag, Trash2, Truck, Wallet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -74,6 +74,8 @@ export default function PaddyKhataPage() {
 
   const [amountForm, setAmountForm] = useState({ amount: '', notes: '' })
   const [partyForm, setPartyForm] = useState({ name: '', address: '', notes: '' })
+  const [editPartyId, setEditPartyId] = useState<number | null>(null)
+  const [deleteParty, setDeleteParty] = useState<PaddyKhataParty | null>(null)
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase)
   const [giveForm, setGiveForm] = useState({ partyId: '', amount: '', notes: '' })
   const [processForm, setProcessForm] = useState({ riceVariety: '', bags: '', notes: '' })
@@ -249,15 +251,23 @@ export default function PaddyKhataPage() {
     }
     setSaving(true)
     try {
-      await paddyKhataApi.addParty(book.id, {
-        secret,
-        kind: partyOpen,
-        name: partyForm.name.trim(),
-        address: partyForm.address.trim() || undefined,
-        notes: partyForm.notes.trim() || undefined,
-      })
+      await (editPartyId
+        ? paddyKhataApi.updateParty(book.id, editPartyId, {
+            secret,
+            name: partyForm.name.trim(),
+            address: partyForm.address.trim() || undefined,
+            notes: partyForm.notes.trim() || undefined,
+          })
+        : paddyKhataApi.addParty(book.id, {
+            secret,
+            kind: partyOpen,
+            name: partyForm.name.trim(),
+            address: partyForm.address.trim() || undefined,
+            notes: partyForm.notes.trim() || undefined,
+          }))
       toast.success('Party saved')
       setPartyOpen(null)
+      setEditPartyId(null)
       setPartyForm({ name: '', address: '', notes: '' })
       refresh()
     } catch (err) {
@@ -850,7 +860,7 @@ export default function PaddyKhataPage() {
             }}
           />
           <Panel title="Add Amount">
-            <MoneyTable rows={book.amounts} empty="No amount added yet. Cash added here stays in this Paddy Khata ID and also updates Arhat Amount." />
+            <MoneyTable rows={book.amounts} empty="No amount added yet." />
           </Panel>
         </div>
       )}
@@ -858,16 +868,22 @@ export default function PaddyKhataPage() {
       {section === 'PURCHASE' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('PURCHASE') }}><Plus className="h-4 w-4" /> Add Party</Button>
+            <Button onClick={() => { setEditPartyId(null); setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('PURCHASE') }}><Plus className="h-4 w-4" /> Add Party</Button>
             <Button onClick={() => { setPurchaseForm(emptyPurchase); setPurchasePreview(null); setPurchaseOpen(true) }}><Package className="h-4 w-4" /> Purchase Product</Button>
             <Button variant="secondary" onClick={() => setGiveOpen(true)}><Banknote className="h-4 w-4" /> Give Amount</Button>
           </div>
           <PartyCards
             parties={book.purchaseParties}
             mode="PURCHASE"
-            empty="Add a party, then purchase product. Each party keeps its own record."
+            empty="Add a party, then purchase product."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setGiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setGiveOpen(true) }}
+            onEdit={(p) => {
+              setEditPartyId(p.id)
+              setPartyForm({ name: p.name, address: p.address || '', notes: p.notes || '' })
+              setPartyOpen('PURCHASE')
+            }}
+            onDelete={(p) => setDeleteParty(p)}
             cashLabel="Give Amount"
           />
           <Panel title="History">
@@ -1024,16 +1040,22 @@ export default function PaddyKhataPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
+            <Button onClick={() => { setEditPartyId(null); setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
             <Button onClick={() => openSell()} disabled={!book.riceVarieties.some((item) => item.remainingBags > 0)}><ShoppingBag className="h-4 w-4" /> Sell Rice</Button>
             <Button variant="secondary" onClick={() => { setReceiveForm({ partyId: '', amount: '', notes: '' }); setReceiveOpen(true) }}><Wallet className="h-4 w-4" /> Receive Amount</Button>
           </div>
           <PartyCards
             parties={book.saleParties}
             mode="SALE"
-            empty="Add a rice party, then sell rice from the frames above. Receive Amount is inside this screen, party by party."
+            empty="Add a rice party, then sell rice from the frames above."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setReceiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setReceiveOpen(true) }}
+            onEdit={(p) => {
+              setEditPartyId(p.id)
+              setPartyForm({ name: p.name, address: p.address || '', notes: p.notes || '' })
+              setPartyOpen('SALE')
+            }}
+            onDelete={(p) => setDeleteParty(p)}
             cashLabel="Receive Amount"
           />
         </div>
@@ -1047,7 +1069,7 @@ export default function PaddyKhataPage() {
         </div>
       </Modal>
 
-      <Modal open={!!partyOpen} onClose={() => setPartyOpen(null)} title="Add Party">
+      <Modal open={!!partyOpen} onClose={() => { setPartyOpen(null); setEditPartyId(null) }} title={editPartyId ? 'Edit Party' : 'Add Party'}>
         <div className="space-y-3">
           <Input label="Name" value={partyForm.name} onChange={(e) => setPartyForm((s) => ({ ...s, name: e.target.value }))} />
           <Input label="Address" value={partyForm.address} onChange={(e) => setPartyForm((s) => ({ ...s, address: e.target.value }))} />
@@ -1185,6 +1207,28 @@ export default function PaddyKhataPage() {
           <Button className="w-full" loading={saving} onClick={() => void saveReceive()}>Save</Button>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteParty}
+        onClose={() => setDeleteParty(null)}
+        title="Delete this party?"
+        message={`${deleteParty?.name || ''} will be removed from this Paddy Khata ID.`}
+        confirmLabel="Delete"
+        loading={saving}
+        onConfirm={async () => {
+          if (!book || !deleteParty) return
+          setSaving(true)
+          try {
+            await paddyKhataApi.deleteParty(book.id, deleteParty.id, secret)
+            toast.success('Deleted')
+            setDeleteParty(null)
+            refresh()
+          } catch (err) {
+            toast.error(apiMessage(err, 'Could not delete party'))
+          } finally {
+            setSaving(false)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -1286,6 +1330,8 @@ function PartyCards({
   mode,
   onBill,
   onCash,
+  onEdit,
+  onDelete,
   cashLabel,
 }: {
   parties: PaddyKhataParty[]
@@ -1293,6 +1339,8 @@ function PartyCards({
   mode: 'PURCHASE' | 'SALE'
   onBill: (party: PaddyKhataParty) => void
   onCash?: (party: PaddyKhataParty) => void
+  onEdit?: (party: PaddyKhataParty) => void
+  onDelete?: (party: PaddyKhataParty) => void
   cashLabel?: string
 }) {
   if (!parties.length) return empty ? <p className="text-sm text-slate-500">{empty}</p> : null
@@ -1337,6 +1385,20 @@ function PartyCards({
             </div>
             {onCash && (
               <Button size="sm" onClick={() => onCash(party)}>{cashLabel || 'Amount'}</Button>
+            )}
+            {(onEdit || onDelete) && (
+              <div className="flex flex-wrap gap-1.5">
+                {onEdit ? (
+                  <Button size="sm" variant="secondary" onClick={() => onEdit(party)}>
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                ) : null}
+                {onDelete ? (
+                  <Button size="sm" variant="danger" onClick={() => onDelete(party)}>
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </Button>
+                ) : null}
+              </div>
             )}
           </div>
         )

@@ -232,9 +232,6 @@ export default function ArhatAmountPage() {
 
       <div className="space-y-3">
         <h3 className="text-sm font-semibold px-1">Complete history</h3>
-        <p className="text-[11px] text-slate-500 px-1">
-          Wheat, Barley, Maize, Others, and Paddy khata cash is included in this list as it is saved.
-        </p>
         {loading ? (
           <div className="card-3d p-4"><TableSkeleton rows={6} /></div>
         ) : !book.history.length ? (
