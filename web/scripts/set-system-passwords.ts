@@ -1,7 +1,7 @@
 /**
- * Reset owner/staff to the shop passwords (or env overrides).
+ * Reset owner (live) and hasham (demo) to the shop passwords (or env overrides).
  * Usage: cd web && npx tsx scripts/set-system-passwords.ts
- * Optional: OWNER_PASSWORD='...' STAFF_PASSWORD='...'
+ * Optional: OWNER_PASSWORD='...' DEMO_PASSWORD='...'
  */
 import { config } from 'dotenv'
 config({ path: '.env' })
@@ -9,11 +9,16 @@ config({ path: '.env' })
 import { prisma } from '../src/server/db'
 import { hashPassword } from '../src/server/auth'
 import { assertStrongPassword } from '../src/server/password-policy'
-import { DEFAULT_SHOP_LOGINS } from '../src/server/shop-login-defaults'
+import {
+  DEFAULT_SHOP_LOGINS,
+  isCanonicalShopPassword,
+} from '../src/server/shop-login-defaults'
 import { endAllSessionsForUser } from '../src/server/services/login-sessions'
 
 async function setPassword(username: string, password: string) {
-  assertStrongPassword(password, username)
+  if (!isCanonicalShopPassword(username, password)) {
+    assertStrongPassword(password, username)
+  }
   const user = await prisma.user.findFirst({
     where: { username, deleted: false },
   })
@@ -32,7 +37,7 @@ async function setPassword(username: string, password: string) {
 
 async function main() {
   for (const login of DEFAULT_SHOP_LOGINS) {
-    const envKey = login.username === 'owner' ? 'OWNER_PASSWORD' : 'STAFF_PASSWORD'
+    const envKey = login.username === 'owner' ? 'OWNER_PASSWORD' : 'DEMO_PASSWORD'
     const password = process.env[envKey]?.trim() || login.password
     await setPassword(login.username, password)
   }

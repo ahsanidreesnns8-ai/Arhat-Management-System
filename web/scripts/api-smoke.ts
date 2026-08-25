@@ -8,7 +8,7 @@ import { requireShopPassword } from './smoke-credentials'
 
 const BASE = process.env.SMOKE_BASE || 'https://arhat-management-system.vercel.app'
 const OWNER_PASSWORD = requireShopPassword('owner')
-const STAFF_PASSWORD = requireShopPassword('staff')
+const DEMO_PASSWORD = requireShopPassword('hasham')
 
 type Result = { name: string; ok: boolean; status: number; detail: string }
 
@@ -88,52 +88,53 @@ async function main() {
   } catch (e) {
     results.push({ name: 'login owner', ok: false, status: 0, detail: String(e) })
   }
-  let staffToken = ''
+  let demoToken = ''
   try {
-    staffToken = await login('staff', STAFF_PASSWORD)
-    results.push({ name: 'login staff', ok: true, status: 200, detail: 'ok' })
+    const r = await req('auth/login', {
+      method: 'POST',
+      body: { username: 'hasham', password: DEMO_PASSWORD },
+    })
+    const data = r.json?.data || {}
+    demoToken = data.token || ''
+    results.push({
+      name: 'login hasham demo',
+      ok: Boolean(demoToken) && data.role === 'OWNER' && data.workspace === 'demo' && data.isDemo === true,
+      status: r.status,
+      detail: `role=${data.role} workspace=${data.workspace} isDemo=${data.isDemo}`,
+    })
   } catch (e) {
-    results.push({ name: 'login staff', ok: false, status: 0, detail: String(e) })
+    results.push({ name: 'login hasham demo', ok: false, status: 0, detail: String(e) })
   }
 
-  if (staffToken) {
+  try {
+    await login('staff', 'Nankana#Desk5831Rtc')
+    results.push({ name: 'login staff removed', ok: false, status: 200, detail: 'staff should be rejected' })
+  } catch {
+    results.push({ name: 'login staff removed', ok: true, status: 401, detail: 'rejected' })
+  }
+
+  if (demoToken) {
     try {
-      const [a, b] = await Promise.all([login('staff', STAFF_PASSWORD), login('staff', STAFF_PASSWORD)])
+      const [a, b] = await Promise.all([
+        login('hasham', DEMO_PASSWORD),
+        login('hasham', DEMO_PASSWORD),
+      ])
       const pulseA = await req('sync/pulse', { token: a })
       const pulseB = await req('sync/pulse', { token: b })
       results.push({
-        name: 'parallel staff sessions',
+        name: 'parallel demo sessions',
         ok: pulseA.status === 200 && pulseB.status === 200 && a !== b,
         status: pulseA.status,
         detail: `tokensDistinct=${a !== b} pulseA=${pulseA.status} pulseB=${pulseB.status}`,
       })
     } catch (e) {
-      results.push({ name: 'parallel staff sessions', ok: false, status: 0, detail: String(e) })
+      results.push({ name: 'parallel demo sessions', ok: false, status: 0, detail: String(e) })
     }
-
-    const staffStats = await req('dashboard/stats', { token: staffToken })
-    const data = staffStats.json?.data || {}
-    results.push({
-      name: 'staff dashboard hides finance',
-      ok:
-        staffStats.status === 200 &&
-        Number(data.pendingPayments || 0) === 0 &&
-        Number(data.revenue || 0) === 0 &&
-        Number(data.commission || 0) === 0,
-      status: staffStats.status,
-      detail: `pending=${data.pendingPayments} revenue=${data.revenue} commission=${data.commission}`,
-    })
     results.push(
-      await check('staff commission blocked', 'reports/commission', {
-        token: staffToken,
-        expect: 403,
-      }),
+      await check('demo owner commission', 'reports/commission', { token: demoToken }),
     )
     results.push(
-      await check('staff profit blocked', 'reports/profit', {
-        token: staffToken,
-        expect: 403,
-      }),
+      await check('demo owner panel users', 'users', { token: demoToken }),
     )
   }
   for (const [u, p] of [
@@ -222,6 +223,31 @@ async function main() {
       },
     }),
   )
+
+  if (liveToken && demoToken) {
+    const stamp = `ISO-${Date.now()}`
+    const create = await req('farmers', {
+      method: 'POST',
+      token: demoToken,
+      body: { name: `Demo Isolation ${stamp}`, city: 'Lahore', code: stamp },
+    })
+    const demoId = create.json?.data?.id
+    const liveList = await req('farmers', { token: liveToken })
+    const rows = Array.isArray(liveList.json?.data) ? liveList.json.data : []
+    const leaked = rows.some(
+      (row: { name?: string; farmerId?: string; code?: string }) =>
+        row.name === `Demo Isolation ${stamp}` || row.farmerId === stamp || row.code === stamp,
+    )
+    results.push({
+      name: 'demo data hidden from live owner',
+      ok: create.status >= 200 && create.status < 300 && !leaked,
+      status: create.status,
+      detail: leaked ? 'demo farmer leaked into live' : `created=${Boolean(demoId)} isolated=true`,
+    })
+    if (demoId) {
+      await req(`farmers/${demoId}`, { method: 'DELETE', token: demoToken })
+    }
+  }
 
   const failed = results.filter((r) => !r.ok)
   for (const r of results) {

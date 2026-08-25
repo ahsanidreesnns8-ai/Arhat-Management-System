@@ -3,10 +3,10 @@ import { useLanguage } from '../../context/LanguageContext'
 
 const steps = [
   {
-    enTitle: 'Secure staff login',
-    urTitle: 'محفوظ عملہ لاگ اِن',
-    en: 'Owner creates users with roles. Staff sign in with username and password. Theme & language preferences are saved.',
-    ur: 'مالک رولز کے ساتھ یوزر بناتا ہے۔ عملہ یوزر نیم/پاس ورڈ سے داخل ہوتا ہے۔ تھیم اور زبان محفوظ رہتی ہے۔',
+    enTitle: 'Secure login',
+    urTitle: 'محفوظ لاگ اِن',
+    en: 'Owner signs in with username and password. Extra users can be added from the Owner Panel. Theme & language preferences are saved.',
+    ur: 'مالک یوزر نیم/پاس ورڈ سے داخل ہوتا ہے۔ اضافی یوزر مالک پینل سے بنائے جا سکتے ہیں۔ تھیم اور زبان محفوظ رہتی ہے۔',
   },
   {
     enTitle: 'Register parties & assets',

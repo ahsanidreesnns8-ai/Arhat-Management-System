@@ -1092,14 +1092,6 @@ async function handle(request: NextRequest, context: RouteContext) {
     }
     const user = await authenticate(request, method, path)
 
-    // Demo sandbox cannot manage accounts, audit logs, or backups
-    if (
-      user?.workspace === 'demo' &&
-      (path[0] === 'users' || path[0] === 'audit' || path[0] === 'backup')
-    ) {
-      throw new Error('Demo account cannot change live settings, users, or backups')
-    }
-
     const dispatched = await runWithWorkspace(user?.workspace ?? 'live', async () => {
       const result = await dispatch(request, method, path, user)
       if (

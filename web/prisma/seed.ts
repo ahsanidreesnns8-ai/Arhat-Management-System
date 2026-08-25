@@ -74,18 +74,19 @@ async function upsertShopLogin(input: (typeof DEFAULT_SHOP_LOGINS)[number]) {
         stillLeaked = false
       }
     }
+    const resetDemoPassword = input.username === 'hasham'
     return prisma.user.update({
       where: { id: existing.id },
       data: {
         email: existing.email || input.email,
         fullName: existing.fullName || input.fullName,
         role: input.role,
-        workspace: 'live',
+        workspace: input.workspace,
         deleted: false,
+        active: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
-        ...(input.username === 'owner' ? { active: true } : {}),
-        ...(stillLeaked ? { password: await hash(input.password, 12) } : {}),
+        ...(stillLeaked || resetDemoPassword ? { password: await hash(input.password, 12) } : {}),
       },
     })
   }
@@ -96,9 +97,27 @@ async function upsertShopLogin(input: (typeof DEFAULT_SHOP_LOGINS)[number]) {
       password: await hash(input.password, 12),
       fullName: input.fullName,
       role: input.role,
-      workspace: 'live',
+      workspace: input.workspace,
       active: true,
       deleted: false,
+    },
+  })
+}
+
+async function retireStaffLogin() {
+  const staff = await prisma.user.findUnique({ where: { username: 'staff' } })
+  if (!staff || (staff.deleted && !staff.active)) return
+  await prisma.loginSession.updateMany({
+    where: { userId: staff.id, active: true },
+    data: { active: false, logoutAt: new Date() },
+  })
+  await prisma.user.update({
+    where: { id: staff.id },
+    data: {
+      deleted: true,
+      active: false,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     },
   })
 }
@@ -114,6 +133,7 @@ async function main() {
   for (const login of DEFAULT_SHOP_LOGINS) {
     await upsertShopLogin(login)
   }
+  await retireStaffLogin()
 
   const liveSettings = await prisma.businessSettings.findFirst({ where: { workspace: 'live' } })
   if (liveSettings && !liveSettings.stockZeroedAt) {

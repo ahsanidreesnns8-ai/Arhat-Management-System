@@ -1,5 +1,7 @@
 import { prisma, basePrisma } from '@/server/db'
 import { logAudit } from '@/server/services/audit'
+import { SHARED_SHOP_USERNAMES } from '@/server/allowed-logins'
+import { getWorkspace } from '@/server/workspace'
 
 type BackupMap = Record<string, unknown>
 
@@ -72,7 +74,9 @@ export async function restoreBackup(data: Record<string, unknown>) {
   await prisma.$transaction(async (tx) => {
     const settings = data.settings as BackupMap | undefined
     if (settings) {
-      const current = await tx.businessSettings.findFirst()
+      const current = await tx.businessSettings.findFirst({
+        where: { workspace: getWorkspace() },
+      })
       if (current) {
         await tx.businessSettings.update({
           where: { id: current.id },
@@ -99,7 +103,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
       await tx.product.upsert({
         where: {
           workspace_productCode: {
-            workspace: 'live',
+            workspace: getWorkspace(),
             productCode: code,
           },
         },
@@ -109,7 +113,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
           deleted: false,
         },
         create: {
-          workspace: 'live',
+          workspace: getWorkspace(),
           productCode: code,
           name: String(item.name ?? code),
           active: true,
@@ -122,7 +126,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
       await tx.farmer.upsert({
         where: {
           workspace_farmerId: {
-            workspace: 'live',
+            workspace: getWorkspace(),
             farmerId,
           },
         },
@@ -135,7 +139,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
           active: true,
         },
         create: {
-          workspace: 'live',
+          workspace: getWorkspace(),
           farmerId,
           name: String(item.name ?? farmerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -150,7 +154,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
       await tx.buyer.upsert({
         where: {
           workspace_buyerId: {
-            workspace: 'live',
+            workspace: getWorkspace(),
             buyerId,
           },
         },
@@ -163,7 +167,7 @@ export async function restoreBackup(data: Record<string, unknown>) {
           active: true,
         },
         create: {
-          workspace: 'live',
+          workspace: getWorkspace(),
           buyerId,
           name: String(item.name ?? buyerId),
           phone: item.phone == null ? null : String(item.phone),
@@ -173,14 +177,16 @@ export async function restoreBackup(data: Record<string, unknown>) {
       })
     }
     for (const item of (data.stock as BackupMap[] | undefined) ?? []) {
-      if (item.productId == null) continue
-      const productId = BigInt(String(item.productId))
-      const product = await tx.product.findUnique({ where: { id: productId } })
+      const code = String(item.productCode ?? '')
+      if (!code) continue
+      const product = await tx.product.findFirst({
+        where: { workspace: getWorkspace(), productCode: code },
+      })
       if (!product) continue
       await tx.stock.upsert({
-        where: { productId },
-        update: { quantity: String(item.quantity ?? 0), workspace: 'live' },
-        create: { workspace: 'live', productId, quantity: String(item.quantity ?? 0) },
+        where: { productId: product.id },
+        update: { quantity: String(item.quantity ?? 0) },
+        create: { workspace: getWorkspace(), productId: product.id, quantity: String(item.quantity ?? 0) },
       })
     }
   })
@@ -215,16 +221,16 @@ export async function getShopStorage() {
     paddyBooks,
     arhatLines,
   ] = await Promise.all([
-    basePrisma.farmer.count(),
-    basePrisma.buyer.count(),
-    basePrisma.dheri.count(),
-    basePrisma.sale.count(),
-    basePrisma.payment.count(),
-    basePrisma.truck.count(),
-    basePrisma.registerParty.count(),
-    basePrisma.wheatKhataParty.count(),
-    basePrisma.paddyKhataBook.count(),
-    basePrisma.arhatAmountEntry.count(),
+    prisma.farmer.count(),
+    prisma.buyer.count(),
+    prisma.dheri.count(),
+    prisma.sale.count(),
+    prisma.payment.count(),
+    prisma.truck.count(),
+    prisma.registerParty.count(),
+    prisma.wheatKhataParty.count(),
+    prisma.paddyKhataBook.count(),
+    prisma.arhatAmountEntry.count(),
   ])
   return {
     databaseBytes: bytes,
@@ -247,55 +253,62 @@ export async function getShopStorage() {
 }
 
 export async function wipeShopData(userId?: bigint) {
-  await basePrisma.$executeRawUnsafe(`
-    TRUNCATE TABLE
-      khata_ledger_entries,
-      khata_ledger_people,
-      sale_items,
-      queue_entries,
-      payments,
-      register_entries,
-      wheat_khata_products,
-      wheat_khata_payments,
-      paddy_khata_cash,
-      paddy_khata_sales,
-      paddy_khata_rice,
-      paddy_khata_expenses,
-      paddy_khata_processes,
-      paddy_khata_purchases,
-      stock_transactions,
-      stock_lots,
-      dheris,
-      sales,
-      register_parties,
-      wheat_khata_parties,
-      wheat_khata_money,
-      khata_treasury,
-      grain_khata_books,
-      paddy_khata_parties,
-      paddy_khata_amounts,
-      paddy_khata_books,
-      arhat_amount_entries,
-      login_sessions,
-      audit_logs,
-      daily_trade_sessions,
-      day_batches,
-      trucks,
-      farmers,
-      buyers
-    RESTART IDENTITY CASCADE
-  `)
-  await basePrisma.stock.updateMany({ data: { quantity: 0 } })
-  await basePrisma.user.deleteMany({
-    where: { username: { notIn: ['owner', 'staff'] } },
+  const workspace = getWorkspace()
+
+  // Delete only this workspace. Live and demo sandboxes stay isolated.
+  await prisma.khataLedgerEntry.deleteMany({})
+  await prisma.khataLedgerPerson.deleteMany({})
+  await prisma.saleItem.deleteMany({})
+  await prisma.queueEntry.deleteMany({})
+  await prisma.payment.deleteMany({})
+  await prisma.registerEntry.deleteMany({})
+  await prisma.wheatKhataProduct.deleteMany({})
+  await prisma.wheatKhataPayment.deleteMany({})
+  await prisma.paddyKhataCash.deleteMany({})
+  await prisma.paddyKhataSale.deleteMany({})
+  await prisma.paddyKhataRice.deleteMany({})
+  await prisma.paddyKhataExpense.deleteMany({})
+  await prisma.paddyKhataProcess.deleteMany({})
+  await prisma.paddyKhataPurchase.deleteMany({})
+  await prisma.stockTransaction.deleteMany({})
+  await prisma.stockLot.deleteMany({})
+  await prisma.dheri.deleteMany({})
+  await prisma.sale.deleteMany({})
+  await prisma.registerParty.deleteMany({})
+  await prisma.wheatKhataParty.deleteMany({})
+  await prisma.wheatKhataMoney.deleteMany({})
+  await prisma.khataTreasury.deleteMany({})
+  await prisma.grainKhataBook.deleteMany({})
+  await prisma.paddyKhataParty.deleteMany({})
+  await prisma.paddyKhataAmount.deleteMany({})
+  await prisma.paddyKhataBook.deleteMany({})
+  await prisma.arhatAmountEntry.deleteMany({})
+  await prisma.auditLog.deleteMany({})
+  await prisma.dailyTradeSession.deleteMany({})
+  await prisma.dayBatch.deleteMany({})
+  await prisma.truck.deleteMany({})
+  await prisma.farmer.deleteMany({})
+  await prisma.buyer.deleteMany({})
+  await prisma.loginSession.deleteMany({
+    where: {
+      workspace,
+      ...(userId ? { userId: { not: userId } } : {}),
+    },
   })
-  await basePrisma.syncState.updateMany({ data: { revision: 1 } })
+  await prisma.stock.updateMany({ data: { quantity: 0, lowStockAlert: false } })
+  await basePrisma.user.deleteMany({
+    where: {
+      workspace,
+      username: { notIn: [...SHARED_SHOP_USERNAMES] },
+    },
+  })
+  await prisma.syncState.updateMany({ data: { revision: 1 } })
   if (userId) {
     await logAudit({
       userId,
       action: 'WIPE_SHOP',
       entityType: 'database',
-      newValue: { emptiedAt: new Date().toISOString() },
+      newValue: { emptiedAt: new Date().toISOString(), workspace },
     })
   }
   return getShopStorage()

@@ -12,7 +12,7 @@ export {
 let ensureOnce: Promise<void> | null = null
 
 /**
- * Create owner/staff if missing. Password upgrades happen at login, not on every API call.
+ * Create owner (live) and hasham (demo) if missing. Password upgrades happen at login, not on every API call.
  */
 export function ensureShopLogins() {
   if (!ensureOnce) {
@@ -22,6 +22,27 @@ export function ensureShopLogins() {
     })
   }
   return ensureOnce
+}
+
+async function retireStaffLogin() {
+  const staff = await basePrisma.user.findUnique({
+    where: { username: 'staff' },
+    select: { id: true, deleted: true, active: true },
+  })
+  if (!staff || (staff.deleted && !staff.active)) return
+  await basePrisma.loginSession.updateMany({
+    where: { userId: staff.id, active: true },
+    data: { active: false, logoutAt: new Date() },
+  })
+  await basePrisma.user.update({
+    where: { id: staff.id },
+    data: {
+      deleted: true,
+      active: false,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  })
 }
 
 async function repairShopLogins() {
@@ -47,7 +68,7 @@ async function repairShopLogins() {
           password: await hashPassword(login.password),
           fullName: login.fullName,
           role: login.role,
-          workspace: 'live',
+          workspace: login.workspace,
           active: true,
           deleted: false,
         },
@@ -55,10 +76,13 @@ async function repairShopLogins() {
       continue
     }
 
-    const needsRepair =
+    const converting =
       existing.deleted ||
-      (login.username === 'owner' && !existing.active) ||
+      !existing.active ||
       existing.role !== login.role ||
+      (existing.workspace || 'live') !== login.workspace
+    const needsRepair =
+      converting ||
       !(existing.email || '').trim() ||
       !(existing.fullName || '').trim()
     if (!needsRepair) continue
@@ -69,12 +93,17 @@ async function repairShopLogins() {
         email: existing.email || login.email,
         fullName: existing.fullName || login.fullName,
         role: login.role,
-        workspace: existing.workspace || 'live',
+        workspace: login.workspace,
         deleted: false,
+        active: true,
         failedLoginAttempts: 0,
         lockedUntil: null,
-        ...(login.username === 'owner' ? { active: true } : {}),
+        ...(login.username === 'hasham' && converting
+          ? { password: await hashPassword(login.password) }
+          : {}),
       },
     })
   }
+
+  await retireStaffLogin()
 }

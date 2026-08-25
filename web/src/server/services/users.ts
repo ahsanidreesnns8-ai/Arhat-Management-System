@@ -2,11 +2,13 @@ import type { User, UserRole } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { hashPassword } from '@/server/auth'
 import {
+  isReservedLoginUsername,
   isSharedShopLogin,
   normalizeLoginUsername,
 } from '@/server/allowed-logins'
 import { assertStrongPassword } from '@/server/password-policy'
 import { endAllSessionsForUser } from '@/server/services/login-sessions'
+import { getWorkspace } from '@/server/workspace'
 
 export type UserInput = {
   username?: string
@@ -53,9 +55,13 @@ function localEmail(username: string) {
   return `${username}@local.rehmani`
 }
 
+function currentWorkspace() {
+  return getWorkspace()
+}
+
 export async function listUsers() {
   const rows = await prisma.user.findMany({
-    where: { deleted: false },
+    where: { deleted: false, workspace: currentWorkspace() },
     orderBy: { createdAt: 'desc' },
   })
   return rows.map(userDto)
@@ -63,7 +69,7 @@ export async function listUsers() {
 
 export async function getUser(id: number | bigint) {
   const row = await prisma.user.findFirst({
-    where: { id: BigInt(id), deleted: false },
+    where: { id: BigInt(id), deleted: false, workspace: currentWorkspace() },
   })
   if (!row) throw new Error('User not found')
   return userDto(row)
@@ -71,7 +77,7 @@ export async function getUser(id: number | bigint) {
 
 export async function createUser(input: UserInput) {
   const username = parseUsername(input.username)
-  if (isSharedShopLogin(username)) {
+  if (isReservedLoginUsername(username)) {
     throw new Error('That username is reserved for the shop login')
   }
   if (!input.fullName?.trim()) throw new Error('Name is required')
@@ -104,7 +110,7 @@ export async function createUser(input: UserInput) {
     password,
     fullName: input.fullName.trim(),
     role,
-    workspace: 'live' as const,
+    workspace: currentWorkspace(),
     active: input.active ?? true,
     deleted: false,
     failedLoginAttempts: 0,
@@ -128,7 +134,7 @@ export async function updateUser(id: number | bigint, input: UserInput) {
   if (!input.fullName?.trim()) throw new Error('Name is required')
   const role = parseRole(input.role)
   const existing = await prisma.user.findFirst({
-    where: { id: BigInt(id), deleted: false },
+    where: { id: BigInt(id), deleted: false, workspace: currentWorkspace() },
   })
   if (!existing) throw new Error('User not found')
   if (isSharedShopLogin(existing.username) && username !== existing.username) {
@@ -173,7 +179,7 @@ export async function updateUser(id: number | bigint, input: UserInput) {
 
 export async function updatePassword(id: number | bigint, newPassword: string) {
   const existing = await prisma.user.findFirst({
-    where: { id: BigInt(id), deleted: false },
+    where: { id: BigInt(id), deleted: false, workspace: currentWorkspace() },
   })
   if (!existing) throw new Error('User not found')
   if (!newPassword?.trim()) throw new Error('Password is required')
@@ -191,10 +197,10 @@ export async function updatePassword(id: number | bigint, newPassword: string) {
 
 export async function setUserActive(id: number | bigint, active: boolean) {
   const existing = await prisma.user.findFirst({
-    where: { id: BigInt(id), deleted: false },
+    where: { id: BigInt(id), deleted: false, workspace: currentWorkspace() },
   })
   if (!existing) throw new Error('User not found')
-  if (existing.username === 'owner' || existing.role === 'OWNER') {
+  if (existing.username === 'owner' || existing.username === 'hasham' || existing.role === 'OWNER') {
     throw new Error('Owner account cannot be suspended')
   }
   await prisma.user.update({ where: { id: existing.id }, data: { active } })
