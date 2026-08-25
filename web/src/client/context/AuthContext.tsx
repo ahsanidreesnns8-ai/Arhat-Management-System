@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event('rehmani:auth-changed'))
   }
 
-  // Keep staff access-time accurate while the tab stays open
+  // Keep access-time accurate while the tab stays open
   useEffect(() => {
     if (!user?.token) return
     const beat = () => {

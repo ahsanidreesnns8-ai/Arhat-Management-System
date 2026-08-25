@@ -1,5 +1,5 @@
 /**
- * Shared owner/staff logins + owner-only finance fields.
+ * Shared owner/hasham logins + owner-only finance fields.
  * Demo workspace for sales; live login users only for session/lockout checks.
  * Usage: cd web && npx tsx scripts/smoke-shared-accounts.ts
  */
@@ -21,7 +21,7 @@ import { runWithWorkspace } from '../src/server/workspace'
 import { requireShopPassword } from './smoke-credentials'
 
 const stamp = `SHR${Date.now().toString().slice(-8)}`
-const STAFF_PASSWORD = requireShopPassword('staff')
+const DEMO_PASSWORD = requireShopPassword('hasham')
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message)
@@ -36,48 +36,55 @@ async function main() {
       typeof ownerStats.commission === 'number',
     'owner stats must include finance fields',
   )
-  assert(staffStats.pendingPayments === 0, 'staff pendingPayments must be 0')
-  assert(staffStats.revenue === 0, 'staff revenue must be 0')
-  assert(staffStats.commission === 0, 'staff commission must be 0')
+  assert(staffStats.pendingPayments === 0, 'operator pendingPayments must be 0')
+  assert(staffStats.revenue === 0, 'operator revenue must be 0')
+  assert(staffStats.commission === 0, 'operator commission must be 0')
   assert(
     staffStats.todaySales === ownerStats.todaySales,
-    'staff still sees today sales operational total',
+    'operator still sees today sales operational total',
   )
   console.log('dashboard finance redaction OK')
 
-  const staffUser = await prisma.user.findFirst({
-    where: { username: 'staff', deleted: false },
+  const retiredStaff = await prisma.user.findFirst({
+    where: { username: 'staff', deleted: false, active: true },
   })
-  assert(staffUser, 'staff user must exist')
+  assert(!retiredStaff, 'staff login must be retired')
+
+  const demoUser = await prisma.user.findFirst({
+    where: { username: 'hasham', deleted: false },
+  })
+  assert(demoUser, 'hasham demo user must exist')
+  assert(demoUser.role === 'OWNER', 'hasham must be OWNER')
+  assert(demoUser.workspace === 'demo', 'hasham must use demo workspace')
 
   const createdSessionIds: bigint[] = []
   try {
     const [sessionA, sessionB] = await Promise.all([
       startLoginSession({
-        userId: staffUser.id,
-        workspace: staffUser.workspace || 'live',
+        userId: demoUser.id,
+        workspace: demoUser.workspace || 'demo',
         userAgent: 'smoke-a',
       }),
       startLoginSession({
-        userId: staffUser.id,
-        workspace: staffUser.workspace || 'live',
+        userId: demoUser.id,
+        workspace: demoUser.workspace || 'demo',
         userAgent: 'smoke-b',
       }),
     ])
     createdSessionIds.push(sessionA.id, sessionB.id)
-    assert(sessionA.id !== sessionB.id, 'concurrent staff sessions must be distinct')
-    assert(sessionA.active && sessionB.active, 'both staff sessions must stay active')
+    assert(sessionA.id !== sessionB.id, 'concurrent demo sessions must be distinct')
+    assert(sessionA.active && sessionB.active, 'both demo sessions must stay active')
     console.log('concurrent login sessions OK', Number(sessionA.id), Number(sessionB.id))
 
     const token = await signToken(
       {
-        id: staffUser.id,
-        username: staffUser.username,
-        email: staffUser.email,
-        fullName: staffUser.fullName,
-        role: staffUser.role,
-        themePreference: staffUser.themePreference,
-        workspace: staffUser.workspace,
+        id: demoUser.id,
+        username: demoUser.username,
+        email: demoUser.email,
+        fullName: demoUser.fullName,
+        role: demoUser.role,
+        themePreference: demoUser.themePreference,
+        workspace: demoUser.workspace,
       },
       sessionA.id,
     )
@@ -88,7 +95,7 @@ async function main() {
     console.log('heartbeat missing session OK')
 
     await prisma.user.update({
-      where: { id: staffUser.id },
+      where: { id: demoUser.id },
       data: {
         failedLoginAttempts: 0,
         lockedUntil: new Date(Date.now() + 15 * 60_000),
@@ -96,46 +103,48 @@ async function main() {
     })
     for (let i = 0; i < 6; i++) {
       try {
-        await login('staff', 'wrong-password-smoke')
+        await login('hasham', 'wrong-password-smoke')
         throw new Error('wrong password should fail')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         assert(
           message === 'Invalid username or password',
-          `shared staff must not lock out, got: ${message}`,
+          `shared demo must not lock out, got: ${message}`,
         )
       }
     }
     const refreshed = await prisma.user.findFirst({
-      where: { id: staffUser.id },
+      where: { id: demoUser.id },
     })
-    assert(!refreshed?.lockedUntil, 'shared staff lock must be cleared after a mistype')
+    assert(!refreshed?.lockedUntil, 'shared demo lock must be cleared after a mistype')
     assert(
       (refreshed?.failedLoginAttempts ?? 0) === 0,
-      'shared staff failed attempts must stay at 0',
+      'shared demo failed attempts must stay at 0',
     )
-    const okLogin = await login('staff', STAFF_PASSWORD, { userAgent: 'smoke-ok' })
+    const okLogin = await login('hasham', DEMO_PASSWORD, { userAgent: 'smoke-ok' })
     createdSessionIds.push(BigInt(okLogin.sessionId))
-    assert(okLogin.token, 'staff must still log in after many mistypes')
+    assert(okLogin.token, 'hasham must still log in after many mistypes')
+    assert(okLogin.isDemo === true, 'hasham login must be demo')
+    assert(okLogin.role === 'OWNER', 'hasham login must be owner')
     await logout(okLogin.token)
-    console.log('shared staff lockout skip OK')
+    console.log('shared demo lockout skip OK')
 
     const [loginOne, loginTwo] = await Promise.all([
-      login('staff', STAFF_PASSWORD, { userAgent: 'smoke-parallel-1' }),
-      login('staff', STAFF_PASSWORD, { userAgent: 'smoke-parallel-2' }),
+      login('hasham', DEMO_PASSWORD, { userAgent: 'smoke-parallel-1' }),
+      login('hasham', DEMO_PASSWORD, { userAgent: 'smoke-parallel-2' }),
     ])
     createdSessionIds.push(BigInt(loginOne.sessionId), BigInt(loginTwo.sessionId))
-    assert(loginOne.token !== loginTwo.token, 'parallel staff logins need distinct tokens')
+    assert(loginOne.token !== loginTwo.token, 'parallel demo logins need distinct tokens')
     assert(
       loginOne.sessionId !== loginTwo.sessionId,
-      'parallel staff logins need distinct sessions',
+      'parallel demo logins need distinct sessions',
     )
     await logout(loginOne.token)
     await logout(loginTwo.token)
-    console.log('parallel staff login OK')
+    console.log('parallel demo login OK')
   } finally {
     await prisma.user.update({
-      where: { id: staffUser.id },
+      where: { id: demoUser.id },
       data: { failedLoginAttempts: 0, lockedUntil: null },
     })
     for (const id of createdSessionIds) {

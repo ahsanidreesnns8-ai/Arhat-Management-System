@@ -98,8 +98,8 @@ model User {
   @@map("users")
 }
 
-/// Tracks each login so owners can see how often/how long staff use the site
-// Multiple concurrent sessions per user are required — owner and staff are shared shop logins.
+/// Tracks each login so owners can see how often/how long extra users use the site
+// Multiple concurrent sessions per user are required — owner and hasham are shared shop logins.
 model LoginSession {
   id          BigInt    @id @default(autoincrement())
   userId      BigInt    @map("user_id")

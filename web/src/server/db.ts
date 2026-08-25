@@ -58,6 +58,8 @@ const SCOPED_MODELS = new Set<Prisma.ModelName>([
   'PaddyKhataRice',
   'PaddyKhataSale',
   'PaddyKhataCash',
+  'KhataLedgerPerson',
+  'KhataLedgerEntry',
 ])
 
 function isScoped(model: string | undefined): model is Prisma.ModelName {

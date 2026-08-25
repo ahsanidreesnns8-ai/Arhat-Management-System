@@ -38,7 +38,7 @@ export async function login(
     where: { username: normalized, deleted: false },
   })
 
-  // owner / staff are shared shop logins. Never lock the whole account
+  // owner / hasham are shared shop logins. Never lock the whole account
   // because one person mistyped the password — everyone else still needs in.
   const sharedShopLogin = isSharedShopLogin(normalized)
 

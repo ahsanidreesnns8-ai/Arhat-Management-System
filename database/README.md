@@ -59,5 +59,5 @@ Replace date placeholders like `'2026-08-09'` with the day you want.
 
 ## Default login (app)
 
-- Username: `owner` / `staff`
-- Password: `Nankana#Shop9472Rtc` / `Nankana#Desk5831Rtc`
+- Username: `owner` (live) / `hasham` (demo)
+- Password: `Nankana#Shop9472Rtc` / `hasham123`

@@ -24,7 +24,7 @@ type ShopStorage = {
 
 function isSystemAccount(username: string) {
   const value = username.trim().toLowerCase()
-  return value === 'owner' || value === 'staff'
+  return value === 'owner' || value === 'hasham'
 }
 
 export default function OwnerPage() {
@@ -82,7 +82,7 @@ export default function OwnerPage() {
   }
 
   const toggleActive = async (u: SystemUser) => {
-    if (u.username === 'owner' || u.role === 'OWNER') {
+    if (u.username === 'owner' || u.username === 'hasham' || u.role === 'OWNER') {
       toast.error('Owner account cannot be suspended')
       return
     }
@@ -209,7 +209,7 @@ export default function OwnerPage() {
       setStorage(res.data.data || null)
       setWipeOpen(false)
       setWipeConfirm('')
-      toast.success('Shop is empty. Owner and staff logins still work.')
+      toast.success('This shop is empty. The other shop (live or demo) was not changed.')
       load()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -288,10 +288,10 @@ export default function OwnerPage() {
       <div className="card overflow-hidden">
         <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 text-sm font-semibold flex items-center gap-1.5">
           <Clock className="h-4 w-4 text-primary" />
-          Staff access time
+          Extra user access time
         </div>
         <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-800">
-          How many times and how long staff accounts used this website. Shared owner logins are not listed here.
+          How many times and how long extra users used this shop. Shared owner and demo logins are not listed here.
         </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {(staffUsage?.staff || []).map((row) => (
@@ -334,7 +334,7 @@ export default function OwnerPage() {
             </div>
           ))}
           {!staffUsage?.staff?.length && (
-            <p className="p-3 text-sm text-gray-500">No staff usage yet — staff logins will appear here.</p>
+            <p className="p-3 text-sm text-gray-500">No extra-user logins yet.</p>
           )}
         </div>
       </div>
@@ -344,7 +344,7 @@ export default function OwnerPage() {
           Users
         </div>
         <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-800">
-          Add a name, username, and password so that person can sign in. Change any password — the previous one is deleted. Suspend a user to block the site. Staff cannot do this. The owner login cannot be suspended or deleted.
+          Add a name, username, and password so that person can sign in. Change any password — the previous one is deleted. Suspend a user to block the site. The owner and demo logins cannot be suspended or deleted.
         </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {users.map((u) => {
@@ -388,11 +388,6 @@ export default function OwnerPage() {
                         Delete
                       </Button>
                     </>
-                  )}
-                  {system && u.username !== 'owner' && (
-                    <Button size="sm" variant="secondary" onClick={() => toggleActive(u)}>
-                      {u.active ? 'Suspend' : 'Activate'}
-                    </Button>
                   )}
                 </div>
               </div>
@@ -526,7 +521,7 @@ export default function OwnerPage() {
       <Modal open={wipeOpen} onClose={() => setWipeOpen(false)} title="Start brand new shop">
         <div className="space-y-2.5">
           <p className="text-[12px] text-slate-500">
-            This permanently deletes farmers, buyers, dheris, sales, payments, Wheat Khata, Barley Khata, Maize Khata, Others Khata, Paddy Khata, Arhat Register, and extra users. Owner and staff logins stay. Products and company settings stay. Type START NEW to confirm.
+            This permanently deletes farmers, buyers, dheris, sales, payments, Wheat Khata, Barley Khata, Maize Khata, Others Khata, Paddy Khata, Arhat Register, and extra users in this shop only. Live owner data and demo data stay separate. This shop’s login stays. Products and company settings stay. Type START NEW to confirm.
           </p>
           <Input
             label='Type START NEW *'

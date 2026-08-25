@@ -1,3 +1,5 @@
+import { isCanonicalShopPassword } from '@/server/shop-login-defaults'
+
 const BREACHED_PASSWORDS = new Set([
   'owner123',
   'staff123',
@@ -39,6 +41,8 @@ export const PASSWORD_HINT =
 
 export function assertStrongPassword(password: string, username?: string) {
   const value = password.trim()
+  // Built-in shop terminals (owner live, hasham demo) keep their published passwords.
+  if (isCanonicalShopPassword(username, value)) return
   if (value.length < 10) {
     throw new Error('Password must be at least 10 characters')
   }

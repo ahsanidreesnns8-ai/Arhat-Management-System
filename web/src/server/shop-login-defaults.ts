@@ -11,15 +11,19 @@ export const DEFAULT_SHOP_LOGINS = [
     email: 'owner@rehmanitrading.com',
     fullName: 'Owner',
     role: 'OWNER' as const,
+    workspace: 'live' as const,
   },
   {
-    username: 'staff' as const,
-    password: 'Nankana#Desk5831Rtc',
-    email: 'staff@rehmanitrading.com',
-    fullName: 'Staff',
-    role: 'OPERATOR' as const,
+    username: 'hasham' as const,
+    password: 'hasham123',
+    email: 'hasham@rehmanitrading.com',
+    fullName: 'Hasham',
+    role: 'OWNER' as const,
+    workspace: 'demo' as const,
   },
 ]
+
+export type ShopLogin = (typeof DEFAULT_SHOP_LOGINS)[number]
 
 export function canonicalShopPassword(username: string): string | null {
   const normalized = username.trim().toLowerCase()
@@ -35,4 +39,10 @@ export function isCanonicalShopPassword(username: string | undefined, password: 
 export function legacyLeakedShopPassword(username: string): string | null {
   const normalized = username.trim().toLowerCase()
   return LEGACY_LEAKED_SHOP_PASSWORDS[normalized] ?? null
+}
+
+export function shopLoginWorkspace(username: string): 'live' | 'demo' | null {
+  const normalized = username.trim().toLowerCase()
+  const row = DEFAULT_SHOP_LOGINS.find((login) => login.username === normalized)
+  return row?.workspace ?? null
 }

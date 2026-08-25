@@ -10,12 +10,12 @@
 
 Login accounts (change these in Owner Panel after first login — the old password is then deleted):
 
-| Username | Password |
-|----------|----------|
-| `owner` | `Nankana#Shop9472Rtc` |
-| `staff` | `Nankana#Desk5831Rtc` |
+| Username | Password | Shop |
+|----------|----------|------|
+| `owner` | `Nankana#Shop9472Rtc` | Live business (original data) |
+| `hasham` | `hasham123` | Demo sandbox (same owner screens, separate data) |
 
-Leaked passwords `owner123` / `staff123` are no longer accepted. Extra users can be added, suspended, or deleted in the Owner Panel. Only the owner can change passwords.
+The staff login has been removed. Demo data never writes into the live owner shop. Extra users can be added, suspended, or deleted in the Owner Panel. Only an owner can change passwords.
 
 
 ---
@@ -48,12 +48,12 @@ API: http://localhost:3000/api
 
 Shop logins (created if missing; leaked passwords are upgraded once, then left alone):
 
-| Username | Password |
-|----------|----------|
-| `owner` | `Nankana#Shop9472Rtc` |
-| `staff` | `Nankana#Desk5831Rtc` |
+| Username | Password | Shop |
+|----------|----------|------|
+| `owner` | `Nankana#Shop9472Rtc` | Live |
+| `hasham` | `hasham123` | Demo (isolated from live) |
 
-The owner can change either password in Owner Panel. Extra users cannot reuse leaked passwords.
+The owner can change passwords in Owner Panel. Extra users cannot reuse leaked passwords.
 
 
 ## AI Assistant (Gemini)

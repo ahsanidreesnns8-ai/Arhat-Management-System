@@ -114,7 +114,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   </motion.div>
                 ))}
             </motion.nav>
-            <div className="px-3 py-3 border-t border-white/10">
+            <div className="px-3 py-3 border-t border-white/10 space-y-2">
+              {user?.isDemo && (
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                  Demo shop · separate from live
+                </p>
+              )}
               <CopyrightLine light className="text-[10px] text-slate-400" />
             </div>
           </div>

@@ -1,4 +1,6 @@
 import { prisma } from '@/server/db'
+import { SHARED_SHOP_USERNAMES } from '@/server/allowed-logins'
+import { getWorkspace } from '@/server/workspace'
 
 function durationBetween(start: Date, end: Date) {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000))
@@ -106,8 +108,9 @@ export async function getStaffUsageSummary() {
   const staff = await prisma.user.findMany({
     where: {
       deleted: false,
+      workspace: getWorkspace(),
       role: { not: 'OWNER' },
-      username: { not: 'demo' },
+      username: { notIn: [...SHARED_SHOP_USERNAMES] },
     },
     orderBy: { fullName: 'asc' },
   })

@@ -49,7 +49,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   const setTheme = (newTheme: ThemeMode) => {
-    // Keep theme on this device only. owner/staff are shared logins — writing
+    // Keep theme on this device only. Shared shop logins — writing
     // theme to the user row would overwrite every other person's screen.
     setThemeState(newTheme)
   }

@@ -122,9 +122,14 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
           </motion.button>
 
           <div className="flex items-center gap-1 pl-1.5 border-l border-slate-200/70 dark:border-white/10">
+            {user?.isDemo && (
+              <span className="hidden sm:inline rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Demo
+              </span>
+            )}
             <div
               className="w-8 h-8 rounded-full bg-gradient-to-br from-[#002D62]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center"
-              title={user?.username || ''}
+              title={user?.isDemo ? `${user?.username || ''} · demo` : user?.username || ''}
             >
               <User className="h-4 w-4 text-[#C5A059]" />
             </div>
