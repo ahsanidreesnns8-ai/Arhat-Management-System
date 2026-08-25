@@ -446,11 +446,7 @@ export default function WheatKhataPage({
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description={
-          book.book?.publicId
-            ? `${book.book.publicId} · receive bags from a party and give money; give bags to a company and receive money`
-            : `Separate ${crop} book: receive bags from a party and give money; give bags to a company and receive money.`
-        }
+        description={book.book?.publicId || undefined}
         action={
           <div className="flex flex-wrap gap-2">
             {onBack ? (
@@ -669,7 +665,7 @@ export default function WheatKhataPage({
             {loading ? (
               <div className="p-4"><TableSkeleton rows={4} /></div>
             ) : !book.money.length ? (
-              <p className="p-5 text-sm text-slate-500">No money added yet. Tap Add Money to deposit cash into this khata.</p>
+              <p className="p-5 text-sm text-slate-500">No money added yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -722,11 +718,6 @@ export default function WheatKhataPage({
           </div>
           <div className="px-1">
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
-            <p className="text-[11px] text-slate-500">
-              {isCompany
-                ? 'Owner gives product to the company and receives money from it. Receive Amount adds to total money. Bill lists every bag sale and cash received.'
-                : 'Owner receives product from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
-            </p>
           </div>
           {loading ? (
             <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
@@ -794,7 +785,6 @@ export default function WheatKhataPage({
 
       <Modal open={moneyOpen} onClose={() => setMoneyOpen(false)} title="Add Money">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Cash deposited here increases this khata total and Arhat Amount.</p>
           <Input
             label="Amount (PKR) *"
             type="number"
@@ -820,16 +810,11 @@ export default function WheatKhataPage({
         title={isCompany ? 'Add Company' : 'Add Party'}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {isCompany
-              ? `Company: owner gives ${crop} to them and receives money from them.`
-              : `Party: owner receives ${crop} from them and gives money to them.`}
-          </p>
           <Input
             label="Name *"
             value={partyForm.name}
             onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })}
-            placeholder={isCompany ? 'Type the company name' : 'Type the party name'}
+            placeholder="Search"
           />
           <Input
             label="Address (optional)"
@@ -854,12 +839,6 @@ export default function WheatKhataPage({
         title={isCompany ? 'Give Product to Company' : 'Receive Product from Party'}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Type a few letters of the name (for example ahs) to autofill name and address.
-            {isCompany
-              ? ' Enter number of bags. Those bags are the truck load you are giving and are deducted from stock.'
-              : ' Enter bags received. They add to the total bags from all parties.'}
-          </p>
           <PartyCombobox
             label="Name"
             required
@@ -871,7 +850,7 @@ export default function WheatKhataPage({
             }))}
             value={productForm.partyId}
             onChange={(id) => setProductForm({ ...productForm, partyId: id })}
-            placeholder="Type ahs… then pick the name"
+            placeholder="Search"
             emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedProductParty && (
@@ -956,11 +935,6 @@ export default function WheatKhataPage({
         title={isCompany ? 'Receive Amount from Company' : 'Give Amount to Party'}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {isCompany
-              ? 'Owner gave product to this company. Receive Amount collects money from the company and adds to total money.'
-              : 'Owner received product from this party. Give Amount pays the party and deducts from total money.'}
-          </p>
           <PartyCombobox
             label="Name"
             required
@@ -972,7 +946,7 @@ export default function WheatKhataPage({
             }))}
             value={paymentForm.partyId}
             onChange={(id) => setPaymentForm({ ...paymentForm, partyId: id })}
-            placeholder="Type ahs… then pick the name"
+            placeholder="Search"
             emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedPaymentParty && (

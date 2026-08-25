@@ -40,7 +40,7 @@ const reports: {
     key: 'commission',
     title: 'Commission Report',
     titleUr: 'کمیشن رپورٹ',
-    description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% of total',
+    description: 'Arhat Head 3%, Paledari Head 0.70%, Tolai Head 0.30% of amount',
     hasRange: true,
     ownerOnly: true,
   },
@@ -163,7 +163,6 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        description="Preview reports and print in English or Urdu"
       />
 
       <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
@@ -259,9 +258,9 @@ function PreviewMetrics({ reportKey, data }: { reportKey: ReportKey; data: Repor
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <Metric label="Commission" value={formatCurrency(Number(data.totalCommission || 0))} />
-        <Metric label="Arhat" value={formatCurrency(Number(data.totalArhatShare || 0))} />
-        <Metric label="Munshi" value={formatCurrency(Number(data.totalSupervisorShare || 0))} />
-        <Metric label="Workers" value={formatCurrency(Number(data.totalLaborShare || 0))} />
+        <Metric label="Arhat Head" value={formatCurrency(Number(data.totalArhatShare || 0))} />
+        <Metric label="Paledari Head" value={formatCurrency(Number(data.totalSupervisorShare || 0))} />
+        <Metric label="Tolai Head" value={formatCurrency(Number(data.totalLaborShare || 0))} />
       </div>
     )
   }

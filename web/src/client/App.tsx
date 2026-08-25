@@ -42,6 +42,7 @@ import ArhatRegisterPage from './pages/ArhatRegisterPage'
 import GrainKhataHubPage from './pages/GrainKhataHubPage'
 import PaddyKhataPage from './pages/PaddyKhataPage'
 import ArhatAmountPage from './pages/ArhatAmountPage'
+import CommissionHeadsPage from './pages/CommissionHeadsPage'
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -109,6 +110,9 @@ function AppRoutes() {
         <Route path="others-khata" element={<GrainKhataHubPage crop="other" />} />
         <Route path="paddy-khata" element={<PaddyKhataPage />} />
         <Route path="arhat-amount" element={<ArhatAmountPage />} />
+        <Route path="arhat-head" element={<CommissionHeadsPage />} />
+        <Route path="paledari-head" element={<CommissionHeadsPage />} />
+        <Route path="tolai-head" element={<CommissionHeadsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route
           path="owner"

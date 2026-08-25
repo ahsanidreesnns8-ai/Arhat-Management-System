@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Trash2, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -151,8 +151,7 @@ export default function SalesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sales Module"
-        description="Mixed-source sales — farmer dheri stock + business stock in one invoice"
+        title="Sales"
         action={<Button onClick={openCreate}><Plus className="h-4 w-4" /> New Sale</Button>}
       />
 
@@ -176,7 +175,7 @@ export default function SalesPage() {
                 {sales.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
-                      No sales yet. Create a mixed-source sale to get started.
+                      No sales yet.
                     </td>
                   </tr>
                 )}
@@ -198,6 +197,9 @@ export default function SalesPage() {
                       }`}>{sale.paymentStatus}</span>
                     </td>
                     <td className="px-4 py-3 text-right space-x-1">
+                      <Link to={`/sales/${sale.id}`} className="inline-flex p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Pencil className="h-4 w-4" />
+                      </Link>
                       <Link to={`/sales/${sale.id}`} className="inline-flex p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                         <Eye className="h-4 w-4" />
                       </Link>
@@ -230,7 +232,7 @@ export default function SalesPage() {
               }))}
               value={buyerId}
               onChange={(id) => setBuyerId(id)}
-              placeholder="Type ahs… then pick Ahsan"
+              placeholder="Search"
             />
             <Input label="Sale date" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
             <Input label="Paid now" type="number" min="0" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
@@ -279,7 +281,7 @@ export default function SalesPage() {
                         }))}
                         value={String(item.farmerId || '')}
                         onChange={(id) => updateItem(index, { farmerId: parseInt(id) || undefined })}
-                        placeholder="Type ahs… then pick Ahsan"
+                        placeholder="Search"
                       />
                       <Select label="Dheri" value={String(item.dheriId || '')} onChange={(e) => {
                         const d = dheris.find((x) => x.id === parseInt(e.target.value))

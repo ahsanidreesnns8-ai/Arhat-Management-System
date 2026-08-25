@@ -240,7 +240,7 @@ export default function KhataPersonLedger({
               list="khata-person-names"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Type to search or add a name"
+              placeholder="Search"
               disabled={!!cashPerson}
             />
           </label>

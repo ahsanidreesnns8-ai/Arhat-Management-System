@@ -145,8 +145,7 @@ export default function FarmersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Farmer Management"
-        description="Eye opens the farmer page. Product bill is product only. Total balance on the farmer page shows Arhat Register given/received plus product."
+        title="Farmers"
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
@@ -160,7 +159,7 @@ export default function FarmersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             className="input-field pl-10"
-            placeholder="Search by ID, name, father name, city..."
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

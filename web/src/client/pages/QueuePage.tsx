@@ -128,7 +128,6 @@ export default function QueuePage() {
     <div className="space-y-6">
       <PageHeader
         title="Queue Management"
-        description="Each dheri gets its own independent queue number"
         action={
           <Button onClick={() => setModalOpen(true)}>
             <Plus className="h-4 w-4" />

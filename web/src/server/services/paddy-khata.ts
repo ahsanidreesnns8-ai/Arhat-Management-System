@@ -266,6 +266,15 @@ export async function restoreBook(bookId: number | bigint, userId: bigint) {
   return bookSummary(row)
 }
 
+export async function purgeBook(bookId: number | bigint, userId: bigint) {
+  const book = await prisma.paddyKhataBook.findFirst({
+    where: { id: BigInt(bookId), deleted: true, createdById: userId },
+  })
+  if (!book) throw new Error('Archived Paddy Khata ID not found')
+  await prisma.paddyKhataBook.delete({ where: { id: book.id } })
+  return { id: Number(book.id), publicId: book.publicId, name: book.name, purged: true }
+}
+
 export async function createBook(
   userId: bigint,
   input: { name?: unknown; secret?: unknown; keepInArchive?: unknown },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CheckCircle2, FileText, History, Pencil, RefreshCw, Scale, Warehouse,
+  CheckCircle2, FileText, History, Pencil, RefreshCw, Scale, Trash2, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -9,11 +9,12 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
 import FarmerDetailFields from '../components/forms/FarmerDetailFields'
 import { useLiveReload } from '../context/SyncContext'
-import { buyerApi, dailyTradeApi, farmerApi, settingsApi } from '../services/api'
+import { buyerApi, dailyTradeApi, dheriApi, farmerApi, saleApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency, formatNumber } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
@@ -114,6 +115,9 @@ export default function DailyTradePage() {
   const [stockBagKg, setStockBagKg] = useState('40')
   const [stockRate, setStockRate] = useState('')
   const [editingSaleId, setEditingSaleId] = useState<number | null>(null)
+  const [editingDheriId, setEditingDheriId] = useState<number | null>(null)
+  const [deleteSaleId, setDeleteSaleId] = useState<number | null>(null)
+  const [deleteDheriId, setDeleteDheriId] = useState<number | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -243,6 +247,7 @@ export default function DailyTradePage() {
       setStockBags('')
       setStockRate('')
       setEditingSaleId(null)
+      setEditingDheriId(null)
       setShowDetails(false)
       setBuyerSales([])
       setPickedItemIds([])
@@ -327,6 +332,7 @@ export default function DailyTradePage() {
     const farmerItem = sale.items.find((item) => item.sourceType === 'FARMER') || sale.items[0]
     const stockItem = sale.items.find((item) => item.sourceType === 'BUSINESS_STOCK')
     const receive = (board?.receives || []).find((row) => row.id === farmerItem?.dheriId)
+    setEditingDheriId(null)
     setEditingSaleId(sale.id)
     setFarmerId(String(receive?.farmerId || farmerItem?.farmerId || ''))
     setProductId(String(receive?.productId || productId))
@@ -343,7 +349,82 @@ export default function DailyTradePage() {
     setStockBagKg(String(stockItem?.weightPerBag || bagKg))
     setStockRate(String(stockItem?.rate || ''))
     setShowDetails(true)
-    toast.success('Details loaded — change what you need, then save')
+    toast.success('Loaded for edit')
+  }
+
+  const startEditReceive = (row: BoardReceive) => {
+    const sale = (board?.sales || []).find((s) => s.items.some((i) => i.dheriId === row.id))
+    if (sale) {
+      startEdit(sale)
+      return
+    }
+    setEditingSaleId(null)
+    setEditingDheriId(row.id)
+    setFarmerId(String(row.farmerId || ''))
+    setProductId(String(row.productId || productId))
+    setFarmerBags(String(row.bags || ''))
+    setBagKg(String(row.weightPerBag || bagKg))
+    setExtraKg(String(row.partialBagWeight ?? '0'))
+    setDheriNo(row.dheriId)
+    setFarmerRate(String(row.rate || ''))
+    toast.success('Loaded for edit')
+  }
+
+  const saveEditedDheri = async () => {
+    if (!editingDheriId) return
+    if (!farmerId) return toast.error('Choose a farmer')
+    if (!productId) return toast.error('Choose dheri type')
+    if (!dheriNo.trim()) return toast.error('Enter the dheri number you assigned')
+    if (fBags <= 0) return toast.error('Enter farmer bags')
+    setSelling(true)
+    try {
+      await dheriApi.update(editingDheriId, {
+        farmerId: Number(farmerId),
+        productId: Number(productId),
+        dheriCode: dheriNo.trim(),
+        numberOfBags: fBags,
+        weightPerBag: fBagKg,
+        partialBagWeight: fExtra,
+        marketRate: fRate,
+      })
+      toast.success('Dheri updated')
+      setEditingDheriId(null)
+      await load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not save edits')
+    } finally {
+      setSelling(false)
+    }
+  }
+
+  const confirmDeleteSale = async () => {
+    if (!deleteSaleId) return
+    try {
+      await saleApi.delete(deleteSaleId)
+      toast.success('Sale deleted')
+      if (editingSaleId === deleteSaleId) setEditingSaleId(null)
+      setDeleteSaleId(null)
+      await load(true)
+      if (buyerId) await loadBuyerSales(buyerId)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete sale')
+    }
+  }
+
+  const confirmDeleteDheri = async () => {
+    if (!deleteDheriId) return
+    try {
+      await dheriApi.delete(deleteDheriId)
+      toast.success('Deleted')
+      if (editingDheriId === deleteDheriId) setEditingDheriId(null)
+      setDeleteDheriId(null)
+      await load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete')
+    }
   }
 
   const saleItemRows = useMemo(
@@ -407,11 +488,6 @@ export default function DailyTradePage() {
     <div className="space-y-5">
       <PageHeader
         title="Daily Trade"
-        description={
-          isUrdu
-            ? 'آج کی بوریاں وصول کریں اور فروخت کریں۔ اضافی کلو اسٹاک میں جاتا ہے۔ پہلے نمبر والی ڈھیری پہلے بکنی ہے۔'
-            : 'Receive and sell today’s bags. Extra KG goes to stock. First dheri number in is first sold.'
-        }
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void load()}>
@@ -445,6 +521,8 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Weight</th>
                   <th className="px-3 py-2">Extra KG</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Edit</th>
+                  <th className="px-3 py-2">Delete</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -457,6 +535,24 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">{formatNumber(r.weight)} kg</td>
                     <td className="px-3 py-2">{formatNumber(r.partialBagWeight)}</td>
                     <td className="px-3 py-2">{r.sellingStatus === 'SOLD' ? 'SOLD' : 'IN'}</td>
+                    <td className="px-3 py-2">
+                      <button type="button" className="text-primary text-xs underline inline-flex items-center gap-1" onClick={() => startEditReceive(r)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-rose-600 text-xs underline inline-flex items-center gap-1"
+                        onClick={() => {
+                          const sale = (board?.sales || []).find((s) => s.items.some((i) => i.dheriId === r.id))
+                          if (sale) setDeleteSaleId(sale.id)
+                          else setDeleteDheriId(r.id)
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -492,6 +588,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">{t('bags')}</th>
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Edit</th>
+                  <th className="px-3 py-2">Delete</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -515,6 +612,15 @@ export default function DailyTradePage() {
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>
                     </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-rose-600 text-xs underline inline-flex items-center gap-1"
+                        onClick={() => setDeleteSaleId(s.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -529,7 +635,7 @@ export default function DailyTradePage() {
       </div>
 
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        Extra KG stock now: {formatNumber(stockKg)} kg · amounts round at .5 and above.
+        Extra KG stock now: {formatNumber(stockKg)} kg
       </p>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -542,7 +648,7 @@ export default function DailyTradePage() {
               items={farmerOptions}
               value={farmerId}
               onChange={(id) => setFarmerId(id)}
-              placeholder="Type ahs… then pick Ahsan"
+              placeholder="Search"
             />
             <FarmerDetailFields farmer={farmer} />
             <BagsExtraRow
@@ -585,7 +691,7 @@ export default function DailyTradePage() {
               items={buyerOptions}
               value={buyerId}
               onChange={(id) => setBuyerId(id)}
-              placeholder="Type ahs… then pick Ahsan"
+              placeholder="Search"
             />
             <Input label="Address" value={buyer ? [buyer.address, buyer.city].filter(Boolean).join(', ') : ''} readOnly />
             <Input label="Buyer ID" value={buyer?.buyerId || ''} readOnly />
@@ -599,8 +705,7 @@ export default function DailyTradePage() {
               readOnly
             />
             <Input label="Rate / 40kg *" type="number" step="0.01" value={buyerRate} onChange={(e) => setBuyerRate(e.target.value)} />
-            <Input label="Total price (no commission)" value={buyerLineTotal ? formatCurrency(buyerLineTotal) : '—'} readOnly />
-            <p className="text-xs text-slate-500">Commission is only on the farmer side. Buyer pays this price.</p>
+            <Input label="Total price" value={buyerLineTotal ? formatCurrency(buyerLineTotal) : '—'} readOnly />
             <Link to="/buyers" className="text-sm text-primary underline">Add buyer</Link>
           </div>
         </div>
@@ -634,14 +739,15 @@ export default function DailyTradePage() {
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <Button onClick={() => void handleSold()} loading={selling}>
-          <Scale className="h-4 w-4" /> {editingSaleId ? 'Save edited sale' : 'Mark this one sold'}
+        <Button onClick={() => void (editingDheriId && !editingSaleId ? saveEditedDheri() : handleSold())} loading={selling}>
+          <Scale className="h-4 w-4" /> {editingSaleId ? 'Save edited sale' : editingDheriId ? 'Save edited dheri' : 'Mark this one sold'}
         </Button>
-        {editingSaleId ? (
+        {editingSaleId || editingDheriId ? (
           <Button
             variant="secondary"
             onClick={() => {
               setEditingSaleId(null)
+              setEditingDheriId(null)
               toast('Edit cancelled')
             }}
           >
@@ -711,6 +817,7 @@ export default function DailyTradePage() {
                   <th className="px-3 py-2">Amount</th>
                   <th className="px-3 py-2">Bills</th>
                   <th className="px-3 py-2">Edit</th>
+                  <th className="px-3 py-2">Delete</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -748,6 +855,15 @@ export default function DailyTradePage() {
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>
                     </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-rose-600 text-xs underline inline-flex items-center gap-1"
+                        onClick={() => setDeleteSaleId(row.saleId)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -760,6 +876,22 @@ export default function DailyTradePage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={deleteSaleId !== null}
+        onClose={() => setDeleteSaleId(null)}
+        onConfirm={() => void confirmDeleteSale()}
+        title="Delete this sale?"
+        message="This sale and its dheri sold status will be removed."
+        confirmLabel="Delete"
+      />
+      <ConfirmDialog
+        open={deleteDheriId !== null}
+        onClose={() => setDeleteDheriId(null)}
+        onConfirm={() => void confirmDeleteDheri()}
+        title="Delete this dheri?"
+        message="This dheri will be removed."
+        confirmLabel="Delete"
+      />
     </div>
   )
 }

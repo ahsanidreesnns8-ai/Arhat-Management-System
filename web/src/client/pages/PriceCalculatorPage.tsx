@@ -72,7 +72,6 @@ export default function PriceCalculatorPage() {
     <div className="space-y-6">
       <PageHeader
         title={t('calculator')}
-        description="Scratch pad only — numbers stay here. Nothing is saved to stock, Daily Trade, or records."
       />
 
       <div className="card p-6 lg:p-8">

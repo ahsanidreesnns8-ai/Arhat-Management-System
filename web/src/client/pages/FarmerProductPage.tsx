@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calculator, FileText, PackagePlus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Calculator, FileText, PackagePlus, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
@@ -51,6 +51,7 @@ export default function FarmerProductPage() {
   const [result, setResult] = useState<PriceCalculationResult>(emptyResult)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [editId, setEditId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [nameSearch, setNameSearch] = useState('')
 
@@ -120,6 +121,7 @@ export default function FarmerProductPage() {
     setNotes('')
     setDheriCode('')
     setResult(emptyResult)
+    setEditId(null)
     void suggestNextDheri()
   }
 
@@ -147,18 +149,29 @@ export default function FarmerProductPage() {
 
     setSaving(true)
     try {
-      const res = await arhatApi.settle({
-        settlementType: 'FARMER_PAYABLE',
-        farmerId: Number(farmerId),
-        productId: Number(productId),
-        dheriCode: dheriCode.trim(),
-        ...payload,
-        paymentNow: parseFloat(paymentNow) || 0,
-        paymentMethod,
-        transactionDate,
-        notes: notes || undefined,
-      })
-      toast.success(res.data.data.message || 'Farmer product saved')
+      if (editId) {
+        await dheriApi.update(editId, {
+          farmerId: Number(farmerId),
+          productId: Number(productId),
+          dheriCode: dheriCode.trim(),
+          ...payload,
+          notes: notes || undefined,
+        })
+        toast.success('Farmer product updated')
+      } else {
+        const res = await arhatApi.settle({
+          settlementType: 'FARMER_PAYABLE',
+          farmerId: Number(farmerId),
+          productId: Number(productId),
+          dheriCode: dheriCode.trim(),
+          ...payload,
+          paymentNow: parseFloat(paymentNow) || 0,
+          paymentMethod,
+          transactionDate,
+          notes: notes || undefined,
+        })
+        toast.success(res.data.data.message || 'Farmer product saved')
+      }
       reset()
       loadLists()
       farmerApi.getAll().then((r) => setFarmers(r.data.data))
@@ -205,6 +218,9 @@ export default function FarmerProductPage() {
     { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
     { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
     { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: true },
+    { label: 'Arhat Head (3%)', value: formatCurrency(result.arhatShare) },
+    { label: 'Paledari Head (0.70%)', value: formatCurrency(result.munshiNigranShare) },
+    { label: 'Tolai Head (0.30%)', value: formatCurrency(result.workersShare) },
     { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
   ]
 
@@ -216,7 +232,6 @@ export default function FarmerProductPage() {
     <div className="space-y-6">
       <PageHeader
         title="Farmer Product"
-        description="Each save is a new product row. Generate bill here is product only. Total balance on the farmer page shows already given/received plus product history."
       />
 
       <div className="card-3d overflow-hidden">
@@ -228,7 +243,7 @@ export default function FarmerProductPage() {
                 label=""
                 value={nameSearch}
                 onChange={(e) => setNameSearch(e.target.value)}
-                placeholder="Search Ishaq…"
+                placeholder="Search"
               />
             </div>
             <div className="w-56">
@@ -284,9 +299,24 @@ export default function FarmerProductPage() {
                     <td className="px-4 py-2 font-medium">{formatCurrency(d.farmerReceivable)}</td>
                     <td className="px-4 py-2">{d.sellingStatus}</td>
                     <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-1">
+                      <Button size="sm" variant="secondary" onClick={() => {
+                        setEditId(d.id)
+                        setFarmerId(String(d.farmerId))
+                        setProductId(String(d.productId))
+                        setNumberOfBags(String(d.numberOfBags || 0))
+                        setWeightPerBag(String(d.weightPerBag || 40))
+                        setPartialBagWeight(String(d.partialBagWeight || 0))
+                        setMarketRate(String(d.marketRate || 0))
+                        setNotes(d.notes || '')
+                        setDheriCode(d.dheriId || '')
+                      }}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
                       <Button size="sm" variant="danger" onClick={() => setDeleteId(d.id)}>
                         <Trash2 className="h-3.5 w-3.5" /> Delete
                       </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -299,7 +329,7 @@ export default function FarmerProductPage() {
       <div className="card-3d p-6 lg:p-8">
         <div className="flex items-center gap-2 mb-6">
           <PackagePlus className="h-6 w-6 text-primary" />
-          <h2 className="text-lg font-semibold">Add farmer product</h2>
+          <h2 className="text-lg font-semibold">{editId ? 'Edit farmer product' : 'Add farmer product'}</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -318,7 +348,7 @@ export default function FarmerProductPage() {
               }))}
               value={farmerId}
               onChange={(id) => setFarmerId(id)}
-              placeholder="Type ahs… then pick Ahsan"
+              placeholder="Search"
             />
             <FarmerDetailFields farmer={farmers.find((f) => String(f.id) === farmerId)} />
             <Select
@@ -341,9 +371,6 @@ export default function FarmerProductPage() {
               onExtraKg={setPartialBagWeight}
               onBagKg={setWeightPerBag}
             />
-            <p className="-mt-2 text-xs text-slate-500">
-              Extra KG sits beside bags. 0 if none. Priced at today’s rate and saved to stock with farmer details.
-            </p>
             <Input label="Market Rate / 40kg (optional — set at auction sell)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />
@@ -400,8 +427,8 @@ export default function FarmerProductPage() {
         open={deleteId != null}
         onClose={() => setDeleteId(null)}
         onConfirm={() => void confirmDelete()}
-        title="Delete this farmer product?"
-        message="This product leaves Farmer Product and its commission leaves Arhat Amount. Extra KG stock and other farmers are not changed."
+        title="Delete?"
+        message="This product will be removed."
         confirmLabel="Delete"
         loading={deleting}
       />

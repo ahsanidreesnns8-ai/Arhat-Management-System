@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, Wallet } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Pencil, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import { dheriApi, farmerApi, paymentApi } from '../services/api'
@@ -14,6 +16,7 @@ import type { Dheri, Payment } from '../types'
 
 export default function DheriDetailPage() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const { id } = useParams()
   const dheriId = Number(id)
   const [dheri, setDheri] = useState<Dheri | null>(null)
@@ -23,6 +26,16 @@ export default function DheriDetailPage() {
   const [dateFilter, setDateFilter] = useState('')
   const [payOpen, setPayOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editForm, setEditForm] = useState({
+    numberOfBags: '',
+    weightPerBag: '',
+    partialBagWeight: '',
+    marketRate: '',
+    notes: '',
+  })
 
   const load = useCallback(() => {
     if (!dheriId) return
@@ -47,6 +60,56 @@ export default function DheriDetailPage() {
 
   useEffect(() => { load() }, [load])
 
+  const openEdit = () => {
+    if (!dheri) return
+    setEditForm({
+      numberOfBags: String(dheri.numberOfBags || 0),
+      weightPerBag: String(dheri.weightPerBag || 40),
+      partialBagWeight: String(dheri.partialBagWeight || 0),
+      marketRate: String(dheri.marketRate || 0),
+      notes: dheri.notes || '',
+    })
+    setEditOpen(true)
+  }
+
+  const saveEdit = async () => {
+    if (!dheri) return
+    setSaving(true)
+    try {
+      const res = await dheriApi.update(dheri.id, {
+        numberOfBags: Number(editForm.numberOfBags) || 0,
+        weightPerBag: Number(editForm.weightPerBag) || 40,
+        partialBagWeight: Number(editForm.partialBagWeight) || 0,
+        marketRate: Number(editForm.marketRate) || 0,
+        notes: editForm.notes,
+      })
+      setDheri(res.data.data)
+      setEditOpen(false)
+      toast.success('Dheri updated')
+      load()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!dheri) return
+    setSaving(true)
+    try {
+      await dheriApi.delete(dheri.id)
+      toast.success('Deleted')
+      navigate('/dheris')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading && !dheri) return <TableSkeleton rows={5} />
   if (!dheri) return <p className="text-gray-500">Dheri not found.</p>
 
@@ -58,9 +121,17 @@ export default function DheriDetailPage() {
           title={dheri.dheriId}
           description={`${dheri.productName} · ${dheri.sellingStatus}${dheri.payablePosted ? ' · payable posted' : ''}`}
           action={
-            <Button onClick={() => setPayOpen(true)} disabled={farmerOutstanding <= 0}>
-              <Wallet className="h-4 w-4" /> Pay farmer for this dheri
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={openEdit}>
+                <Pencil className="h-4 w-4" /> Edit
+              </Button>
+              <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
+              <Button onClick={() => setPayOpen(true)} disabled={farmerOutstanding <= 0}>
+                <Wallet className="h-4 w-4" /> Pay farmer for this dheri
+              </Button>
+            </div>
           }
         />
       </div>
@@ -87,7 +158,7 @@ export default function DheriDetailPage() {
         </div>
         <div>
           <p className="text-gray-500">Shares</p>
-          <p className="font-medium">Arhat {formatCurrency(dheri.arhatShare)} · Munshi {formatCurrency(dheri.supervisorShare)} · Workers {formatCurrency(dheri.laborShare)}</p>
+          <p className="font-medium">Arhat Head {formatCurrency(dheri.arhatShare)} · Paledari Head {formatCurrency(dheri.supervisorShare)} · Tolai Head {formatCurrency(dheri.laborShare)}</p>
         </div>
       </div>
 
@@ -135,13 +206,32 @@ export default function DheriDetailPage() {
                   <td className="px-4 py-2 text-gray-500">{p.notes || '—'}</td>
                   <td className="px-4 py-2">
                     {p.paymentType === 'FARMER' && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
-                        onClick={() => { setEditingPayment(p); setPayOpen(true) }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Update
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline"
+                          onClick={() => { setEditingPayment(p); setPayOpen(true) }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Update
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                          onClick={async () => {
+                            if (!confirm('Delete this payment?')) return
+                            try {
+                              await paymentApi.delete(p.id)
+                              toast.success('Payment deleted')
+                              load()
+                            } catch (err: unknown) {
+                              const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                              toast.error(msg || 'Could not delete')
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -161,6 +251,30 @@ export default function DheriDetailPage() {
         outstanding={farmerOutstanding}
         dheriId={dheri.id}
         editingPayment={editingPayment}
+      />
+
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit dheri">
+        <div className="space-y-3">
+          <Input label={t('bags')} type="number" value={editForm.numberOfBags} onChange={(e) => setEditForm({ ...editForm, numberOfBags: e.target.value })} />
+          <Input label="Weight per bag" type="number" value={editForm.weightPerBag} onChange={(e) => setEditForm({ ...editForm, weightPerBag: e.target.value })} />
+          <Input label="Extra KG" type="number" value={editForm.partialBagWeight} onChange={(e) => setEditForm({ ...editForm, partialBagWeight: e.target.value })} />
+          <Input label="Rate / 40kg" type="number" value={editForm.marketRate} onChange={(e) => setEditForm({ ...editForm, marketRate: e.target.value })} />
+          <Input label="Notes" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button loading={saving} onClick={() => void saveEdit()}>Save</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDelete()}
+        title="Delete this dheri?"
+        message="The dheri will be removed."
+        confirmLabel="Delete"
+        loading={saving}
       />
     </div>
   )

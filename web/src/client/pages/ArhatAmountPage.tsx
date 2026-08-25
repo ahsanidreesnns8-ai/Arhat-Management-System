@@ -149,17 +149,14 @@ export default function ArhatAmountPage() {
   const sectionCopy = {
     ADD: {
       title: 'Add Amount',
-      hint: 'Cash you put into Arhat Amount. Buyer receipts, register receiving, and farmer payouts are counted automatically.',
       reason: 'Reason this money was added',
     },
     RECEIVING: {
       title: 'Receiving Amount',
-      hint: 'Extra cash received here, plus automatic receipts from buyers and Arhat Register receiving.',
       reason: 'Reason this money was received',
     },
     GIVING: {
       title: 'Giving Amount',
-      hint: 'Extra cash given here, plus automatic payouts to farmers, Arhat Register giving, and zakat.',
       reason: 'Reason this money was given',
     },
   }[section]
@@ -168,7 +165,6 @@ export default function ArhatAmountPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Amount"
-        description="End-of-day shop cash. Farmer payouts, buyer receipts, register, zakat, and every khata add / give / receive are counted here as they happen."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void openArhatBill()} loading={billing}>
@@ -201,9 +197,9 @@ export default function ArhatAmountPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {([
-          { id: 'ADD' as const, label: 'Add Amount', icon: Banknote, hint: 'Deposit cash into this book' },
-          { id: 'RECEIVING' as const, label: 'Receiving Amount', icon: Wallet, hint: 'Cash in, including buyers' },
-          { id: 'GIVING' as const, label: 'Giving Amount', icon: Coins, hint: 'Cash out, including farmers and zakat' },
+          { id: 'ADD' as const, label: 'Add Amount', icon: Banknote },
+          { id: 'RECEIVING' as const, label: 'Receiving Amount', icon: Wallet },
+          { id: 'GIVING' as const, label: 'Giving Amount', icon: Coins },
         ]).map((item) => (
           <button
             key={item.id}
@@ -215,7 +211,6 @@ export default function ArhatAmountPage() {
           >
             <item.icon className="h-5 w-5 text-primary mb-2" />
             <p className="font-semibold">{item.label}</p>
-            <p className="text-[11px] text-slate-500 mt-1">{item.hint}</p>
           </button>
         ))}
       </div>
@@ -226,7 +221,6 @@ export default function ArhatAmountPage() {
             <Plus className="h-4 w-4" /> {sectionCopy.title}
           </Button>
         </div>
-        <p className="text-[11px] text-slate-500 px-1">{sectionCopy.hint}</p>
         {loading ? (
           <div className="card-3d p-4"><TableSkeleton rows={4} /></div>
         ) : !sectionLines.length ? (
@@ -256,7 +250,6 @@ export default function ArhatAmountPage() {
         title={sectionCopy.title}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">{sectionCopy.hint}</p>
           <Input
             label="Amount (PKR) *"
             type="number"

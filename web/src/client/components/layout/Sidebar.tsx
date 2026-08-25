@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
-  Calculator, PackagePlus, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield, Scale, BookOpen, Wheat, Sprout, Flower2, BookMarked, Leaf, Coins
+  Calculator, PackagePlus, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield, Scale, BookOpen, Wheat, Sprout, Flower2, BookMarked, Leaf, Coins, Landmark, HardHat, Weight
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -29,6 +29,9 @@ const navItems: { to: string; icon: typeof LayoutDashboard; labelKey: Translatio
   { to: '/others-khata', icon: BookMarked, labelKey: 'othersKhata' },
   { to: '/paddy-khata', icon: Leaf, labelKey: 'paddyKhata' },
   { to: '/arhat-amount', icon: Coins, labelKey: 'arhatAmount' },
+  { to: '/arhat-head', icon: Landmark, labelKey: 'arhatHead' },
+  { to: '/paledari-head', icon: HardHat, labelKey: 'paledariHead' },
+  { to: '/tolai-head', icon: Weight, labelKey: 'tolaiHead' },
   { to: '/queue', icon: ListOrdered, labelKey: 'queue' },
   { to: '/sales', icon: Receipt, labelKey: 'sales' },
   { to: '/payments', icon: Wallet, labelKey: 'payments' },

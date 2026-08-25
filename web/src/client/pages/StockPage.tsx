@@ -92,7 +92,6 @@ export default function StockPage() {
     <div className="space-y-6">
       <PageHeader
         title="Stock Management"
-        description="Product totals + Extra KG batches kept separate per farmer/dheri"
         action={
           <div className="flex flex-wrap gap-2">
             <Link to="/daily-trade">

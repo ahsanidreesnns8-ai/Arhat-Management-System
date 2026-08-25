@@ -7,7 +7,7 @@ import type {
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
   GrainKhataBookMeta, KhataHead, KhataTreasuryLine, KhataLedgerPerson, AccountStatement,
   PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataPurchase,
-  ArhatAmountBook, ArhatAmountMergeReport,
+  ArhatAmountBook, ArhatAmountMergeReport, CommissionHeadsBook,
 } from '../types'
 
 const api = axios.create({
@@ -482,6 +482,7 @@ export const paddyKhataApi = {
   create: (data: { name?: string; secret: string; keepInArchive?: boolean }) =>
     api.post<ApiResponse<PaddyKhataBookSummary>>('/paddy-khata', data),
   restoreBook: (id: number) => api.post<ApiResponse<PaddyKhataBookSummary>>(`/paddy-khata/${id}/restore`),
+  purgeBook: (id: number) => api.delete<ApiResponse<{ id: number; purged: boolean }>>(`/paddy-khata/${id}/purge`),
   get: (id: number, secret: string) =>
     api.get<ApiResponse<PaddyKhataBook>>(`/paddy-khata/${id}`, { params: { secret } }),
   previewPurchase: (data: {
@@ -559,6 +560,7 @@ export const truckApi = {
   getById: (id: number) => api.get<ApiResponse<Truck>>(`/trucks/${id}`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Truck>>('/trucks', data),
   update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<Truck>>(`/trucks/${id}`, data),
+  delete: (id: number) => api.delete<ApiResponse<void>>(`/trucks/${id}`),
 }
 
 export const dheriApi = {
@@ -744,6 +746,7 @@ export const reportApi = {
     api.get<ApiResponse<ReportSummary>>('/reports/sales', { params: { from, to } }),
   commission: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/commission', { params: { from, to } }),
+  heads: () => api.get<ApiResponse<CommissionHeadsBook>>('/reports/heads'),
   stock: () => api.get<ApiResponse<ReportSummary>>('/reports/stock'),
   profit: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/profit', { params: { from, to } }),

@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { nextDheriCode, nextDheriQueueNumber, normalizeOwnerCode } from '@/server/ids'
-import { calculatePrice, type PriceInput } from '@/server/services/calculator'
+import { calculatePrice, saveCalculation, type PriceInput } from '@/server/services/calculator'
 
 const dheriInclude = {
   farmer: { select: { id: true, name: true, farmerId: true } },
@@ -183,11 +183,31 @@ export async function createDheri(input: DheriInput) {
 }
 
 export async function updateDheri(id: number | bigint, input: DheriInput) {
-  await getDheri(id)
+  const existing = await prisma.dheri.findFirst({
+    where: { id: BigInt(id), deleted: false },
+  })
+  if (!existing) throw new Error('Dheri not found')
   await validateRelations(input, true)
-  const row = await prisma.dheri.update({
-    where: { id: BigInt(id) },
+  const oldPayable = existing.farmerReceivable
+  let nextCode: string | undefined
+  let nextQueue: number | undefined
+  if (input.dheriCode != null) {
+    const requested = normalizeOwnerCode(input.dheriCode)
+    if (requested && requested !== existing.dheriId) {
+      const taken = await prisma.dheri.findFirst({
+        where: { dheriId: requested, deleted: false, NOT: { id: existing.id } },
+      })
+      if (taken) throw new Error(`Dheri number ${requested} is already used`)
+      await freeDheriCode(requested)
+      nextCode = requested
+      if (/^\d+$/.test(requested)) nextQueue = Number(requested)
+    }
+  }
+  await prisma.dheri.update({
+    where: { id: existing.id },
     data: {
+      ...(nextCode != null && { dheriId: nextCode }),
+      ...(nextQueue != null && { queueNumber: nextQueue }),
       ...(input.farmerId != null && { farmerId: BigInt(input.farmerId) }),
       ...(input.productId != null && { productId: BigInt(input.productId) }),
       ...(input.truckId != null && { truckId: BigInt(input.truckId) }),
@@ -201,9 +221,28 @@ export async function updateDheri(id: number | bigint, input: DheriInput) {
       ...(input.marketRate != null && { marketRate: String(input.marketRate) }),
       ...(input.notes != null && { notes: input.notes }),
     },
+  })
+  await saveCalculation(existing.id, {
+    numberOfBags: input.numberOfBags ?? existing.numberOfBags,
+    weightPerBag: input.weightPerBag ?? existing.weightPerBag.toNumber(),
+    partialBagWeight: input.partialBagWeight ?? existing.partialBagWeight.toNumber(),
+    marketRate: input.marketRate ?? existing.marketRate.toNumber(),
+  })
+  const updated = await prisma.dheri.findFirst({
+    where: { id: existing.id },
     include: dheriInclude,
   })
-  return dheriDto(row)
+  if (!updated) throw new Error('Dheri not found')
+  if (existing.payablePosted) {
+    const delta = updated.farmerReceivable.minus(oldPayable)
+    if (!delta.isZero()) {
+      await prisma.farmer.update({
+        where: { id: updated.farmerId },
+        data: { outstandingBalance: { increment: delta.toFixed(2) } },
+      })
+    }
+  }
+  return dheriDto(updated)
 }
 
 export async function deleteDheri(id: number | bigint) {

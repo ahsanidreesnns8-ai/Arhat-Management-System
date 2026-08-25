@@ -630,6 +630,9 @@ async function dispatch(
       if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
       return result(await reports.getCommissionReport(from, to))
     }
+    if (path[1] === 'heads' && method === 'GET') {
+      return result(await reports.getCommissionHeads())
+    }
     if (path[1] === 'stock' && method === 'GET') {
       return result(await reports.getStockReport())
     }
@@ -784,6 +787,9 @@ async function dispatch(
     }
     if (path[2] === 'restore' && method === 'POST') {
       return result(await paddyKhata.restoreBook(id, userId), 'Paddy Khata ID restored')
+    }
+    if (path[2] === 'purge' && method === 'DELETE') {
+      return result(await paddyKhata.purgeBook(id, userId), 'Paddy Khata ID deleted permanently')
     }
     if (path[2] === 'amounts' && method === 'POST') {
       return result(await paddyKhata.addAmount(id, userId, payload), 'Amount added', 201)

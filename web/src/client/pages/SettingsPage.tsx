@@ -503,11 +503,11 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-4">
             <p className="text-xs text-gray-500 -mt-1 mb-1">
-              Shares are % of total amount. Default: Arhat 3% + Munshi 0.70% + Workers 0.30% = 4%
+              Default: Arhat Head 3% + Paledari Head 0.70% + Tolai Head 0.30% = 4%
             </p>
-            <Input label="Arhat % of total" type="number" step="0.01" value={settings?.arhatSharePercentage ?? 3} onChange={(e) => update('arhatSharePercentage', parseFloat(e.target.value))} />
-            <Input label="Munshi/Nigran % of total" type="number" step="0.01" value={settings?.supervisorSharePercentage ?? 0.7} onChange={(e) => update('supervisorSharePercentage', parseFloat(e.target.value))} />
-            <Input label="Workers % of total" type="number" step="0.01" value={settings?.laborSharePercentage ?? 0.3} onChange={(e) => update('laborSharePercentage', parseFloat(e.target.value))} />
+            <Input label="Arhat Head % of total" type="number" step="0.01" value={settings?.arhatSharePercentage ?? 3} onChange={(e) => update('arhatSharePercentage', parseFloat(e.target.value))} />
+            <Input label="Paledari Head % of total" type="number" step="0.01" value={settings?.supervisorSharePercentage ?? 0.7} onChange={(e) => update('supervisorSharePercentage', parseFloat(e.target.value))} />
+            <Input label="Tolai Head % of total" type="number" step="0.01" value={settings?.laborSharePercentage ?? 0.3} onChange={(e) => update('laborSharePercentage', parseFloat(e.target.value))} />
             <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
               <span className="text-gray-500">Total commission of amount: </span>
               <span className="font-semibold text-primary">
