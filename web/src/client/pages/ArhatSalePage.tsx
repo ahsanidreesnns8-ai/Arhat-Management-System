@@ -181,7 +181,7 @@ export default function ArhatSalePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Arhat Sale" description="Sell to buyer or post farmer payable" />
+      <PageHeader title="Arhat Sale" />
 
       <div className="card-3d p-2 flex flex-wrap gap-2">
         <button
@@ -229,7 +229,7 @@ export default function ArhatSalePage() {
                 }))}
                 value={buyerId}
                 onChange={(id) => setBuyerId(id)}
-                placeholder="Type ahs… then pick Ahsan"
+                placeholder="Search"
               />
             ) : (
               <PartyCombobox
@@ -246,7 +246,7 @@ export default function ArhatSalePage() {
                 }))}
                 value={farmerId}
                 onChange={(id) => setFarmerId(id)}
-                placeholder="Type ahs… then pick Ahsan"
+                placeholder="Search"
               />
             )}
             {mode !== 'BUYER_SALE' && (
@@ -270,7 +270,7 @@ export default function ArhatSalePage() {
                 ]}
                 value={farmerId}
                 onChange={(id) => setFarmerId(id)}
-                placeholder="Type ahs… or pick Business stock"
+                placeholder="Search"
                 showDetails={Boolean(farmerId)}
               />
             )}

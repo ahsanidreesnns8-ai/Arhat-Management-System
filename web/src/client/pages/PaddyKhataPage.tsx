@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Plus, ShoppingBag, Truck, Wallet,
+  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Pencil, Plus, ShoppingBag, Trash2, Truck, Wallet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -60,6 +60,7 @@ export default function PaddyKhataPage() {
   const [createForm, setCreateForm] = useState({ name: '', secret: '', keepInArchive: true })
   const [unlockSecret, setUnlockSecret] = useState('')
   const [deleteBookId, setDeleteBookId] = useState<PaddyKhataBookSummary | null>(null)
+  const [purgeBookId, setPurgeBookId] = useState<PaddyKhataBookSummary | null>(null)
   const [completeOpen, setCompleteOpen] = useState<string | null>(null)
 
   const [amountOpen, setAmountOpen] = useState(false)
@@ -73,6 +74,8 @@ export default function PaddyKhataPage() {
 
   const [amountForm, setAmountForm] = useState({ amount: '', notes: '' })
   const [partyForm, setPartyForm] = useState({ name: '', address: '', notes: '' })
+  const [editPartyId, setEditPartyId] = useState<number | null>(null)
+  const [deleteParty, setDeleteParty] = useState<PaddyKhataParty | null>(null)
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase)
   const [giveForm, setGiveForm] = useState({ partyId: '', amount: '', notes: '' })
   const [processForm, setProcessForm] = useState({ riceVariety: '', bags: '', notes: '' })
@@ -248,15 +251,23 @@ export default function PaddyKhataPage() {
     }
     setSaving(true)
     try {
-      await paddyKhataApi.addParty(book.id, {
-        secret,
-        kind: partyOpen,
-        name: partyForm.name.trim(),
-        address: partyForm.address.trim() || undefined,
-        notes: partyForm.notes.trim() || undefined,
-      })
+      await (editPartyId
+        ? paddyKhataApi.updateParty(book.id, editPartyId, {
+            secret,
+            name: partyForm.name.trim(),
+            address: partyForm.address.trim() || undefined,
+            notes: partyForm.notes.trim() || undefined,
+          })
+        : paddyKhataApi.addParty(book.id, {
+            secret,
+            kind: partyOpen,
+            name: partyForm.name.trim(),
+            address: partyForm.address.trim() || undefined,
+            notes: partyForm.notes.trim() || undefined,
+          }))
       toast.success('Party saved')
       setPartyOpen(null)
+      setEditPartyId(null)
       setPartyForm({ name: '', address: '', notes: '' })
       refresh()
     } catch (err) {
@@ -457,7 +468,6 @@ export default function PaddyKhataPage() {
       <div className="space-y-6">
         <PageHeader
           title="Paddy Khata"
-          description="Create your own Paddy Khata ID with a name and secret code. Cash in each ID also updates Arhat Amount."
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" /> Paddy Khata ID
@@ -472,7 +482,7 @@ export default function PaddyKhataPage() {
               <div className="card-3d p-8 text-center">
                 <Leaf className="h-8 w-8 mx-auto text-[#C5A059] mb-3" />
                 <p className="font-semibold">No live Paddy Khata ID</p>
-                <p className="text-sm text-slate-500 mt-1">Create a new ID to start. Extra IDs stay in archive unless you restore them.</p>
+                <p className="text-sm text-slate-500 mt-1">Create a new ID to start.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -515,9 +525,6 @@ export default function PaddyKhataPage() {
                 <Archive className="h-4 w-4 text-[#C5A059]" />
                 <h2 className="font-semibold">Archive</h2>
               </div>
-              <p className="text-sm text-slate-500">
-                Extra IDs are stored here permanently. Restore one to use it again. ZAFAR TRADERS and Abdul Hadi Traders stay on the live list.
-              </p>
               {!archivedBooks.length ? (
                 <p className="text-sm text-slate-500 card-3d p-4">Archive is empty.</p>
               ) : (
@@ -531,6 +538,7 @@ export default function PaddyKhataPage() {
                           <p className="text-[11px] text-slate-500 mt-1">Archived {new Date(item.archivedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                         )}
                       </div>
+                      <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
                         variant="secondary"
@@ -550,6 +558,14 @@ export default function PaddyKhataPage() {
                       >
                         <ArchiveRestore className="h-3.5 w-3.5" /> Restore
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setPurgeBookId(item)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -571,9 +587,6 @@ export default function PaddyKhataPage() {
               />
               <span>
                 <span className="font-medium">Keep extra IDs in archive</span>
-                <span className="block text-slate-500 mt-1">
-                  Other IDs leave this list and stay stored in Archive. ZAFAR TRADERS and Abdul Hadi Traders stay live.
-                </span>
               </span>
             </label>
             <Button className="w-full" loading={saving} onClick={() => void saveCreate()}>Save ID</Button>
@@ -607,6 +620,28 @@ export default function PaddyKhataPage() {
             }
           }}
         />
+        <ConfirmDialog
+          open={!!purgeBookId}
+          onClose={() => setPurgeBookId(null)}
+          title="Delete permanently?"
+          message={`${purgeBookId?.name || ''} and all of its records will be removed. This cannot be undone.`}
+          confirmLabel="Delete"
+          loading={saving}
+          onConfirm={async () => {
+            if (!purgeBookId) return
+            setSaving(true)
+            try {
+              await paddyKhataApi.purgeBook(purgeBookId.id)
+              toast.success('Deleted')
+              setPurgeBookId(null)
+              await loadList(true)
+            } catch (err) {
+              toast.error(apiMessage(err, 'Could not delete Paddy Khata ID'))
+            } finally {
+              setSaving(false)
+            }
+          }}
+        />
       </div>
     )
   }
@@ -617,7 +652,7 @@ export default function PaddyKhataPage() {
     <div className="space-y-6">
       <PageHeader
         title={book.name}
-        description={`${book.publicId} · cash here also updates Arhat Amount`}
+        description={book.publicId}
         action={
           <Button variant="secondary" onClick={() => { setBook(null); setSection('HOME'); void loadList() }}>
             <ArrowLeft className="h-4 w-4" /> All IDs
@@ -669,7 +704,6 @@ export default function PaddyKhataPage() {
       >
         <p className="text-xs uppercase tracking-wide text-slate-500">Rice</p>
         <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatNumber(totals.riceInStock, 0)} bags in Sell Rice</p>
-        <p className="text-xs text-slate-500 mt-1">Rice appears here only after Processing complete. You can sell only the bags in these frames.</p>
       </button>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -826,7 +860,7 @@ export default function PaddyKhataPage() {
             }}
           />
           <Panel title="Add Amount">
-            <MoneyTable rows={book.amounts} empty="No amount added yet. Cash added here stays in this Paddy Khata ID and also updates Arhat Amount." />
+            <MoneyTable rows={book.amounts} empty="No amount added yet." />
           </Panel>
         </div>
       )}
@@ -834,16 +868,22 @@ export default function PaddyKhataPage() {
       {section === 'PURCHASE' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('PURCHASE') }}><Plus className="h-4 w-4" /> Add Party</Button>
+            <Button onClick={() => { setEditPartyId(null); setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('PURCHASE') }}><Plus className="h-4 w-4" /> Add Party</Button>
             <Button onClick={() => { setPurchaseForm(emptyPurchase); setPurchasePreview(null); setPurchaseOpen(true) }}><Package className="h-4 w-4" /> Purchase Product</Button>
             <Button variant="secondary" onClick={() => setGiveOpen(true)}><Banknote className="h-4 w-4" /> Give Amount</Button>
           </div>
           <PartyCards
             parties={book.purchaseParties}
             mode="PURCHASE"
-            empty="Add a party, then purchase product. Each party keeps its own record."
+            empty="Add a party, then purchase product."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setGiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setGiveOpen(true) }}
+            onEdit={(p) => {
+              setEditPartyId(p.id)
+              setPartyForm({ name: p.name, address: p.address || '', notes: p.notes || '' })
+              setPartyOpen('PURCHASE')
+            }}
+            onDelete={(p) => setDeleteParty(p)}
             cashLabel="Give Amount"
           />
           <Panel title="History">
@@ -888,7 +928,7 @@ export default function PaddyKhataPage() {
       {section === 'VARIETY' && (
         <div className="space-y-3">
           {!book.varieties.length ? (
-            <p className="text-sm text-slate-500">Varieties appear here after Purchase Product. Process starts the mill. Processing complete moves that variety into Sell Rice frames.</p>
+            <p className="text-sm text-slate-500">No varieties yet.</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {book.varieties.map((item) => {
@@ -899,9 +939,6 @@ export default function PaddyKhataPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-lg font-semibold">{item.variety}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Process starts milling. Processing complete moves these bags to a Sell Rice frame.
-                        </p>
                       </div>
                       {milling ? (
                         <span className="shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide">
@@ -968,9 +1005,8 @@ export default function PaddyKhataPage() {
 
       {section === 'RICE' && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Ready rice in Sell Rice: {formatNumber(totals.riceInStock, 0)} bags · sold {formatNumber(totals.soldBags, 0)}. Tap Processing complete on a variety to move bags here. You cannot sell more than the bags in these frames.</p>
           {!book.riceVarieties.length ? (
-            <p className="text-sm text-slate-500">No rice is in Sell Rice yet. Process a variety, then tap Processing complete.</p>
+            <p className="text-sm text-slate-500">No rice is ready yet.</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {book.riceVarieties.map((item) => (
@@ -988,10 +1024,9 @@ export default function PaddyKhataPage() {
       {section === 'SELL' && (
         <div className="space-y-4">
           <div>
-            <h3 className="font-semibold mb-1">Sell Rice</h3>
-            <p className="text-sm text-slate-500 mb-3">Sell only the bags that have been moved here from Variety. Each frame is a processed rice variety.</p>
+            <h3 className="font-semibold mb-3">Sell Rice</h3>
             {!book.riceVarieties.length ? (
-              <p className="text-sm text-slate-500 card-3d p-4">No rice is ready. Open Variety, tap Process, then Processing complete.</p>
+              <p className="text-sm text-slate-500 card-3d p-4">No rice is ready.</p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {book.riceVarieties.map((item) => (
@@ -1005,16 +1040,22 @@ export default function PaddyKhataPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => { setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
+            <Button onClick={() => { setEditPartyId(null); setPartyForm({ name: '', address: '', notes: '' }); setPartyOpen('SALE') }}><Plus className="h-4 w-4" /> Add Party</Button>
             <Button onClick={() => openSell()} disabled={!book.riceVarieties.some((item) => item.remainingBags > 0)}><ShoppingBag className="h-4 w-4" /> Sell Rice</Button>
             <Button variant="secondary" onClick={() => { setReceiveForm({ partyId: '', amount: '', notes: '' }); setReceiveOpen(true) }}><Wallet className="h-4 w-4" /> Receive Amount</Button>
           </div>
           <PartyCards
             parties={book.saleParties}
             mode="SALE"
-            empty="Add a rice party, then sell rice from the frames above. Receive Amount is inside this screen, party by party."
+            empty="Add a rice party, then sell rice from the frames above."
             onBill={(p) => void openBill(undefined, p.id)}
             onCash={(p) => { setReceiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setReceiveOpen(true) }}
+            onEdit={(p) => {
+              setEditPartyId(p.id)
+              setPartyForm({ name: p.name, address: p.address || '', notes: p.notes || '' })
+              setPartyOpen('SALE')
+            }}
+            onDelete={(p) => setDeleteParty(p)}
             cashLabel="Receive Amount"
           />
         </div>
@@ -1028,7 +1069,7 @@ export default function PaddyKhataPage() {
         </div>
       </Modal>
 
-      <Modal open={!!partyOpen} onClose={() => setPartyOpen(null)} title="Add Party">
+      <Modal open={!!partyOpen} onClose={() => { setPartyOpen(null); setEditPartyId(null) }} title={editPartyId ? 'Edit Party' : 'Add Party'}>
         <div className="space-y-3">
           <Input label="Name" value={partyForm.name} onChange={(e) => setPartyForm((s) => ({ ...s, name: e.target.value }))} />
           <Input label="Address" value={partyForm.address} onChange={(e) => setPartyForm((s) => ({ ...s, address: e.target.value }))} />
@@ -1070,7 +1111,6 @@ export default function PaddyKhataPage() {
 
       <Modal open={giveOpen} onClose={() => setGiveOpen(false)} title="Give Amount">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Purchase Product only saves the lot. The amount you type here is deducted from total amount.</p>
           <select className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-transparent px-3 py-2.5" value={giveForm.partyId} onChange={(e) => setGiveForm((s) => ({ ...s, partyId: e.target.value }))}>
             <option value="">Choose party</option>
             {book.purchaseParties.map((p) => <option key={p.id} value={p.id}>{p.name} · remaining {formatCurrency(p.remaining)}</option>)}
@@ -1083,7 +1123,6 @@ export default function PaddyKhataPage() {
 
       <Modal open={!!processOpen} onClose={() => setProcessOpen(null)} title={`Process ${processOpen || ''}`}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">This starts milling. Bags stay on this variety until you tap Processing complete, which moves them into a Sell Rice frame. You cannot sell them before that.</p>
           <Input label="Variety of rice" value={processForm.riceVariety} onChange={(e) => setProcessForm((s) => ({ ...s, riceVariety: e.target.value }))} />
           <Input label="No. of bags" type="number" min="1" value={processForm.bags} onChange={(e) => setProcessForm((s) => ({ ...s, bags: e.target.value }))} />
           <Input label="Note (optional)" value={processForm.notes} onChange={(e) => setProcessForm((s) => ({ ...s, notes: e.target.value }))} />
@@ -1093,27 +1132,14 @@ export default function PaddyKhataPage() {
 
       <Modal open={!!completeOpen} onClose={() => setCompleteOpen(null)} title="Processing complete">
         <div className="space-y-3">
-          {(() => {
-            const frame = book.varieties.find((row) => row.variety === completeOpen)
-            return (
-              <>
-                <p className="text-sm text-slate-500">
-                  {frame
-                    ? `${formatNumber(frame.processingBags, 0)} bags of ${frame.variety} will move from Variety to a Sell Rice frame. You can then sell only that ready stock.`
-                    : 'This variety will move to Sell Rice.'}
-                </p>
-                <Button className="w-full" loading={saving} onClick={() => completeOpen && void saveComplete(completeOpen)}>
-                  Move to Sell Rice
-                </Button>
-              </>
-            )
-          })()}
+          <Button className="w-full" loading={saving} onClick={() => completeOpen && void saveComplete(completeOpen)}>
+            Move to Sell Rice
+          </Button>
         </div>
       </Modal>
 
       <Modal open={!!expenseOpen} onClose={() => setExpenseOpen(null)} title={`Pay Bill/Amount · ${expenseOpen || ''}`}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">This deducts from total amount and adds to this variety’s running amount.</p>
           <Input label="Amount" type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm((s) => ({ ...s, amount: e.target.value }))} />
           <Input label="Bill reason" value={expenseForm.reason} onChange={(e) => setExpenseForm((s) => ({ ...s, reason: e.target.value }))} />
           <Button className="w-full" loading={saving} onClick={() => void saveExpense()}>Save</Button>
@@ -1136,7 +1162,7 @@ export default function PaddyKhataPage() {
               list="ready-rice-varieties"
               value={sellForm.variety}
               onChange={(e) => setSellForm((s) => ({ ...s, variety: e.target.value }))}
-              placeholder="Type to pick a ready variety"
+          placeholder="Search"
             />
             <datalist id="ready-rice-varieties">
               {book.riceVarieties.filter((item) => item.remainingBags > 0).map((item) => (
@@ -1174,13 +1200,35 @@ export default function PaddyKhataPage() {
             {book.saleParties.map((p) => <option key={p.id} value={p.id}>{p.name} · remaining {formatCurrency(p.remaining)}</option>)}
           </select>
           {selectedReceiveParty && (
-            <p className="text-sm text-slate-500">You can receive less now and the rest later. Remaining {formatCurrency(selectedReceiveParty.remaining)}</p>
+            <p className="text-sm text-slate-500">Remaining {formatCurrency(selectedReceiveParty.remaining)}</p>
           )}
           <Input label="Amount" type="number" value={receiveForm.amount} onChange={(e) => setReceiveForm((s) => ({ ...s, amount: e.target.value }))} />
           <Input label="Note (optional)" value={receiveForm.notes} onChange={(e) => setReceiveForm((s) => ({ ...s, notes: e.target.value }))} />
           <Button className="w-full" loading={saving} onClick={() => void saveReceive()}>Save</Button>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteParty}
+        onClose={() => setDeleteParty(null)}
+        title="Delete this party?"
+        message={`${deleteParty?.name || ''} will be removed from this Paddy Khata ID.`}
+        confirmLabel="Delete"
+        loading={saving}
+        onConfirm={async () => {
+          if (!book || !deleteParty) return
+          setSaving(true)
+          try {
+            await paddyKhataApi.deleteParty(book.id, deleteParty.id, secret)
+            toast.success('Deleted')
+            setDeleteParty(null)
+            refresh()
+          } catch (err) {
+            toast.error(apiMessage(err, 'Could not delete party'))
+          } finally {
+            setSaving(false)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -1282,6 +1330,8 @@ function PartyCards({
   mode,
   onBill,
   onCash,
+  onEdit,
+  onDelete,
   cashLabel,
 }: {
   parties: PaddyKhataParty[]
@@ -1289,6 +1339,8 @@ function PartyCards({
   mode: 'PURCHASE' | 'SALE'
   onBill: (party: PaddyKhataParty) => void
   onCash?: (party: PaddyKhataParty) => void
+  onEdit?: (party: PaddyKhataParty) => void
+  onDelete?: (party: PaddyKhataParty) => void
   cashLabel?: string
 }) {
   if (!parties.length) return empty ? <p className="text-sm text-slate-500">{empty}</p> : null
@@ -1333,6 +1385,20 @@ function PartyCards({
             </div>
             {onCash && (
               <Button size="sm" onClick={() => onCash(party)}>{cashLabel || 'Amount'}</Button>
+            )}
+            {(onEdit || onDelete) && (
+              <div className="flex flex-wrap gap-1.5">
+                {onEdit ? (
+                  <Button size="sm" variant="secondary" onClick={() => onEdit(party)}>
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                ) : null}
+                {onDelete ? (
+                  <Button size="sm" variant="danger" onClick={() => onDelete(party)}>
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </Button>
+                ) : null}
+              </div>
             )}
           </div>
         )

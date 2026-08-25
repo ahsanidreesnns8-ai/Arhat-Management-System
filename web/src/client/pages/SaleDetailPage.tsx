@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { billApi, buyerApi, saleApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -13,12 +14,15 @@ import type { Sale } from '../types'
 
 export default function SaleDetailPage() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const { id } = useParams()
   const saleId = Number(id)
   const [sale, setSale] = useState<Sale | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [groupSize, setGroupSize] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!saleId) return
@@ -67,6 +71,21 @@ export default function SaleDetailPage() {
     )
   }
 
+  const confirmDelete = async () => {
+    setDeleting(true)
+    try {
+      await saleApi.delete(saleId)
+      toast.success('Sale deleted')
+      setDeleteOpen(false)
+      navigate('/sales')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete sale')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) return <TableSkeleton rows={6} />
   if (!sale) return <p className="text-gray-500">Sale not found.</p>
 
@@ -91,6 +110,9 @@ export default function SaleDetailPage() {
                   <Button variant="secondary" onClick={() => openBill('farmer', 'ur')}><FileText className="h-4 w-4" /> کسان بل</Button>
                 </>
               )}
+              <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
             </div>
           }
         />
@@ -172,6 +194,16 @@ export default function SaleDetailPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDelete()}
+        title="Delete this sale?"
+        message="The sale will be removed."
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </div>
   )
 }

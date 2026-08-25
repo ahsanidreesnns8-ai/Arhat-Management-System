@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -27,6 +27,7 @@ export default function DheriesPage() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ farmerId: '', productId: '', numberOfBags: '0', partialBagWeight: '0', weightPerBag: '40', marketRate: '0', notes: '' })
   const [saving, setSaving] = useState(false)
 
@@ -60,6 +61,26 @@ export default function DheriesPage() {
       }))
   }, [form.farmerId, dheris, t])
 
+  const openCreate = () => {
+    setEditId(null)
+    setForm({ farmerId: '', productId: '', numberOfBags: '0', partialBagWeight: '0', weightPerBag: '40', marketRate: '0', notes: '' })
+    setModalOpen(true)
+  }
+
+  const openEdit = (d: Dheri) => {
+    setEditId(d.id)
+    setForm({
+      farmerId: String(d.farmerId),
+      productId: String(d.productId || ''),
+      numberOfBags: String(d.numberOfBags || 0),
+      partialBagWeight: String(d.partialBagWeight || 0),
+      weightPerBag: String(d.weightPerBag || 40),
+      marketRate: String(d.marketRate || 0),
+      notes: d.notes || '',
+    })
+    setModalOpen(true)
+  }
+
   const handleCreate = async () => {
     if (!form.farmerId || !form.productId) {
       toast.error('Farmer and product are required')
@@ -67,16 +88,29 @@ export default function DheriesPage() {
     }
     setSaving(true)
     try {
-      await dheriApi.create({
-        farmerId: parseInt(form.farmerId),
-        productId: parseInt(form.productId),
-        numberOfBags: parseInt(form.numberOfBags) || 0,
-        weightPerBag: parseFloat(form.weightPerBag) || 40,
-        partialBagWeight: parseFloat(form.partialBagWeight) || 0,
-        marketRate: parseFloat(form.marketRate) || 0,
-        notes: form.notes,
-      })
-      toast.success('Dheri created')
+      if (editId) {
+        await dheriApi.update(editId, {
+          farmerId: parseInt(form.farmerId),
+          productId: parseInt(form.productId),
+          numberOfBags: parseInt(form.numberOfBags) || 0,
+          weightPerBag: parseFloat(form.weightPerBag) || 40,
+          partialBagWeight: parseFloat(form.partialBagWeight) || 0,
+          marketRate: parseFloat(form.marketRate) || 0,
+          notes: form.notes,
+        })
+        toast.success('Dheri updated')
+      } else {
+        await dheriApi.create({
+          farmerId: parseInt(form.farmerId),
+          productId: parseInt(form.productId),
+          numberOfBags: parseInt(form.numberOfBags) || 0,
+          weightPerBag: parseFloat(form.weightPerBag) || 40,
+          partialBagWeight: parseFloat(form.partialBagWeight) || 0,
+          marketRate: parseFloat(form.marketRate) || 0,
+          notes: form.notes,
+        })
+        toast.success('Dheri created')
+      }
       setModalOpen(false)
       load()
     } catch {
@@ -98,7 +132,7 @@ export default function DheriesPage() {
   }
 
   useVoicePageActions({
-    openCreate: () => setModalOpen(true),
+    openCreate,
     save: () => { void handleCreate() },
     cancel: () => setModalOpen(false),
     refresh: () => load(),
@@ -108,9 +142,8 @@ export default function DheriesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dheri Management"
-        description="Track dheris with queue numbers, weight details, and sale history"
-        action={<Button onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Add Dheri</Button>}
+        title="Dheris"
+        action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Add Dheri</Button>}
       />
 
       <div className="card-3d overflow-hidden">
@@ -137,7 +170,10 @@ export default function DheriesPage() {
                     <td className="p-4 text-right">{d.numberOfBags}</td>
                     <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(d.sellingStatus || 'PENDING')}`}>{(d.sellingStatus || 'PENDING').replace(/_/g, ' ')}</span></td>
                     <td className="p-4 text-right">{formatCurrency(d.totalPrice)}</td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right space-x-1">
+                      <button onClick={() => openEdit(d)} className="p-2 rounded-lg hover:bg-primary/10 text-gray-500 hover:text-primary">
+                        <Pencil className="h-4 w-4" />
+                      </button>
                       <button onClick={() => setDeleteId(d.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-500">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -150,7 +186,7 @@ export default function DheriesPage() {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Dheri">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Edit Dheri' : 'Add Dheri'}>
         <div className="space-y-4">
           <DuplicateSuggestions matches={recentForFarmer} entityLabel="dheri" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,7 +204,7 @@ export default function DheriesPage() {
             }))}
             value={form.farmerId}
             onChange={(id) => setForm({ ...form, farmerId: id })}
-            placeholder="Type ahs… then pick Ahsan"
+            placeholder="Search"
           />
           <Select label="Product *" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}
             options={[{ value: '', label: 'Select' }, ...products.map((p) => ({ value: p.id, label: p.name }))]} />
@@ -188,13 +224,13 @@ export default function DheriesPage() {
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreate} loading={saving}>Create</Button>
+          <Button onClick={handleCreate} loading={saving}>{editId ? 'Save' : 'Create'}</Button>
         </div>
       </Modal>
 
       <ConfirmDialog open={deleteId !== null} onClose={() => setDeleteId(null)} onConfirm={async () => {
         if (deleteId) { await dheriApi.delete(deleteId); toast.success('Deleted'); setDeleteId(null); load() }
-      }} title="Delete farmer product" message="This product leaves the list and its commission leaves Arhat Amount. Extra KG stock is not changed." />
+      }} title="Delete dheri" message="This dheri will be removed." />
     </div>
   )
 }

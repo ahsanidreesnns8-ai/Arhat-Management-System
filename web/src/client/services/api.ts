@@ -7,7 +7,7 @@ import type {
   WheatKhataBook, WheatKhataMoney, WheatKhataParty, WheatKhataProduct, WheatKhataPayment,
   GrainKhataBookMeta, KhataHead, KhataTreasuryLine, KhataLedgerPerson, AccountStatement,
   PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataPurchase,
-  ArhatAmountBook, ArhatAmountMergeReport,
+  ArhatAmountBook, ArhatAmountMergeReport, CommissionHeadsBook,
 } from '../types'
 
 const api = axios.create({
@@ -388,6 +388,10 @@ export const grainKhataApi = {
     api.post<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, '/parties'), withSecret(data, secret)),
   getParty: (bookKey: string, id: number, secret?: string) =>
     api.get<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, `/parties/${id}`), { params: secret ? { secret } : {} }),
+  updateParty: (bookKey: string, id: number, data: { name: string; address?: string; notes?: string }, secret?: string) =>
+    api.put<ApiResponse<WheatKhataParty>>(grainKhataPath(bookKey, `/parties/${id}`), withSecret(data, secret)),
+  deleteParty: (bookKey: string, id: number, secret?: string) =>
+    api.delete<ApiResponse<{ id: number; deleted: boolean }>>(grainKhataPath(bookKey, `/parties/${id}`), { params: secret ? { secret } : {} }),
   previewProduct: (bookKey: string, data: {
     bags?: number
     trucks?: number
@@ -482,6 +486,7 @@ export const paddyKhataApi = {
   create: (data: { name?: string; secret: string; keepInArchive?: boolean }) =>
     api.post<ApiResponse<PaddyKhataBookSummary>>('/paddy-khata', data),
   restoreBook: (id: number) => api.post<ApiResponse<PaddyKhataBookSummary>>(`/paddy-khata/${id}/restore`),
+  purgeBook: (id: number) => api.delete<ApiResponse<{ id: number; purged: boolean }>>(`/paddy-khata/${id}/purge`),
   get: (id: number, secret: string) =>
     api.get<ApiResponse<PaddyKhataBook>>(`/paddy-khata/${id}`, { params: { secret } }),
   previewPurchase: (data: {
@@ -509,6 +514,10 @@ export const paddyKhataApi = {
     api.post(`/paddy-khata/${id}/amounts`, data),
   addParty: (id: number, data: { secret: string; kind: 'PURCHASE' | 'SALE'; name: string; address?: string; notes?: string }) =>
     api.post(`/paddy-khata/${id}/parties`, data),
+  updateParty: (id: number, partyId: number, data: { secret: string; name: string; address?: string; notes?: string }) =>
+    api.put(`/paddy-khata/${id}/parties/${partyId}`, data),
+  deleteParty: (id: number, partyId: number, secret: string) =>
+    api.delete(`/paddy-khata/${id}/parties/${partyId}`, { params: { secret } }),
   addPurchase: (id: number, data: Record<string, unknown>) =>
     api.post(`/paddy-khata/${id}/purchases`, data),
   addCash: (id: number, data: { secret: string; partyId: number; kind: 'GIVE' | 'RECEIVE'; amount: number; notes?: string }) =>
@@ -559,6 +568,7 @@ export const truckApi = {
   getById: (id: number) => api.get<ApiResponse<Truck>>(`/trucks/${id}`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Truck>>('/trucks', data),
   update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<Truck>>(`/trucks/${id}`, data),
+  delete: (id: number) => api.delete<ApiResponse<void>>(`/trucks/${id}`),
 }
 
 export const dheriApi = {
@@ -744,6 +754,7 @@ export const reportApi = {
     api.get<ApiResponse<ReportSummary>>('/reports/sales', { params: { from, to } }),
   commission: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/commission', { params: { from, to } }),
+  heads: () => api.get<ApiResponse<CommissionHeadsBook>>('/reports/heads'),
   stock: () => api.get<ApiResponse<ReportSummary>>('/reports/stock'),
   profit: (from?: string, to?: string) =>
     api.get<ApiResponse<ReportSummary>>('/reports/profit', { params: { from, to } }),

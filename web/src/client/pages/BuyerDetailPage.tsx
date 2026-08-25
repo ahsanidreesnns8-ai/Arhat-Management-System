@@ -10,7 +10,7 @@ import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
-import { buyerApi, paymentApi, registerApi } from '../services/api'
+import { buyerApi, paymentApi, registerApi, saleApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
@@ -231,6 +231,7 @@ export default function BuyerDetailPage() {
                 <th className="px-4 py-2">Paid</th>
                 <th className="px-4 py-2">Remaining</th>
                 <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -248,6 +249,30 @@ export default function BuyerDetailPage() {
                     </td>
                     <td className="px-4 py-2">
                       <PaymentStatusBadge status={paid ? 'PAID' : s.paymentStatus} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex gap-2">
+                        <Link to={`/sales/${s.id}`} className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline">
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Link>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                          onClick={async () => {
+                            if (!confirm('Delete this sale?')) return
+                            try {
+                              await saleApi.delete(s.id)
+                              toast.success('Sale deleted')
+                              load()
+                            } catch (err: unknown) {
+                              const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                              toast.error(msg || 'Could not delete')
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -434,11 +459,6 @@ export default function BuyerDetailPage() {
         title={idCashOpen === 'RECEIVING' ? `Receive on ID ${buyer.buyerId}` : `Give on ID ${buyer.buyerId}`}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {idCashOpen === 'RECEIVING'
-              ? `Record money received from ${buyer.name} (${buyer.buyerId}). Product bill is not changed.`
-              : `Record money given to ${buyer.name} (${buyer.buyerId}). Product bill is not changed.`}
-          </p>
           <Input
             label="Amount (PKR) *"
             type="number"

@@ -21,7 +21,7 @@ export default function PartyCombobox<T extends PartySearchItem>({
   items,
   value,
   onChange,
-  placeholder = 'Type a name, e.g. ahs…',
+  placeholder = 'Search',
   emptyLabel = 'No matching names',
   required,
   showDetails = true,

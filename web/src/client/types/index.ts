@@ -435,6 +435,36 @@ export interface ReportSummary {
   rows?: Record<string, unknown>[]
 }
 
+export interface CommissionHeadLine {
+  id: number
+  dheriNumber: string
+  farmerName: string
+  productName: string
+  bags: number
+  totalPrice: number
+  commission: number
+  share: number
+  createdAt: string
+  date: string
+  time: string
+}
+
+export interface CommissionHead {
+  kind: 'ARHAT' | 'PALEDARI' | 'TOLAI'
+  name: string
+  percentage: number
+  total: number
+  recentlyAdded: CommissionHeadLine[]
+  history: CommissionHeadLine[]
+}
+
+export interface CommissionHeadsBook {
+  commissionPercentage: number
+  arhat: CommissionHead
+  paledari: CommissionHead
+  tolai: CommissionHead
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export interface RegisterParty {

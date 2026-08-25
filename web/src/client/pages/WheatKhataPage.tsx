@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Banknote, Building2, FileText, PackagePlus, Plus, Truck, Wallet } from 'lucide-react'
+import { ArrowLeft, Banknote, Building2, FileText, PackagePlus, Pencil, Plus, Trash2, Truck, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import { billApi, grainKhataApi } from '../services/api'
@@ -149,6 +150,8 @@ export default function WheatKhataPage({
 
   const [moneyOpen, setMoneyOpen] = useState(false)
   const [partyOpen, setPartyOpen] = useState(false)
+  const [editPartyId, setEditPartyId] = useState<number | null>(null)
+  const [deletePartyId, setDeletePartyId] = useState<number | null>(null)
   const [productOpen, setProductOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [detailParty, setDetailParty] = useState<WheatKhataParty | null>(null)
@@ -205,7 +208,19 @@ export default function WheatKhataPage({
 
   const openEntity = (kind: Section) => {
     setSection(kind)
+    setEditPartyId(null)
     setPartyForm({ name: '', address: '', notes: '' })
+    setPartyOpen(true)
+  }
+
+  const openEditEntity = (kind: Section, party: WheatKhataParty) => {
+    setSection(kind)
+    setEditPartyId(party.id)
+    setPartyForm({
+      name: party.name,
+      address: party.address || '',
+      notes: party.notes || '',
+    })
     setPartyOpen(true)
   }
 
@@ -325,14 +340,23 @@ export default function WheatKhataPage({
     const kind = section === 'COMPANY' ? 'COMPANY' : 'PARTY'
     setSaving(true)
     try {
-      await grainKhataApi.addParty(bookKey, {
-        kind,
-        name: partyForm.name.trim(),
-        address: partyForm.address.trim() || undefined,
-        notes: partyForm.notes.trim() || undefined,
-      }, secret || undefined)
+      if (editPartyId) {
+        await grainKhataApi.updateParty(bookKey, editPartyId, {
+          name: partyForm.name.trim(),
+          address: partyForm.address.trim() || undefined,
+          notes: partyForm.notes.trim() || undefined,
+        }, secret || undefined)
+      } else {
+        await grainKhataApi.addParty(bookKey, {
+          kind,
+          name: partyForm.name.trim(),
+          address: partyForm.address.trim() || undefined,
+          notes: partyForm.notes.trim() || undefined,
+        }, secret || undefined)
+      }
       toast.success(kind === 'COMPANY' ? 'Company saved' : 'Party saved')
       setPartyForm({ name: '', address: '', notes: '' })
+      setEditPartyId(null)
       setPartyOpen(false)
       void load(true)
     } catch (err) {
@@ -446,11 +470,7 @@ export default function WheatKhataPage({
     <div className="space-y-6">
       <PageHeader
         title={title}
-        description={
-          book.book?.publicId
-            ? `${book.book.publicId} · receive bags from a party and give money; give bags to a company and receive money`
-            : `Separate ${crop} book: receive bags from a party and give money; give bags to a company and receive money.`
-        }
+        description={book.book?.publicId || undefined}
         action={
           <div className="flex flex-wrap gap-2">
             {onBack ? (
@@ -669,7 +689,7 @@ export default function WheatKhataPage({
             {loading ? (
               <div className="p-4"><TableSkeleton rows={4} /></div>
             ) : !book.money.length ? (
-              <p className="p-5 text-sm text-slate-500">No money added yet. Tap Add Money to deposit cash into this khata.</p>
+              <p className="p-5 text-sm text-slate-500">No money added yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -722,11 +742,6 @@ export default function WheatKhataPage({
           </div>
           <div className="px-1">
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
-            <p className="text-[11px] text-slate-500">
-              {isCompany
-                ? 'Owner gives product to the company and receives money from it. Receive Amount adds to total money. Bill lists every bag sale and cash received.'
-                : 'Owner receives product from the party and gives money to it. Give Amount deducts from total money. Bill lists every receive line and cash given.'}
-            </p>
           </div>
           {loading ? (
             <div className="card-3d p-4"><TableSkeleton rows={3} /></div>
@@ -777,6 +792,12 @@ export default function WheatKhataPage({
                       <FileText className="h-3.5 w-3.5" />
                       Bill
                     </Button>
+                    <Button size="sm" variant="secondary" onClick={() => openEditEntity(section, p)}>
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => setDeletePartyId(p.id)}>
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
                     <button
                       type="button"
                       className="text-[11px] text-slate-500 underline-offset-2 hover:underline"
@@ -794,7 +815,6 @@ export default function WheatKhataPage({
 
       <Modal open={moneyOpen} onClose={() => setMoneyOpen(false)} title="Add Money">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Cash deposited here increases this khata total and Arhat Amount.</p>
           <Input
             label="Amount (PKR) *"
             type="number"
@@ -816,20 +836,14 @@ export default function WheatKhataPage({
 
       <Modal
         open={partyOpen}
-        onClose={() => setPartyOpen(false)}
-        title={isCompany ? 'Add Company' : 'Add Party'}
+        onClose={() => { setPartyOpen(false); setEditPartyId(null) }}
+        title={editPartyId ? (isCompany ? 'Edit Company' : 'Edit Party') : (isCompany ? 'Add Company' : 'Add Party')}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {isCompany
-              ? `Company: owner gives ${crop} to them and receives money from them.`
-              : `Party: owner receives ${crop} from them and gives money to them.`}
-          </p>
           <Input
             label="Name *"
             value={partyForm.name}
             onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })}
-            placeholder={isCompany ? 'Type the company name' : 'Type the party name'}
           />
           <Input
             label="Address (optional)"
@@ -842,7 +856,7 @@ export default function WheatKhataPage({
             onChange={(e) => setPartyForm({ ...partyForm, notes: e.target.value })}
           />
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => setPartyOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => { setPartyOpen(false); setEditPartyId(null) }}>Cancel</Button>
             <Button onClick={() => void saveParty()} loading={saving}>Save</Button>
           </div>
         </div>
@@ -854,12 +868,6 @@ export default function WheatKhataPage({
         title={isCompany ? 'Give Product to Company' : 'Receive Product from Party'}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Type a few letters of the name (for example ahs) to autofill name and address.
-            {isCompany
-              ? ' Enter number of bags. Those bags are the truck load you are giving and are deducted from stock.'
-              : ' Enter bags received. They add to the total bags from all parties.'}
-          </p>
           <PartyCombobox
             label="Name"
             required
@@ -871,7 +879,7 @@ export default function WheatKhataPage({
             }))}
             value={productForm.partyId}
             onChange={(id) => setProductForm({ ...productForm, partyId: id })}
-            placeholder="Type ahs… then pick the name"
+            placeholder="Search"
             emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedProductParty && (
@@ -956,11 +964,6 @@ export default function WheatKhataPage({
         title={isCompany ? 'Receive Amount from Company' : 'Give Amount to Party'}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {isCompany
-              ? 'Owner gave product to this company. Receive Amount collects money from the company and adds to total money.'
-              : 'Owner received product from this party. Give Amount pays the party and deducts from total money.'}
-          </p>
           <PartyCombobox
             label="Name"
             required
@@ -972,7 +975,7 @@ export default function WheatKhataPage({
             }))}
             value={paymentForm.partyId}
             onChange={(id) => setPaymentForm({ ...paymentForm, partyId: id })}
-            placeholder="Type ahs… then pick the name"
+            placeholder="Search"
             emptyLabel={isCompany ? 'Add a company first' : 'Add a party first'}
           />
           {selectedPaymentParty && (
@@ -1138,6 +1141,25 @@ export default function WheatKhataPage({
           </div>
         )}
       </Modal>
+      <ConfirmDialog
+        open={deletePartyId != null}
+        onClose={() => setDeletePartyId(null)}
+        onConfirm={async () => {
+          if (deletePartyId == null) return
+          try {
+            await grainKhataApi.deleteParty(bookKey, deletePartyId, secret || undefined)
+            toast.success('Deleted')
+            setDeletePartyId(null)
+            if (detailParty?.id === deletePartyId) setDetailParty(null)
+            void load(true)
+          } catch (err) {
+            toast.error(apiMessage(err, 'Could not delete'))
+          }
+        }}
+        title="Delete this record?"
+        message="The party or company will be removed from this khata."
+        confirmLabel="Delete"
+      />
     </div>
   )
 }

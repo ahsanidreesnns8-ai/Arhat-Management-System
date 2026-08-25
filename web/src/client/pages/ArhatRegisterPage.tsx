@@ -122,6 +122,15 @@ function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
   return partyFrame(a).amount - partyFrame(b).amount
 }
 
+function isProductLinked(p: RegisterParty) {
+  return Boolean(
+    p.linkedFarmerId ||
+    p.linkedBuyerId ||
+    (p.productTotal || 0) > 0 ||
+    (p.soldTotal || 0) > 0,
+  )
+}
+
 function AccountBreakdown({ party }: { party: RegisterParty }) {
   const side = partyFrame(party)
   const tradeLines = (party.entries || []).filter((row) => !isCashKind(row.kind))
@@ -543,6 +552,16 @@ export default function ArhatRegisterPage() {
           ) : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {!isProductLinked(p) && (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => openMoney('RECEIVING', String(p.id))}>
+                <Wallet className="h-3.5 w-3.5" /> Receive
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
+                <HandCoins className="h-3.5 w-3.5" /> Give
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="ghost" onClick={() => void openEdit(p)}>
             <Eye className="h-3.5 w-3.5" /> Details
           </Button>
@@ -574,7 +593,6 @@ export default function ArhatRegisterPage() {
     <div className="space-y-6">
       <PageHeader
         title="Arhat Register"
-        description="Give or receive cash on an ID. The same ID as a farmer or buyer is one account. Search the ID to see cash, product, sold, and remaining."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -657,7 +675,7 @@ export default function ArhatRegisterPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or ID (R74.1)"
+              placeholder="Search"
               className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 pl-10 pr-3 py-2.5 text-sm"
             />
           </div>
@@ -765,7 +783,7 @@ export default function ArhatRegisterPage() {
         loading ? (
           <div className="card-3d p-4"><TableSkeleton rows={6} /></div>
         ) : !ledgerPeople.length ? (
-          <p className="card-3d p-5 text-sm text-slate-500">Add people in Arhat Register and they will all appear in this ledger.</p>
+          <p className="card-3d p-5 text-sm text-slate-500">No people in this ledger.</p>
         ) : (
           <div className="card-3d overflow-hidden">
             <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
@@ -889,9 +907,6 @@ export default function ArhatRegisterPage() {
 
       <Modal open={personOpen} onClose={() => setPersonOpen(false)} title="Add person">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            If this is the same ID as a farmer or buyer (for example R74.1), later products and sales are added to this account automatically.
-          </p>
           <Input label="Name *" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} />
           <Input label="Address (optional)" value={person.address} onChange={(e) => setPerson({ ...person, address: e.target.value })} />
           <Input label="Note (optional)" value={person.notes} onChange={(e) => setPerson({ ...person, notes: e.target.value })} />
@@ -904,11 +919,6 @@ export default function ArhatRegisterPage() {
 
       <Modal open={giveOpen} onClose={() => setGiveOpen(false)} title={money.kind === 'RECEIVING' ? 'Receive amount' : 'Give amount'}>
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {money.kind === 'RECEIVING'
-              ? 'Owner received this money from the selected person. You can receive more later — the total updates.'
-              : 'Owner gave this money to the selected person. You can give more later — the total updates.'}
-          </p>
           <PartyCombobox
             label="Name"
             required
@@ -920,7 +930,7 @@ export default function ArhatRegisterPage() {
             }))}
             value={money.partyId}
             onChange={(id) => setMoney({ ...money, partyId: id })}
-            placeholder="Type ahs… then pick the name"
+            placeholder="Search"
             emptyLabel="Add a person first"
           />
           {selectedParty && (
@@ -962,9 +972,6 @@ export default function ArhatRegisterPage() {
 
       <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditLedger(null) }} title="Person details" size="lg">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Cash given or received on this ID is combined with farmer product and sales. Each product stays on its own line. Totals update on save.
-          </p>
           {editLedger ? <AccountBreakdown party={editLedger} /> : null}
           {editForm.id ? (
             <Button variant="secondary" onClick={() => void openBalanceBill(editForm.id)}>
@@ -989,7 +996,7 @@ export default function ArhatRegisterPage() {
           <div className="space-y-2">
             <h4 className="text-sm font-semibold">Amounts</h4>
             {!editForm.lines.length ? (
-              <p className="text-sm text-slate-500">No amounts yet. Use Receive amount or Give amount.</p>
+              <p className="text-sm text-slate-500">No amounts yet.</p>
             ) : editForm.lines.map((line, index) => (
               <div
                 key={line.id}
@@ -1088,7 +1095,6 @@ export default function ArhatRegisterPage() {
 
       <Modal open={advanceOpen} onClose={() => setAdvanceOpen(false)} title="Advance payment to farmer">
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">This amount prints on the farmer bill and reduces what is still payable.</p>
           <PartyCombobox
             label="Farmer"
             required
@@ -1103,7 +1109,7 @@ export default function ArhatRegisterPage() {
             }))}
             value={advance.farmerId}
             onChange={(id) => setAdvance({ ...advance, farmerId: id })}
-            placeholder="Type ahs… then pick Ahsan"
+            placeholder="Search"
           />
           <Input
             label="Amount (PKR) *"

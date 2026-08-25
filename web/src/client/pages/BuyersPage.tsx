@@ -141,8 +141,7 @@ export default function BuyersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Buyer Management"
-        description="Eye opens the buyer page. Product bill is sales only. Total balance shows Arhat Register given/received plus purchases."
+        title="Buyers"
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
@@ -156,7 +155,7 @@ export default function BuyersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             className="input-field pl-10"
-            placeholder="Search by ID, name, father name, city..."
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

@@ -630,6 +630,9 @@ async function dispatch(
       if (!isOwnerFinanceRole(user?.role)) throw new Error('Access denied')
       return result(await reports.getCommissionReport(from, to))
     }
+    if (path[1] === 'heads' && method === 'GET') {
+      return result(await reports.getCommissionHeads())
+    }
     if (path[1] === 'stock' && method === 'GET') {
       return result(await reports.getStockReport())
     }
@@ -692,6 +695,12 @@ async function dispatch(
     if (path[2] === 'parties' && path.length === 4 && method === 'GET') {
       return result(await wheatKhata.getParty(numericId(path[3]), bookKey, access))
     }
+    if (path[2] === 'parties' && path.length === 4 && method === 'PUT') {
+      return result(await wheatKhata.updateParty(numericId(path[3]), payload, bookKey, access), 'Party updated')
+    }
+    if (path[2] === 'parties' && path.length === 4 && method === 'DELETE') {
+      return result(await wheatKhata.deleteParty(numericId(path[3]), bookKey, access), 'Party deleted')
+    }
     if (path[2] === 'parties' && method === 'POST') {
       return result(await wheatKhata.createParty(payload, bookKey, access), 'Party saved', 201)
     }
@@ -744,6 +753,12 @@ async function dispatch(
     if (path[1] === 'parties' && path.length === 3 && method === 'GET') {
       return result(await wheatKhata.getParty(numericId(path[2])))
     }
+    if (path[1] === 'parties' && path.length === 3 && method === 'PUT') {
+      return result(await wheatKhata.updateParty(numericId(path[2]), payload), 'Party updated')
+    }
+    if (path[1] === 'parties' && path.length === 3 && method === 'DELETE') {
+      return result(await wheatKhata.deleteParty(numericId(path[2])), 'Party deleted')
+    }
     if (path[1] === 'parties' && method === 'POST') {
       return result(await wheatKhata.createParty(payload), 'Party saved', 201)
     }
@@ -785,8 +800,17 @@ async function dispatch(
     if (path[2] === 'restore' && method === 'POST') {
       return result(await paddyKhata.restoreBook(id, userId), 'Paddy Khata ID restored')
     }
+    if (path[2] === 'purge' && method === 'DELETE') {
+      return result(await paddyKhata.purgeBook(id, userId), 'Paddy Khata ID deleted permanently')
+    }
     if (path[2] === 'amounts' && method === 'POST') {
       return result(await paddyKhata.addAmount(id, userId, payload), 'Amount added', 201)
+    }
+    if (path[2] === 'parties' && path.length === 4 && method === 'PUT') {
+      return result(await paddyKhata.updateParty(id, userId, numericId(path[3]), payload), 'Party updated')
+    }
+    if (path[2] === 'parties' && path.length === 4 && method === 'DELETE') {
+      return result(await paddyKhata.deleteParty(id, userId, numericId(path[3]), secret), 'Party deleted')
     }
     if (path[2] === 'parties' && method === 'POST') {
       return result(await paddyKhata.createParty(id, userId, payload), 'Party saved', 201)

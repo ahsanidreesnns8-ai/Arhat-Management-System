@@ -22,7 +22,6 @@ import { buyerApi, dashboardApi, farmerApi } from '../services/api'
 import { formatCurrency, formatDateTime, formatNumber } from '../utils/format'
 import type { DashboardStats } from '../types'
 import { useAuth } from '../context/AuthContext'
-import { useBusiness } from '../context/BusinessContext'
 import { fadeUp } from '../utils/motion'
 import { isOwnerFinanceRole } from '../../lib/roles'
 
@@ -50,7 +49,6 @@ const activityLink = (entityType?: string) => {
 }
 
 export default function DashboardPage() {
-  const { companyName } = useBusiness()
   const { user } = useAuth()
   const showFinance = isOwnerFinanceRole(user?.role)
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -164,7 +162,6 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`Welcome to ${companyName} — tap any card for full details`}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

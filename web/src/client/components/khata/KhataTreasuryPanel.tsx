@@ -367,7 +367,7 @@ export default function KhataTreasuryPanel({
               list="khata-bank-names"
               value={receiveForm.bankName}
               onChange={(e) => setReceiveForm({ ...receiveForm, bankName: e.target.value })}
-              placeholder="Type to search bank"
+              placeholder="Search"
             />
           </label>
           <Input

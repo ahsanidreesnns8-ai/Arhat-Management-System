@@ -225,7 +225,6 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Payment Records"
-        description="View, update, delete, and record farmer/buyer payments with balance settlement"
         action={
           <Button onClick={() => { setNewType('BUYER'); setNewPartyId(''); setNewOpen(true) }}>
             <Plus className="h-4 w-4" /> Record payment
@@ -238,7 +237,7 @@ export default function PaymentsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             className="input pl-10 w-full"
-            placeholder="Search party, invoice, dheri, notes…"
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -488,7 +487,7 @@ export default function PaymentsPage() {
               }))}
             value={newPartyId}
             onChange={(id) => setNewPartyId(id)}
-            placeholder="Type ahs… then pick Ahsan"
+            placeholder="Search"
             emptyLabel="No parties with outstanding balance"
           />
           <div className="flex justify-end gap-2 pt-2">

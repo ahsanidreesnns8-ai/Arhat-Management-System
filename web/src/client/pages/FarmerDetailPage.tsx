@@ -10,7 +10,7 @@ import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
-import { farmerApi, paymentApi, registerApi } from '../services/api'
+import { dheriApi, farmerApi, paymentApi, registerApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useLanguage } from '../context/LanguageContext'
@@ -162,9 +162,6 @@ export default function FarmerDetailPage() {
         <p className="mt-1 font-medium">{farmer.fatherName || '—'}</p>
         <p className="text-sm text-gray-500">{[farmer.address, farmer.city].filter(Boolean).join(', ') || ''}</p>
         {farmer.notes ? <p className="mt-2 text-sm text-gray-500">{farmer.notes}</p> : null}
-        <p className="mt-2 text-sm text-slate-500">
-          Generate bill here or from Farmer Product prints these dheris only (product calculation). Tap Total balance for Arhat Register given/received plus product history.
-        </p>
         {settled && (
           <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
             <CheckCircle2 className="h-3.5 w-3.5" /> Settled — kept in records
@@ -172,7 +169,7 @@ export default function FarmerDetailPage() {
         )}
       </div>
 
-      <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', t('bags'), 'Farmer amount', 'Status']}>
+      <Section title="Dheri / product history" empty="No dheris" headers={['Dheri', 'Product', t('bags'), 'Farmer amount', 'Status', '']}>
         {dheris.map((d) => (
           <tr key={d.id}>
             <td className="px-4 py-2"><Link className="text-primary" to={`/dheris/${d.id}`}>{d.dheriId}</Link></td>
@@ -180,6 +177,30 @@ export default function FarmerDetailPage() {
             <td className="px-4 py-2">{d.numberOfBags}</td>
             <td className="px-4 py-2 font-medium">{formatCurrency(d.farmerReceivable)}</td>
             <td className="px-4 py-2">{d.sellingStatus}</td>
+            <td className="px-4 py-2">
+              <div className="flex gap-2">
+                <Link to={`/dheris/${d.id}`} className="inline-flex items-center gap-1 text-primary text-xs font-semibold hover:underline">
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Link>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold hover:underline"
+                  onClick={async () => {
+                    if (!confirm('Delete this dheri?')) return
+                    try {
+                      await dheriApi.delete(d.id)
+                      toast.success('Deleted')
+                      load()
+                    } catch (err: unknown) {
+                      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+                      toast.error(msg || 'Could not delete')
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </button>
+              </div>
+            </td>
           </tr>
         ))}
       </Section>
@@ -268,11 +289,6 @@ export default function FarmerDetailPage() {
         title={idCashOpen === 'RECEIVING' ? `Receive on ID ${farmer.farmerId}` : `Give on ID ${farmer.farmerId}`}
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {idCashOpen === 'RECEIVING'
-              ? `Record money received from ${farmer.name} (${farmer.farmerId}). Product bill is not changed.`
-              : `Record money given to ${farmer.name} (${farmer.farmerId}). Product bill is not changed.`}
-          </p>
           <Input
             label="Amount (PKR) *"
             type="number"

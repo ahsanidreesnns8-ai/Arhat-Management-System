@@ -266,6 +266,15 @@ export async function restoreBook(bookId: number | bigint, userId: bigint) {
   return bookSummary(row)
 }
 
+export async function purgeBook(bookId: number | bigint, userId: bigint) {
+  const book = await prisma.paddyKhataBook.findFirst({
+    where: { id: BigInt(bookId), deleted: true, createdById: userId },
+  })
+  if (!book) throw new Error('Archived Paddy Khata ID not found')
+  await prisma.paddyKhataBook.delete({ where: { id: book.id } })
+  return { id: Number(book.id), publicId: book.publicId, name: book.name, purged: true }
+}
+
 export async function createBook(
   userId: bigint,
   input: { name?: unknown; secret?: unknown; keepInArchive?: unknown },
@@ -697,6 +706,58 @@ export async function createParty(
     },
   })
   return { id: Number(row.id), kind: row.kind, name: row.name, address: row.address, notes: row.notes }
+}
+
+export async function updateParty(
+  bookId: number | bigint,
+  userId: bigint,
+  partyId: number | bigint,
+  input: { secret?: unknown; name?: unknown; address?: unknown; notes?: unknown },
+) {
+  const book = await requireBook(bookId, userId, input.secret)
+  const existing = await prisma.paddyKhataParty.findFirst({
+    where: { id: BigInt(partyId), bookId: book.id, deleted: false },
+  })
+  if (!existing) throw new Error('Party not found')
+  const name = String(input.name ?? existing.name).trim()
+  if (!name) throw new Error('Party name is required')
+  const clash = await prisma.paddyKhataParty.findFirst({
+    where: {
+      bookId: book.id,
+      deleted: false,
+      kind: existing.kind,
+      name: { equals: name, mode: 'insensitive' },
+      NOT: { id: existing.id },
+    },
+  })
+  if (clash) throw new Error(`Party ${name} is already used`)
+  const row = await prisma.paddyKhataParty.update({
+    where: { id: existing.id },
+    data: {
+      name,
+      address: parseOptionalText(input.address),
+      notes: parseOptionalText(input.notes),
+    },
+  })
+  return { id: Number(row.id), kind: row.kind, name: row.name, address: row.address, notes: row.notes }
+}
+
+export async function deleteParty(
+  bookId: number | bigint,
+  userId: bigint,
+  partyId: number | bigint,
+  secret: unknown,
+) {
+  const book = await requireBook(bookId, userId, secret)
+  const existing = await prisma.paddyKhataParty.findFirst({
+    where: { id: BigInt(partyId), bookId: book.id, deleted: false },
+  })
+  if (!existing) throw new Error('Party not found')
+  await prisma.paddyKhataParty.update({
+    where: { id: existing.id },
+    data: { deleted: true },
+  })
+  return { id: Number(existing.id), deleted: true }
 }
 
 export async function addPurchase(

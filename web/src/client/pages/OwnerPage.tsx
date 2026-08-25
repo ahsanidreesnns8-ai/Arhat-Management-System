@@ -237,7 +237,6 @@ export default function OwnerPage() {
     <div className="space-y-4">
       <PageHeader
         title="Owner Panel"
-        description="Change your password, add users, suspend access, and manage staff. Staff cannot change passwords."
         action={
           <div className="flex flex-wrap gap-2">
             <Button

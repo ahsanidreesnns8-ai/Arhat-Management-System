@@ -127,7 +127,7 @@ const sections: Array<{
     to: '/reports?type=commission',
     icon: BarChart3,
     title: 'Commission Records',
-    description: 'Arhat 3%, Munshi 0.70%, Workers 0.30% — preview & print',
+    description: 'Arhat Head 3%, Paledari Head 0.70%, Tolai Head 0.30%',
     ownerOnly: true,
   },
   {
@@ -199,7 +199,6 @@ export default function RecordsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Records"
-        description="Saved Daily Trade days plus every record module"
       />
 
       <section className="card-3d overflow-hidden">
