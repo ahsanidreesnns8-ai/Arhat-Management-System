@@ -386,8 +386,12 @@ async function findRegisterPartiesForKeys(keys: Array<string | null | undefined>
   for (const row of parties) {
     const nameKey = normalizeAccountKey(row.name)
     const codeKey = normalizeAccountKey(row.ownerCode)
+    const notesKey = normalizeAccountKey(row.notes)
     const token = firstTokenKey(row.name)
-    const exact = wanted.has(nameKey) || (Boolean(codeKey) && wanted.has(codeKey))
+    const exact =
+      wanted.has(nameKey) ||
+      (Boolean(codeKey) && wanted.has(codeKey)) ||
+      (Boolean(notesKey) && [...wanted].some((key) => notesKey.includes(key)))
     const first = token.length >= 3 && wanted.has(token) && firstCounts.get(token) === 1
     if (exact || first) matched.set(String(row.id), row)
   }
@@ -487,6 +491,27 @@ export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null
 
 const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
 
+async function reclaimLinkedParty(
+  partyId: bigint,
+  field: 'linkedFarmerId' | 'linkedBuyerId',
+  accountId: bigint,
+) {
+  const taken = await prisma.registerParty.findFirst({
+    where: { [field]: accountId, id: { not: partyId } },
+    include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+  })
+  if (!taken) return partyId
+  if (taken.deleted) {
+    await prisma.registerParty.update({
+      where: { id: taken.id },
+      data: { [field]: null },
+    })
+    return partyId
+  }
+  const merged = await mergeRegisterParties([taken, { id: partyId, entries: [] }])
+  return merged?.id ?? partyId
+}
+
 async function stampAccountLinks(
   partyId: bigint,
   resolved: Awaited<ReturnType<typeof resolveAccountKeys>>,
@@ -495,39 +520,14 @@ async function stampAccountLinks(
   const ownerCode = resolved.farmer?.code || resolved.buyer?.code || fallbackCode
   const farmerId = resolved.farmer?.id ?? null
   const buyerId = resolved.buyer?.id ?? null
-  if (farmerId) {
-    const taken = await prisma.registerParty.findFirst({
-      where: { deleted: false, linkedFarmerId: farmerId, id: { not: partyId } },
-      select: { id: true },
-    })
-    if (taken) {
-      await mergeRegisterParties(
-        await prisma.registerParty.findMany({
-          where: { id: { in: [taken.id, partyId] }, deleted: false },
-          include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
-        }),
-      )
-    }
-  }
-  if (buyerId) {
-    const taken = await prisma.registerParty.findFirst({
-      where: { deleted: false, linkedBuyerId: buyerId, id: { not: partyId } },
-      select: { id: true },
-    })
-    if (taken) {
-      await mergeRegisterParties(
-        await prisma.registerParty.findMany({
-          where: { id: { in: [taken.id, partyId] }, deleted: false },
-          include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
-        }),
-      )
-    }
-  }
+  let liveId = partyId
+  if (farmerId) liveId = await reclaimLinkedParty(liveId, 'linkedFarmerId', farmerId)
+  if (buyerId) liveId = await reclaimLinkedParty(liveId, 'linkedBuyerId', buyerId)
   const live = await prisma.registerParty.findFirst({
     where: {
       deleted: false,
       OR: [
-        { id: partyId },
+        { id: liveId },
         ...(farmerId ? [{ linkedFarmerId: farmerId }] : []),
         ...(buyerId ? [{ linkedBuyerId: buyerId }] : []),
       ],
@@ -536,15 +536,28 @@ async function stampAccountLinks(
     orderBy: { id: 'asc' },
   })
   if (!live) return null
-  return prisma.registerParty.update({
-    where: { id: live.id },
-    data: {
-      ownerCode,
-      ...(farmerId ? { linkedFarmerId: farmerId } : {}),
-      ...(buyerId ? { linkedBuyerId: buyerId } : {}),
-    },
-    include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
-  })
+  try {
+    return await prisma.registerParty.update({
+      where: { id: live.id },
+      data: {
+        ownerCode,
+        notes: live.notes || `ID ${ownerCode}`,
+        ...(farmerId ? { linkedFarmerId: farmerId } : {}),
+        ...(buyerId ? { linkedBuyerId: buyerId } : {}),
+      },
+      include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+    })
+  } catch {
+    try {
+      return await prisma.registerParty.update({
+        where: { id: live.id },
+        data: { notes: live.notes || `ID ${ownerCode}` },
+        include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+      })
+    } catch {
+      return live
+    }
+  }
 }
 
 /** Reuse the Arhat Register person when farmer/buyer ID or name matches. Merge split records. */
@@ -574,19 +587,34 @@ export async function ensureRegisterPartyForAccount(code: string, extraName?: st
       return stampAccountLinks(row.id, resolved, name)
     }
   }
-  const created = await prisma.registerParty.create({
-    data: {
-      kind: 'PERSON',
-      name: label,
-      address: null,
-      notes: extraName && extraName !== name ? `ID ${name}` : null,
-      ownerCode: resolved.farmer?.code || resolved.buyer?.code || name,
-      linkedFarmerId: resolved.farmer?.id ?? null,
-      linkedBuyerId: resolved.buyer?.id ?? null,
-    },
-    include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
-  })
-  return stampAccountLinks(created.id, resolved, name)
+  const ownerCode = resolved.farmer?.code || resolved.buyer?.code || name
+  const notes = `ID ${ownerCode}`
+  try {
+    const created = await prisma.registerParty.create({
+      data: {
+        kind: 'PERSON',
+        name: label,
+        address: null,
+        notes,
+        ownerCode,
+        linkedFarmerId: resolved.farmer?.id ?? null,
+        linkedBuyerId: resolved.buyer?.id ?? null,
+      },
+      include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+    })
+    return stampAccountLinks(created.id, resolved, name)
+  } catch {
+    const created = await prisma.registerParty.create({
+      data: {
+        kind: 'PERSON',
+        name: label,
+        address: null,
+        notes,
+      },
+      include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+    })
+    return stampAccountLinks(created.id, resolved, name)
+  }
 }
 
 /** Make sure every live farmer and buyer has a searchable Arhat Register person. */
@@ -621,14 +649,22 @@ export async function syncAllAccountsToRegister() {
       linkedFarmers.has(String(farmer.id)) &&
       partyKeys.has(normalizeAccountKey(farmer.farmerId))
     if (already) continue
-    await ensureRegisterPartyForAccount(farmer.farmerId, farmer.name)
+    try {
+      await ensureRegisterPartyForAccount(farmer.farmerId, farmer.name)
+    } catch {
+      /* listParties still overlays this farmer so the ID cannot go missing */
+    }
   }
   for (const buyer of buyers) {
     const already =
       linkedBuyers.has(String(buyer.id)) &&
       partyKeys.has(normalizeAccountKey(buyer.buyerId))
     if (already) continue
-    await ensureRegisterPartyForAccount(buyer.buyerId, buyer.name)
+    try {
+      await ensureRegisterPartyForAccount(buyer.buyerId, buyer.name)
+    } catch {
+      /* same: buyer still appears from the accounts overlay */
+    }
   }
 }
 

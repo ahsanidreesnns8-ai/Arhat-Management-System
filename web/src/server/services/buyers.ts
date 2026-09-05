@@ -95,7 +95,11 @@ export async function listBuyers() {
 }
 
 async function withRegisterAccount<T extends ReturnType<typeof buyerDto>>(dto: T) {
-  await ensureRegisterPartyForAccount(dto.buyerId, dto.name)
+  try {
+    await ensureRegisterPartyForAccount(dto.buyerId, dto.name)
+  } catch {
+    /* buyer stays saved even if the register row cannot be written */
+  }
   const statement = await getAccountStatement(dto.buyerId, dto.name)
   return {
     ...dto,
@@ -136,7 +140,11 @@ export async function createBuyer(input: PartyInput) {
     },
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(buyerId, input.name.trim())
+  try {
+    await ensureRegisterPartyForAccount(buyerId, input.name.trim())
+  } catch {
+    /* buyer is already saved; register overlay will still show the ID */
+  }
   return withRegisterAccount(buyerDto(row))
 }
 
