@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { amountFromWeight, d, round2, totalWeight } from '@/server/money'
+import { amountFromWeight, d, round2, stockCoversRequestedKg, totalWeight } from '@/server/money'
 import { getWorkspace } from '@/server/workspace'
 
 export type IntakeStockLotInput = {
@@ -214,21 +214,41 @@ export async function consumeStockLotsToBags(input: {
     where: { productId: BigInt(input.productId), remainingKg: { gt: 0 } },
     orderBy: [{ intakeDate: 'asc' }, { id: 'asc' }],
   })
-  const totalAvailable = lots.reduce(
+  const lotAvailable = lots.reduce(
     (sum, lot) => sum.add(d(lot.remainingKg.toString())),
     d(0),
   )
-  const wholeAvailable = Math.floor(totalAvailable.div(bagWeight).toNumber())
-  const bagsFromStock =
-    input.maxBags != null && input.maxBags >= 0
-      ? Math.min(wholeAvailable, input.maxBags)
-      : wholeAvailable
-  const kgNeeded = bagWeight.mul(bagsFromStock)
+  const stockRow = await prisma.stock.findFirst({
+    where: { productId: BigInt(input.productId) },
+  })
+  const qtyAvailable = stockRow ? d(stockRow.quantity.toString()) : d(0)
+  const totalAvailable = lotAvailable.gte(qtyAvailable) ? lotAvailable : qtyAvailable
+  const requestedBags =
+    input.maxBags != null && input.maxBags >= 0 ? Math.floor(input.maxBags) : null
+  let bagsFromStock: number
+  let kgNeeded: ReturnType<typeof d>
+  if (requestedBags != null) {
+    kgNeeded = totalWeight(requestedBags, bagWeight, 0)
+    const lotCover = stockCoversRequestedKg(lotAvailable.toString(), requestedBags, bagWeight)
+    const qtyCover = stockCoversRequestedKg(qtyAvailable.toString(), requestedBags, bagWeight)
+    if (lotCover.covers || qtyCover.covers) {
+      bagsFromStock = requestedBags
+    } else {
+      bagsFromStock = Math.min(
+        requestedBags,
+        Math.max(lotCover.bagsPossible, qtyCover.bagsPossible),
+      )
+      kgNeeded = totalWeight(bagsFromStock, bagWeight, 0)
+    }
+  } else {
+    bagsFromStock = Math.max(0, totalAvailable.div(bagWeight).floor().toNumber())
+    kgNeeded = totalWeight(bagsFromStock, bagWeight, 0)
+  }
   if (bagsFromStock <= 0) {
     return {
       bagsFromStock: 0,
       kgUsed: 0,
-      leftoverKg: totalAvailable.toNumber(),
+      leftoverKg: lotAvailable.toNumber(),
       ratePer40Kg: round2(input.highestRateHint ?? 0).toNumber(),
       amount: 0,
       bagWeightKg: bagWeight.toNumber(),
@@ -259,8 +279,14 @@ export async function consumeStockLotsToBags(input: {
       create: { productId: BigInt(input.productId), quantity: 0 },
     })
     const previous = d(stock.quantity.toString())
-    const next = previous.sub(kgNeeded)
-    if (next.lt(0)) throw new Error('Insufficient stock KG')
+    const nextRaw = previous.sub(kgNeeded)
+    const lotsCover = lotAvailable.add(d('0.01')).gte(round2(kgNeeded))
+    if (nextRaw.lt(0) && !lotsCover) {
+      throw new Error(
+        `Not enough stock: need ${kgNeeded.toFixed(2)} kg (${bagsFromStock} bag(s) × ${bagWeight.toFixed(2)} kg). Available ${round2(totalAvailable).toFixed(2)} kg.`,
+      )
+    }
+    const next = nextRaw.lt(0) ? d(0) : nextRaw
     await tx.stock.update({
       where: { id: stock.id },
       data: {
@@ -394,4 +420,4 @@ export function bagsFromWeight(kg: number, bagWeight: number) {
   }
 }
 
-export { totalWeight }
+export { stockCoversRequestedKg, totalWeight }

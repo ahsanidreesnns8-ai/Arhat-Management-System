@@ -22,5 +22,10 @@ assert(ah.some((p) => p.name === 'Ahmed Khan'), 'Ahmed should match ah')
 const details = partyDetailsLine(parties[0])
 assert(details.includes('F-01'), 'details missing code')
 assert(details.includes('Idrees'), 'details missing father')
-console.log('party search OK', ahs[0].name, details)
+const byId = matchPartyQuery(
+  [...parties, { id: '4', code: 'R74.A', name: 'RANA ALLAHWASYA' }],
+  'r74.a',
+)
+assert(byId[0]?.code === 'R74.A', 'search by farmer ID must find R74.A')
+console.log('party search OK', ahs[0].name, details, byId[0].name)
 console.log('SMOKE PASS')

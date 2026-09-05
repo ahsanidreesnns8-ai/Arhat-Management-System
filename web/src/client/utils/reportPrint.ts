@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast'
+import { creatorCreditHtml } from '@/lib/branding'
 import { formatCurrency, formatNumber } from './format'
 import type { ReportKey, ReportSummary } from '../types'
 
@@ -255,6 +256,11 @@ export function buildReportHtml(
     th{background:#002D62;color:#fff}
     .empty{color:#64748b;margin-top:16px}
     .footer{margin-top:28px;padding-top:12px;border-top:2px solid #C5A059;text-align:center;color:#002D62;font-weight:700}
+    .creator-credit{margin-top:10px;text-align:center;color:#002D62}
+    .creator-line{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:700}
+    .creator-line .ai-mark{display:inline-flex;width:16px;height:16px}
+    .creator-line .ai-mark svg{width:16px;height:16px;display:block}
+    .creator-phone{margin-top:3px;font-size:11px;font-weight:600;color:#475569}
     @media print{body{padding:0}.sheet{border:none;box-shadow:none}}
   </style>
 </head>
@@ -268,7 +274,7 @@ export function buildReportHtml(
       <div class="meta">${esc(generated)}</div>
     </div>
     ${body}
-    <div class="footer">${esc(t.footer)}<br/><span style="font-weight:500;font-size:12px">© ${year} ${esc(company)} · ${esc(rights)}</span></div>
+    <div class="footer">${esc(t.footer)}<br/><span style="font-weight:500;font-size:12px">© ${year} ${esc(company)} · ${esc(rights)}</span>${creatorCreditHtml()}</div>
   </div>
   <script>window.focus(); setTimeout(function(){ window.print(); }, 250);</script>
 </body>

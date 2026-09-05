@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { d, round2 } from '@/server/money'
+import { d, round2, totalWeight } from '@/server/money'
 import { createSale } from '@/server/services/sales'
 import { consumeStockLotsToBags, listStockLots } from '@/server/services/stock-lots'
 
@@ -707,8 +707,9 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
       maxBags: stockToSell,
     })
     if (formed.bagsFromStock < stockToSell) {
+      const needKg = totalWeight(stockToSell, stockBagKg, 0)
       throw new Error(
-        `Not enough Extra KG stock to sell ${stockToSell} extra/stock bags (can form ${formed.bagsFromStock})`,
+        `Not enough stock: need ${needKg.toFixed(2)} kg (${stockToSell} bag(s) × ${round2(stockBagKg).toFixed(2)} kg). Extra KG can cover ${formed.bagsFromStock} bag(s).`,
       )
     }
   }
@@ -993,8 +994,9 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
       maxBags: stockToSell,
     })
     if (formed.bagsFromStock < stockToSell) {
+      const needKg = totalWeight(stockToSell, stockBagKg, 0)
       throw new Error(
-        `Not enough Extra KG stock to sell ${stockToSell} extra/stock bags (can form ${formed.bagsFromStock})`,
+        `Not enough stock: need ${needKg.toFixed(2)} kg (${stockToSell} bag(s) × ${round2(stockBagKg).toFixed(2)} kg). Extra KG can cover ${formed.bagsFromStock} bag(s).`,
       )
     }
   }

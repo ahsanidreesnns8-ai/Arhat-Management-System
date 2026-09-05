@@ -490,6 +490,7 @@ export interface RegisterParty {
   remainingToGive?: number
   remainingToReceive?: number
   displayLabel?: string
+  ownerCode?: string | null
   linkedFarmerId?: number | null
   farmerCode?: string | null
   farmerName?: string | null

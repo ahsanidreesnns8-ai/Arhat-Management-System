@@ -24,7 +24,7 @@ export function partySearchHaystack(item: PartySearchItem) {
     .toLowerCase()
 }
 
-export function matchPartyQuery<T extends PartySearchItem>(items: T[], query: string, limit = 12): T[] {
+export function matchPartyQuery<T extends PartySearchItem>(items: T[], query: string, limit = 40): T[] {
   const q = query.trim().toLowerCase()
   if (!q) return items.slice(0, limit)
   const starts: T[] = []

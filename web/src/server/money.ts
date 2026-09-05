@@ -28,6 +28,27 @@ export function totalWeight(
   return round2(d(bags ?? 0).mul(d(weightPerBag ?? 40)).add(d(partialBagWeight)))
 }
 
+/** True when available KG can cover bags × bag weight (0.01 kg rounding slack). */
+export function stockCoversRequestedKg(
+  availableKg: DecimalInput,
+  bags: number,
+  bagWeightKg: DecimalInput,
+) {
+  const available = round2(availableKg)
+  const needed = totalWeight(bags, bagWeightKg, 0)
+  const bagWeight = round2(bagWeightKg)
+  const covers = available.add(d('0.01')).gte(needed)
+  const bagsPossible = bagWeight.gt(0)
+    ? Math.max(0, available.div(bagWeight).floor().toNumber())
+    : 0
+  return {
+    availableKg: available.toNumber(),
+    neededKg: needed.toNumber(),
+    covers,
+    bagsPossible,
+  }
+}
+
 export function amountFromWeight(weight: DecimalInput, rate: DecimalInput): Decimal {
   return roundRupee(d(weight).div(40).mul(d(rate)))
 }
