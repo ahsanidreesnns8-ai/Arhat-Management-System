@@ -533,10 +533,10 @@ export default function ArhatRegisterPage() {
           ) : null}
           <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
           {p.farmerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}{p.farmerCode ? ` · ${p.farmerCode}` : ''}</p>
+            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}</p>
           ) : null}
           {p.buyerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName}{p.buyerCode ? ` · ${p.buyerCode}` : ''}</p>
+            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName}</p>
           ) : null}
         </div>
         <div className={`rounded-lg px-3 py-2 text-[11px] ${
