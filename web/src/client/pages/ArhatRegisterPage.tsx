@@ -50,12 +50,19 @@ function moneySide(
   return { kind: null, label: 'Settled', amount: 0, count: 0 }
 }
 
+function partyAccountCode(party: Pick<RegisterParty, 'ownerCode' | 'farmerCode' | 'buyerCode'>) {
+  return party.ownerCode || party.farmerCode || party.buyerCode || ''
+}
+
 function matchesSearch(party: RegisterParty, query: string) {
   if (!query) return true
+  const code = partyAccountCode(party)
   const blob = [
     party.name,
     party.address || '',
     party.notes || '',
+    code,
+    party.ownerCode || '',
     party.farmerCode || '',
     party.farmerName || '',
     party.buyerCode || '',
@@ -63,7 +70,12 @@ function matchesSearch(party: RegisterParty, query: string) {
   ].join(' ').toLowerCase()
   const compact = blob.replace(/\s+/g, '')
   const q = query.toLowerCase()
-  return blob.includes(q) || compact.includes(q.replace(/\s+/g, ''))
+  const qCompact = q.replace(/\s+/g, '')
+  return (
+    blob.includes(q) ||
+    compact.includes(qCompact) ||
+    code.replace(/\s+/g, '').toLowerCase().includes(qCompact)
+  )
 }
 
 function kindLabel(kind: string) {
@@ -516,12 +528,15 @@ export default function ArhatRegisterPage() {
       <div key={p.id} className="card-3d p-4 space-y-3">
         <div>
           <p className="font-semibold truncate">{p.name}</p>
+          {partyAccountCode(p) ? (
+            <p className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate">ID {partyAccountCode(p)}</p>
+          ) : null}
           <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
           {p.farmerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName} · {p.farmerCode}</p>
+            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}</p>
           ) : null}
           {p.buyerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName} · {p.buyerCode}</p>
+            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName}</p>
           ) : null}
         </div>
         <div className={`rounded-lg px-3 py-2 text-[11px] ${
@@ -695,6 +710,9 @@ export default function ArhatRegisterPage() {
                   >
                     <span className="min-w-0">
                       <span className="font-medium truncate block">{p.name}</span>
+                      {partyAccountCode(p) ? (
+                        <span className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate block">ID {partyAccountCode(p)}</span>
+                      ) : null}
                       {p.farmerName ? (
                         <span className="text-[11px] text-slate-500 truncate block">Farmer {p.farmerName}</span>
                       ) : null}
@@ -795,6 +813,7 @@ export default function ArhatRegisterPage() {
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100 dark:border-white/10">
                     <th className="px-4 py-2">Name</th>
+                    <th className="px-4 py-2">ID</th>
                     <th className="px-4 py-2 text-right">Giving amount</th>
                     <th className="px-4 py-2 text-right">Receiving amount</th>
                   </tr>
@@ -803,6 +822,7 @@ export default function ArhatRegisterPage() {
                   {ledgerPeople.map((p) => (
                     <tr key={p.id} className="border-b border-slate-100 dark:border-white/10">
                       <td className="px-4 py-2 font-medium">{p.name}</td>
+                      <td className="px-4 py-2 text-slate-500">{partyAccountCode(p) || '—'}</td>
                       <td className="px-4 py-2 text-right">{formatCurrency(p.givenTotal || 0)}</td>
                       <td className="px-4 py-2 text-right">{formatCurrency(p.receivedTotal || 0)}</td>
                     </tr>
@@ -924,7 +944,10 @@ export default function ArhatRegisterPage() {
             required
             items={parties.map((p) => ({
               id: String(p.id),
-              name: p.farmerCode ? `${p.name} · ${p.farmerCode}` : p.name,
+              code: partyAccountCode(p) || undefined,
+              name: partyAccountCode(p)
+                ? `${p.name} · ${partyAccountCode(p)}`
+                : p.name,
               address: p.address,
               notes: sideNote(p, money.kind),
             }))}

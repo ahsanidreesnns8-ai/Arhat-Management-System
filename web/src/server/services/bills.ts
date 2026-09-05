@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { copyrightText, rtcMarkHtml } from '@/lib/branding'
+import { copyrightText, creatorCreditHtml, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
 import { d, type DecimalInput } from '@/server/money'
 import { getPartyLedger, listParties } from '@/server/services/register'
@@ -270,6 +270,26 @@ th.product-over-rest{background:var(--navy)}
   letter-spacing:.01em;
   line-height:1.35;
 }
+.creator-credit{margin-top:6px;text-align:center;color:#002D62}
+.creator-line{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.02em;
+  line-height:1.3;
+}
+.creator-line .ai-mark{display:inline-flex;width:13px;height:13px;flex-shrink:0}
+.creator-line .ai-mark svg{width:13px;height:13px;display:block}
+.creator-phone{
+  margin-top:2px;
+  font-size:7.5px;
+  font-weight:600;
+  color:#475569;
+  letter-spacing:.01em;
+}
 @media print{
   html,body{background:#fff;padding:0}
   .slip{box-shadow:none;margin:0;width:auto;min-height:calc(8in - 0.32in)}
@@ -304,6 +324,7 @@ function slipHtml(
     <div class="sign-row"><span class="sign-line">${urdu ? 'دستخط' : 'Signature'}</span></div>
     <hr class="rule" />
     <div class="copyright ${urdu ? 'urdu' : ''}">${escape(copy)}</div>
+    ${creatorCreditHtml()}
   </footer>
 </article>`
 }

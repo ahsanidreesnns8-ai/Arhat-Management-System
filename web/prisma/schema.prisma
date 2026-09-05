@@ -195,6 +195,7 @@ model Farmer {
   saleItems          SaleItem[]
   stockLots          StockLot[]
   registerEntries    RegisterEntry[]
+  registerParties    RegisterParty[]
 
   @@unique([workspace, farmerId])
   @@index([workspace])
@@ -220,6 +221,7 @@ model Buyer {
   updatedAt          DateTime @updatedAt @map("updated_at")
   sales              Sale[]
   payments           Payment[]
+  registerParties    RegisterParty[]
 
   @@unique([workspace, buyerId])
   @@index([workspace])
@@ -535,18 +537,26 @@ model DailyTradeSession {
 
 /// Cash-book person for Arhat Register giving / receiving
 model RegisterParty {
-  id        BigInt           @id @default(autoincrement())
-  workspace String           @default("live") @db.VarChar(20)
-  kind      String           @db.VarChar(20)
-  name      String           @db.VarChar(255)
-  address   String?
-  notes     String?
-  deleted   Boolean          @default(false)
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  entries   RegisterEntry[]
+  id             BigInt           @id @default(autoincrement())
+  workspace      String           @default("live") @db.VarChar(20)
+  kind           String           @db.VarChar(20)
+  name           String           @db.VarChar(255)
+  address        String?
+  notes          String?
+  ownerCode      String?          @map("owner_code") @db.VarChar(40)
+  linkedFarmerId BigInt?          @map("linked_farmer_id")
+  linkedBuyerId  BigInt?          @map("linked_buyer_id")
+  deleted        Boolean          @default(false)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  entries        RegisterEntry[]
+  farmer         Farmer?          @relation(fields: [linkedFarmerId], references: [id])
+  buyer          Buyer?           @relation(fields: [linkedBuyerId], references: [id])
 
+  @@unique([workspace, linkedFarmerId])
+  @@unique([workspace, linkedBuyerId])
   @@index([workspace, kind])
+  @@index([workspace, ownerCode])
   @@map("register_parties")
 }
 

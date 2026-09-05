@@ -47,6 +47,7 @@ async function main() {
       entryIds: [] as bigint[],
       linkedPartyId: undefined as bigint | undefined,
       linkedFarmerId: undefined as bigint | undefined,
+      searchFarmerId: undefined as bigint | undefined,
       linkedDheriId: undefined as bigint | undefined,
       linkedDheriId2: undefined as bigint | undefined,
     }
@@ -201,9 +202,36 @@ async function main() {
       assert(html.includes('seed advance'), 'advance note missing from farmer bill')
       assert(html.includes('Advance'), 'advance reference missing from farmer bill')
       assert(html.includes('aria-label="RTC"'), 'RTC logo missing on farmer bill')
+      assert(html.includes('Created by AI'), 'farmer bill missing Created by AI credit')
+      assert(html.includes('Ahsan Idrees'), 'farmer bill missing creator name')
+      assert(html.includes('+923224398646'), 'farmer bill missing creator contact')
 
       assert(normalizeAccountKey('r74.1') === 'R74.1', 'farmer id case should match register id')
       assert(normalizeAccountKey('R 74.1') === 'R74.1', 'spaces in the same id should still match')
+
+      const searchFarmer = await createFarmer({
+        name: `RANA ALLAHWASYA ${stamp}`,
+        code: `R${stamp.slice(-4)}.A`,
+      })
+      ids.searchFarmerId = BigInt(searchFarmer.id)
+      const listedPeople = await listParties('GIVING')
+      const foundById = listedPeople.find(
+        (row) =>
+          row.ownerCode === searchFarmer.farmerId ||
+          row.farmerCode === searchFarmer.farmerId ||
+          row.linkedFarmerId === searchFarmer.id,
+      )
+      assert(foundById, `new farmer ${searchFarmer.farmerId} must appear on Arhat Register`)
+      const hay = [
+        foundById.name,
+        foundById.ownerCode,
+        foundById.farmerCode,
+        foundById.farmerName,
+      ].join(' ').toLowerCase()
+      assert(
+        hay.includes(searchFarmer.farmerId.toLowerCase()),
+        `Arhat Register search must find ${searchFarmer.farmerId}`,
+      )
 
       const linkedCode = `R${stamp.slice(-6)}`
       const linkedParty = await createParty({ kind: 'GIVING', name: linkedCode })
@@ -312,6 +340,10 @@ async function main() {
       if (ids.linkedFarmerId) {
         await prisma.payment.deleteMany({ where: { farmerId: ids.linkedFarmerId } })
         await prisma.farmer.deleteMany({ where: { id: ids.linkedFarmerId } })
+      }
+      if (ids.searchFarmerId) {
+        await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.searchFarmerId } })
+        await prisma.farmer.deleteMany({ where: { id: ids.searchFarmerId } })
       }
     }
   })

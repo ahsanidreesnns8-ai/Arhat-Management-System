@@ -9,6 +9,7 @@ import {
   getAccountStatement,
   loadTradeForKey,
   loadTradeIndex,
+  syncAllAccountsToRegister,
   tradeForKey,
   type LinkedTrade,
 } from '@/server/services/linked-account'
@@ -92,6 +93,9 @@ function partyDto(
     name: string
     address: string | null
     notes: string | null
+    ownerCode?: string | null
+    linkedFarmerId?: bigint | null
+    linkedBuyerId?: bigint | null
     createdAt: Date
     entries?: Array<{
       id: bigint
@@ -139,11 +143,12 @@ function partyDto(
     remainingToGive: 0,
     remainingToReceive: 0,
     displayLabel: 'Settled',
-    linkedFarmerId: null as number | null,
-    farmerCode: null as string | null,
+    ownerCode: party.ownerCode ?? null,
+    linkedFarmerId: party.linkedFarmerId != null ? Number(party.linkedFarmerId) : null,
+    farmerCode: party.ownerCode ?? null,
     farmerName: null as string | null,
-    linkedBuyerId: null as number | null,
-    buyerCode: null as string | null,
+    linkedBuyerId: party.linkedBuyerId != null ? Number(party.linkedBuyerId) : null,
+    buyerCode: party.ownerCode && party.linkedBuyerId != null ? party.ownerCode : null,
     buyerName: null as string | null,
     ...(includeEntries ? { entries } : {}),
   }
@@ -208,24 +213,47 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
     remainingToGive: position.remainingToGive,
     remainingToReceive: position.remainingToReceive,
     displayLabel: position.displayLabel,
-    linkedFarmerId: trade.farmerId,
-    farmerCode: trade.farmerCode,
-    farmerName: trade.farmerName,
-    linkedBuyerId: trade.buyerId,
-    buyerCode: trade.buyerCode,
-    buyerName: trade.buyerName,
+    ownerCode: dto.ownerCode || trade.farmerCode || trade.buyerCode,
+    linkedFarmerId: dto.linkedFarmerId ?? trade.farmerId,
+    farmerCode: dto.farmerCode || trade.farmerCode,
+    farmerName: dto.farmerName || trade.farmerName,
+    linkedBuyerId: dto.linkedBuyerId ?? trade.buyerId,
+    buyerCode: dto.buyerCode || trade.buyerCode,
+    buyerName: dto.buyerName || trade.buyerName,
     ...(includeEntries ? { entries } : {}),
   }
 }
 
+function tradeKeysForParty(dto: Pick<PartyDto, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'name'>) {
+  return [dto.ownerCode, dto.farmerCode, dto.buyerCode, dto.name].filter(
+    (key): key is string => Boolean(key && String(key).trim()),
+  )
+}
+
+function tradeForParty(index: Map<string, LinkedTrade>, dto: PartyDto) {
+  for (const key of tradeKeysForParty(dto)) {
+    const row = tradeForKey(index, key)
+    if (row.farmerId || row.buyerId || row.farmerCode || row.buyerCode) return row
+  }
+  return tradeForKey(index, dto.name)
+}
+
+async function loadTradeForParty(dto: PartyDto) {
+  for (const key of tradeKeysForParty(dto)) {
+    const trade = await loadTradeForKey(key)
+    if (trade.farmerId || trade.buyerId) return trade
+  }
+  return loadTradeForKey(dto.name)
+}
+
 async function withTrade<T extends PartyDto>(dto: T, includeEntries = false) {
-  const trade = await loadTradeForKey(dto.name)
+  const trade = await loadTradeForParty(dto)
   return attachTrade(dto, trade, includeEntries) as T
 }
 
 async function withTradeAll(dtos: PartyDto[], includeEntries = false) {
   const index = await loadTradeIndex(includeEntries)
-  return dtos.map((dto) => attachTrade(dto, tradeForKey(index, dto.name), includeEntries))
+  return dtos.map((dto) => attachTrade(dto, tradeForParty(index, dto), includeEntries))
 }
 
 function parseKind(value: unknown, allowed: readonly string[] = KINDS): RegisterKind {
@@ -247,6 +275,7 @@ function moneyEntryInclude() {
 
 export async function listParties(kind: string) {
   if (kind) parseKind(kind, ['GIVING', 'RECEIVING'])
+  await syncAllAccountsToRegister()
   const [rows, sums] = await Promise.all([
     prisma.registerParty.findMany({
       where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
@@ -314,13 +343,13 @@ export async function createParty(input: {
   const address = String(input.address ?? '').trim() || null
   const notes = String(input.notes ?? '').trim() || null
 
-  const existing = await findRegisterPartyByKey(name)
-  if (existing) {
+  const linked = await ensureRegisterPartyForAccount(name, name)
+  if (linked) {
     const row = await prisma.registerParty.update({
-      where: { id: existing.id },
+      where: { id: linked.id },
       data: {
-        address: address ?? existing.address,
-        notes: notes ?? existing.notes,
+        address: address ?? linked.address,
+        notes: notes ?? linked.notes,
       },
       include: moneyEntryInclude(),
     })

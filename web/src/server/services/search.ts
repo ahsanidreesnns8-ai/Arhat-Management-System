@@ -126,7 +126,10 @@ export async function search(query: string, userId?: bigint) {
       keys.set(key, value)
     }
   }
-  for (const item of registerParties) remember(item.name)
+  for (const item of registerParties) {
+    remember(item.name)
+    if (item.ownerCode) remember(item.ownerCode)
+  }
   for (const item of farmers) remember(item.farmerId)
   for (const item of buyers) remember(item.buyerId)
   const accounts = await Promise.all(

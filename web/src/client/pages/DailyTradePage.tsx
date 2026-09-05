@@ -80,6 +80,7 @@ type Board = {
   receives: BoardReceive[]
   sales: BoardSale[]
   stockKgAvailable?: number
+  stockLots?: Array<{ productId: number; remainingKg: number }>
 }
 
 const COMMISSION_PCT = 4
@@ -202,6 +203,18 @@ export default function DailyTradePage() {
   const stockWeight = sBags * sBagKg
   const stockAmount = moneyFromWeight(stockWeight, sRate)
   const stockFilled = sBags > 0
+  const stockBagsNeeded = sBags + bExtraBags
+  const stockRequiredKg = Math.round(stockBagsNeeded * sBagKg * 100) / 100
+  const allStockKg = board?.stockKgAvailable ?? board?.session.stockInKg ?? 0
+  const productStockKg = (() => {
+    const pid = Number(productId)
+    const lots = board?.stockLots || []
+    if (!pid || !lots.length) return allStockKg
+    return lots
+      .filter((lot) => lot.productId === pid)
+      .reduce((sum, lot) => sum + (lot.remainingKg || 0), 0)
+  })()
+  const stockEnough = stockBagsNeeded <= 0 || stockRequiredKg <= productStockKg + 0.011
   const buyerLineTotal = buyerAmount + moneyFromWeight(extraBagWeight, bRate)
   const grandTotal = buyerLineTotal + (stockFilled ? stockAmount : 0)
 
@@ -309,6 +322,11 @@ export default function DailyTradePage() {
     if (bBags <= 0) return toast.error('Enter buyer bags')
     if (fRate <= 0) return toast.error('Enter farmer rate / 40kg')
     if (bRate <= 0) return toast.error('Enter buyer rate / 40kg')
+    if (stockBagsNeeded > 0 && stockRequiredKg > productStockKg + 0.011) {
+      return toast.error(
+        `Not enough stock: need ${stockRequiredKg.toFixed(2)} kg (${stockBagsNeeded} bag(s) × ${sBagKg.toFixed(2)} kg). Available ${productStockKg.toFixed(2)} kg.`,
+      )
+    }
     setSelling(true)
     try {
       const payload = soldPayload()
@@ -482,7 +500,7 @@ export default function DailyTradePage() {
   const receivedBags = board?.session.receivedBags ?? 0
   const soldBags = board?.session.soldBags ?? 0
   const balanced = receivedBags === soldBags
-  const stockKg = board?.stockKgAvailable ?? board?.session.stockInKg ?? 0
+  const stockKg = allStockKg
 
   return (
     <div className="space-y-5">
@@ -636,6 +654,7 @@ export default function DailyTradePage() {
 
       <p className="text-sm text-slate-600 dark:text-slate-300">
         Extra KG stock now: {formatNumber(stockKg)} kg
+        {product ? ` · ${product.name}: ${formatNumber(productStockKg)} kg` : ''}
       </p>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -722,6 +741,19 @@ export default function DailyTradePage() {
           <Input label="Rate / 40kg" type="number" step="0.01" value={stockRate} onChange={(e) => setStockRate(e.target.value)} />
           <Input label="Stock amount" value={stockAmount ? formatCurrency(stockAmount) : '—'} readOnly />
         </div>
+        {stockBagsNeeded > 0 ? (
+          <p className={`px-5 pb-2 text-sm font-medium ${stockEnough ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+            {stockBagsNeeded} bag{stockBagsNeeded === 1 ? '' : 's'} × {formatNumber(sBagKg)} kg = {formatNumber(stockRequiredKg)} kg
+            {bExtraBags > 0 ? ` (stock ${sBags || 0} + extra ${bExtraBags})` : ''}
+            {' · '}
+            available {formatNumber(productStockKg)} kg
+            {stockEnough ? ' — stock is enough' : ' — stock is not enough'}
+          </p>
+        ) : (
+          <p className="px-5 pb-2 text-sm text-slate-500">
+            Available Extra KG for {product?.name || 'this type'}: {formatNumber(productStockKg)} kg. Bags × bag weight is checked against this stock.
+          </p>
+        )}
         <div className="px-5 pb-5 text-sm">
           Payable now:{' '}
           <span className="font-semibold">
