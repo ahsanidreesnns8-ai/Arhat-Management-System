@@ -79,7 +79,11 @@ export function farmerDto(farmer: FarmerRow) {
 }
 
 async function withRegisterAccount<T extends ReturnType<typeof farmerDto>>(dto: T) {
-  await ensureRegisterPartyForAccount(dto.farmerId, dto.name)
+  try {
+    await ensureRegisterPartyForAccount(dto.farmerId, dto.name)
+  } catch {
+    /* farmer stays saved even if the register row cannot be written */
+  }
   const statement = await getAccountStatement(dto.farmerId, dto.name)
   const productBalance = (dto.totalBilled || 0) - (dto.totalPaid || 0)
   return {
@@ -164,7 +168,11 @@ export async function createFarmer(input: PartyInput) {
     },
     include: includeTotals,
   })
-  await ensureRegisterPartyForAccount(farmerId, input.name.trim())
+  try {
+    await ensureRegisterPartyForAccount(farmerId, input.name.trim())
+  } catch {
+    /* farmer is already saved; register overlay will still show the ID */
+  }
   return withRegisterAccount(farmerDto(row))
 }
 

@@ -23,9 +23,14 @@ const details = partyDetailsLine(parties[0])
 assert(details.includes('F-01'), 'details missing code')
 assert(details.includes('Idrees'), 'details missing father')
 const byId = matchPartyQuery(
-  [...parties, { id: '4', code: 'R74.A', name: 'RANA ALLAHWASYA' }],
+  [...parties, { id: '4', code: 'R 74.A', name: 'Rana AllahWasya' }],
   'r74.a',
 )
-assert(byId[0]?.code === 'R74.A', 'search by farmer ID must find R74.A')
+assert(byId[0]?.code === 'R 74.A', 'search R74.A must find R 74.A')
+const bySpaced = matchPartyQuery(
+  [...parties, { id: '4', code: 'R74.A', name: 'Rana AllahWasya' }],
+  'R 74.A',
+)
+assert(bySpaced[0]?.code === 'R74.A', 'search R 74.A must find R74.A')
 console.log('party search OK', ahs[0].name, details, byId[0].name)
 console.log('SMOKE PASS')

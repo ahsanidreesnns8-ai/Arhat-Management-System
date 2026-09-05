@@ -1,5 +1,7 @@
 import { prisma } from '@/server/db'
 
+export { normalizeAccountKey } from '@/lib/account-key'
+
 export function nextCode(codes: string[], prefix: string, separator = '') {
   const maximum = codes.reduce((max, code) => {
     if (!code.startsWith(prefix)) return max
@@ -31,11 +33,6 @@ export async function nextDheriCode() {
 
 export function normalizeOwnerCode(value: string | null | undefined) {
   return String(value ?? '').trim()
-}
-
-/** Same person ID across Farmer / Buyer / Arhat Register: r74.1, R74.1, "R 74.1". */
-export function normalizeAccountKey(value: string | null | undefined) {
-  return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
 }
 
 export async function nextDheriQueueNumber() {

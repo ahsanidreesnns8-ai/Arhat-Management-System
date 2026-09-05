@@ -7,7 +7,8 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
-import { farmerApi, registerApi, billApi } from '../services/api'
+import { buyerApi, farmerApi, registerApi, billApi } from '../services/api'
+import { compactSearchText, normalizeAccountKey } from '@/lib/account-key'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
@@ -68,14 +69,79 @@ function matchesSearch(party: RegisterParty, query: string) {
     party.buyerCode || '',
     party.buyerName || '',
   ].join(' ').toLowerCase()
-  const compact = blob.replace(/\s+/g, '')
   const q = query.toLowerCase()
-  const qCompact = q.replace(/\s+/g, '')
+  const qCompact = compactSearchText(q)
   return (
     blob.includes(q) ||
-    compact.includes(qCompact) ||
-    code.replace(/\s+/g, '').toLowerCase().includes(qCompact)
+    compactSearchText(blob).includes(qCompact) ||
+    compactSearchText(code).includes(qCompact)
   )
+}
+
+function mergeAccountsIntoParties(
+  parties: RegisterParty[],
+  farmers: Farmer[],
+  buyers: Array<{ id: number; buyerId: string; name: string; address?: string | null }>,
+) {
+  const next = [...parties]
+  const covers = (code: string, linkedId?: number | null) =>
+    next.find((party) => {
+      const keys = [party.ownerCode, party.farmerCode, party.buyerCode, party.name, party.notes]
+      if (linkedId != null && (party.linkedFarmerId === linkedId || party.linkedBuyerId === linkedId)) {
+        return true
+      }
+      return keys.some((value) => normalizeAccountKey(value) === normalizeAccountKey(code))
+    })
+
+  for (const farmer of farmers) {
+    const hit = covers(farmer.farmerId, farmer.id)
+      || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(farmer.name))
+    if (hit) {
+      hit.ownerCode = hit.ownerCode || farmer.farmerId
+      hit.farmerCode = hit.farmerCode || farmer.farmerId
+      hit.farmerName = hit.farmerName || farmer.name
+      hit.linkedFarmerId = hit.linkedFarmerId ?? farmer.id
+      continue
+    }
+    next.push({
+      id: farmer.id,
+      kind: 'PERSON',
+      name: farmer.name,
+      address: farmer.address,
+      notes: `ID ${farmer.farmerId}`,
+      createdAt: new Date().toISOString(),
+      ownerCode: farmer.farmerId,
+      farmerCode: farmer.farmerId,
+      farmerName: farmer.name,
+      linkedFarmerId: farmer.id,
+      displayLabel: 'Settled',
+    })
+  }
+  for (const buyer of buyers) {
+    const hit = covers(buyer.buyerId, buyer.id)
+      || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(buyer.name))
+    if (hit) {
+      hit.ownerCode = hit.ownerCode || buyer.buyerId
+      hit.buyerCode = hit.buyerCode || buyer.buyerId
+      hit.buyerName = hit.buyerName || buyer.name
+      hit.linkedBuyerId = hit.linkedBuyerId ?? buyer.id
+      continue
+    }
+    next.push({
+      id: buyer.id,
+      kind: 'PERSON',
+      name: buyer.name,
+      address: buyer.address,
+      notes: `ID ${buyer.buyerId}`,
+      createdAt: new Date().toISOString(),
+      ownerCode: buyer.buyerId,
+      buyerCode: buyer.buyerId,
+      buyerName: buyer.name,
+      linkedBuyerId: buyer.id,
+      displayLabel: 'Settled',
+    })
+  }
+  return next
 }
 
 function kindLabel(kind: string) {
@@ -199,6 +265,7 @@ export default function ArhatRegisterPage() {
   const [entries, setEntries] = useState<RegisterEntry[]>([])
   const [zakat, setZakat] = useState<ZakatSummary | null>(null)
   const [farmers, setFarmers] = useState<Farmer[]>([])
+  const [buyers, setBuyers] = useState<Array<{ id: number; buyerId: string; name: string; address?: string | null }>>([])
   const [loading, setLoading] = useState(true)
 
   const [personOpen, setPersonOpen] = useState(false)
@@ -235,14 +302,24 @@ export default function ArhatRegisterPage() {
         setEntries(e.data.data || [])
         setFarmers(f.data.data || [])
       } else if (section === 'LEDGER') {
-        const p = await registerApi.parties('RECEIVING')
-        setParties(p.data.data || [])
+        const [p, f, b] = await Promise.all([
+          registerApi.parties('RECEIVING'),
+          farmerApi.getAll(),
+          buyerApi.getAll(),
+        ])
+        setFarmers(f.data.data || [])
+        setBuyers(b.data.data || [])
+        setParties(mergeAccountsIntoParties(p.data.data || [], f.data.data || [], b.data.data || []))
         setEntries([])
       } else {
-        const [p] = await Promise.all([
+        const [p, f, b] = await Promise.all([
           registerApi.parties('RECEIVING'),
+          farmerApi.getAll(),
+          buyerApi.getAll(),
         ])
-        setParties(p.data.data || [])
+        setFarmers(f.data.data || [])
+        setBuyers(b.data.data || [])
+        setParties(mergeAccountsIntoParties(p.data.data || [], f.data.data || [], b.data.data || []))
         const merged = (p.data.data || [])
           .flatMap((row) => (row.entries || []).filter((line) => isCashKind(line.kind)))
           .sort(

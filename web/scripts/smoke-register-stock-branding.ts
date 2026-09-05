@@ -28,8 +28,8 @@ async function main() {
     }
     try {
       const farmer = await createFarmer({
-        name: `RANA ALLAHWASYA ${stamp}`,
-        code: 'R74.A',
+        name: `Rana AllahWasya ${stamp}`,
+        code: 'R 74.A',
       })
       ids.farmerId = BigInt(farmer.id)
       const buyer = await createBuyer({
@@ -41,9 +41,10 @@ async function main() {
       const people = await listParties('GIVING')
       const farmerHit = people.find(
         (row) =>
-          row.ownerCode === farmer.farmerId ||
-          row.farmerCode === farmer.farmerId ||
-          row.linkedFarmerId === farmer.id,
+          row.linkedFarmerId === farmer.id ||
+          [row.ownerCode, row.farmerCode, row.notes, row.name].some(
+            (value) => String(value || '').replace(/\s+/g, '').toUpperCase() === 'R74.A',
+          ),
       )
       const buyerHit = people.find(
         (row) =>
@@ -55,7 +56,8 @@ async function main() {
       assert(buyerHit, `buyer ${buyer.buyerId} missing from Arhat Register`)
       const farmerHay = [farmerHit.name, farmerHit.ownerCode, farmerHit.farmerCode].join(' ').toLowerCase()
       const buyerHay = [buyerHit.name, buyerHit.ownerCode, buyerHit.buyerCode].join(' ').toLowerCase()
-      assert(farmerHay.includes('r74.a'), 'search haystack missing R74.A')
+      const farmerCompact = farmerHay.replace(/\s+/g, '')
+      assert(farmerCompact.includes('r74.a'), 'search haystack missing R 74.A / R74.A')
       assert(buyerHay.includes(buyer.buyerId.toLowerCase()), 'search haystack missing buyer ID')
 
       const product = await prisma.product.findFirst({ where: { deleted: false, active: true } })
