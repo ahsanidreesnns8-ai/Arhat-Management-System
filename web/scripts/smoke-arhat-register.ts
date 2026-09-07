@@ -7,7 +7,7 @@ config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
 import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill, accountBalanceBillByFarmer } from '../src/server/services/bills'
-import { createFarmer, getFarmer } from '../src/server/services/farmers'
+import { createFarmer, getFarmer, listFarmers } from '../src/server/services/farmers'
 import { createDheri } from '../src/server/services/dheris'
 import { normalizeAccountKey } from '../src/server/ids'
 import { getAccountStatement } from '../src/server/services/linked-account'
@@ -43,6 +43,7 @@ async function main() {
   await runWithWorkspace('demo', async () => {
     const ids = {
       farmerId: undefined as bigint | undefined,
+      hideFarmerId: undefined as bigint | undefined,
       partyId: undefined as bigint | undefined,
       entryIds: [] as bigint[],
       linkedPartyId: undefined as bigint | undefined,
@@ -178,6 +179,37 @@ async function main() {
       assert(!peopleAfterDelete.some((row) => row.id === receivedParty.id), 'deleted person should leave the register list')
       const listedAfterDelete = await listEntries('GIVING')
       assert(!listedAfterDelete.some((row) => row.id === received.id), 'deleted person amounts should leave history')
+
+      const hideFarmer = await createFarmer({
+        name: `Hide ${stamp}`,
+        code: `H${stamp.slice(-6)}`,
+      })
+      ids.hideFarmerId = BigInt(hideFarmer.id)
+      const hideListed = await listParties('RECEIVING')
+      const hideCard = hideListed.find((row) => row.linkedFarmerId === hideFarmer.id)
+      assert(hideCard, 'farmer must appear on Arhat Register with a real person')
+      assert(hideCard.id !== hideFarmer.id, 'register person id must not be the farmer row id')
+      const hideLedger = await getPartyLedger(hideCard.id)
+      assert(hideLedger.id === hideCard.id, 'details/edit must open the real register person')
+      const hideCash = await createEntry({
+        kind: 'RECEIVING',
+        partyId: hideCard.id,
+        amount: 40,
+        notes: 'register cash on farmer card',
+      })
+      ids.entryIds.push(BigInt(hideCash.id))
+      await deleteParty(hideCard.id)
+      await listFarmers()
+      const stillHidden = await listParties('RECEIVING')
+      assert(
+        !stillHidden.some((row) => row.id === hideCard.id || row.linkedFarmerId === hideFarmer.id),
+        'loading farmers must not put a deleted register person back',
+      )
+      const restored = await createParty({ kind: 'RECEIVING', name: hideFarmer.name })
+      assert(restored.id === hideCard.id, 'adding the same person again should restore them')
+      const restoredList = await listParties('RECEIVING')
+      assert(restoredList.some((row) => row.id === hideCard.id), 'restored person should be visible again')
+      await deleteParty(hideCard.id)
 
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))
@@ -332,6 +364,11 @@ async function main() {
       }
       if (ids.linkedPartyId) {
         await prisma.registerParty.deleteMany({ where: { id: ids.linkedPartyId } })
+      }
+      if (ids.hideFarmerId) {
+        await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.hideFarmerId } })
+        await prisma.payment.deleteMany({ where: { farmerId: ids.hideFarmerId } })
+        await prisma.farmer.deleteMany({ where: { id: ids.hideFarmerId } })
       }
       if (ids.farmerId) {
         await prisma.payment.deleteMany({ where: { farmerId: ids.farmerId } })

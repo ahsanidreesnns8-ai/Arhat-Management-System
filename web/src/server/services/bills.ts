@@ -593,6 +593,9 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         include: { product: true },
         orderBy: { createdAt: 'asc' },
       },
+      payments: {
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      },
     },
   })
   if (!farmer) throw new Error('Farmer not found')
@@ -652,6 +655,35 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     urdu,
   })
 
+  const recentPayments = farmer.payments.slice(0, 12)
+  const paid = farmer.payments.reduce((sumPaid, payment) => sumPaid + payment.amount.toNumber(), 0)
+  const paymentRows = recentPayments.map((payment) => [
+    payment.paymentDate.toISOString().slice(0, 10),
+    money(payment.amount),
+    payment.referenceNumber || '—',
+    payment.notes || '—',
+  ])
+  const paymentBox = `<div class="payment-box">
+    <div class="head">${urdu ? 'ادائیگی / ایڈوانس' : 'Payments and advance'}</div>
+    <div class="body">
+      ${
+        recentPayments.length === 0
+          ? `<p style="margin:0;color:#64748b">${urdu ? 'ابھی کوئی ادائیگی درج نہیں۔' : 'No payments recorded yet.'}</p>`
+          : table(
+              urdu
+                ? ['تاریخ', 'رقم', 'حوالہ', 'نوٹ']
+                : ['Date', 'Amount (PKR)', 'Reference', 'Note'],
+              paymentRows,
+              undefined,
+              { compactCols: [0, 2], moneyCols: [1] },
+            )
+      }
+      <div class="payment-totals">
+        <div><div class="label">${urdu ? 'ادا / ایڈوانس' : 'Paid / Advance'}</div><div class="value">PKR ${money(paid)}</div></div>
+      </div>
+    </div>
+  </div>`
+
   return page(
     '',
     partyHtml,
@@ -677,7 +709,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
         colWidths: FARMER_COL_WIDTHS,
         overlabel: { text: uniqueProductNames(lines.map((item) => item.product)), span: 2 },
       },
-    ),
+    ) + paymentBox,
     urdu,
   )
 }
@@ -968,11 +1000,9 @@ export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en'
 }
 
 export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
-  const party = await prisma.registerParty.findFirst({
-    where: { id: BigInt(id), deleted: false },
-  })
-  if (!party) throw new Error('Person not found')
-  return accountBalanceBillByKey(party.name, lang)
+  const ledger = await getPartyLedger(id)
+  const key = ledger.ownerCode || ledger.farmerCode || ledger.buyerCode || ledger.name
+  return accountBalanceBillByKey(key, lang, ledger.name)
 }
 
 function renderAccountBalanceBill(

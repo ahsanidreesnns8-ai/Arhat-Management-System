@@ -491,6 +491,62 @@ export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null
 
 const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
 
+const moneyEntriesInclude = {
+  entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
+}
+
+export type EnsureRegisterPartyOptions = {
+  /** Restore a person the owner already removed from Arhat Register. Default stays hidden. */
+  reviveDeleted?: boolean
+}
+
+async function findDeletedLinkedParty(farmerId?: bigint | null, buyerId?: bigint | null) {
+  const or = [
+    ...(farmerId ? [{ linkedFarmerId: farmerId }] : []),
+    ...(buyerId ? [{ linkedBuyerId: buyerId }] : []),
+  ]
+  if (!or.length) return null
+  return prisma.registerParty.findFirst({
+    where: { deleted: true, kind: { in: [...MONEY_PARTY_KINDS] }, OR: or },
+    include: moneyEntriesInclude,
+    orderBy: { updatedAt: 'desc' },
+  })
+}
+
+export async function hiddenRegisterAccountLinks() {
+  const rows = await prisma.registerParty.findMany({
+    where: {
+      deleted: true,
+      kind: { in: [...MONEY_PARTY_KINDS] },
+      OR: [{ linkedFarmerId: { not: null } }, { linkedBuyerId: { not: null } }],
+    },
+    select: { linkedFarmerId: true, linkedBuyerId: true },
+  })
+  return {
+    farmerIds: new Set(
+      rows.filter((row) => row.linkedFarmerId != null).map((row) => Number(row.linkedFarmerId)),
+    ),
+    buyerIds: new Set(
+      rows.filter((row) => row.linkedBuyerId != null).map((row) => Number(row.linkedBuyerId)),
+    ),
+  }
+}
+
+async function restoreDeletedParty(
+  partyId: bigint,
+  data: { name: string; notes?: string | null },
+) {
+  return prisma.registerParty.update({
+    where: { id: partyId },
+    data: {
+      deleted: false,
+      name: data.name,
+      notes: data.notes,
+    },
+    include: moneyEntriesInclude,
+  })
+}
+
 async function reclaimLinkedParty(
   partyId: bigint,
   field: 'linkedFarmerId' | 'linkedBuyerId',
@@ -498,14 +554,11 @@ async function reclaimLinkedParty(
 ) {
   const taken = await prisma.registerParty.findFirst({
     where: { [field]: accountId, id: { not: partyId } },
-    include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+    include: moneyEntriesInclude,
   })
   if (!taken) return partyId
   if (taken.deleted) {
-    await prisma.registerParty.update({
-      where: { id: taken.id },
-      data: { [field]: null },
-    })
+    // Keep the tombstone so delete stays deleted and unique links are not stolen.
     return partyId
   }
   const merged = await mergeRegisterParties([taken, { id: partyId, entries: [] }])
@@ -561,12 +614,23 @@ async function stampAccountLinks(
 }
 
 /** Reuse the Arhat Register person when farmer/buyer ID or name matches. Merge split records. */
-export async function ensureRegisterPartyForAccount(code: string, extraName?: string | null) {
+export async function ensureRegisterPartyForAccount(
+  code: string,
+  extraName?: string | null,
+  options?: EnsureRegisterPartyOptions,
+) {
   const name = String(code ?? '').trim()
   if (!name) return null
   const resolved = await resolveAccountKeys(name, extraName)
-  const parties = await findRegisterPartiesForKeys(resolved.aliases)
   const label = String(extraName ?? '').trim() || resolved.farmer?.name || resolved.buyer?.name || name
+  const notes = `ID ${resolved.farmer?.code || resolved.buyer?.code || name}`
+  const tombstone = await findDeletedLinkedParty(resolved.farmer?.id, resolved.buyer?.id)
+  if (tombstone) {
+    if (!options?.reviveDeleted) return null
+    const restored = await restoreDeletedParty(tombstone.id, { name: label, notes: tombstone.notes || notes })
+    return stampAccountLinks(restored.id, resolved, name)
+  }
+  const parties = await findRegisterPartiesForKeys(resolved.aliases)
   if (parties.length) {
     const merged = await mergeRegisterParties(parties)
     if (merged) {
@@ -578,17 +642,14 @@ export async function ensureRegisterPartyForAccount(code: string, extraName?: st
       const row = wantsRename
         ? await prisma.registerParty.update({
             where: { id: merged.id },
-            data: { name: label, notes: merged.notes || `ID ${name}` },
-            include: {
-              entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
-            },
+            data: { name: label, notes: merged.notes || notes },
+            include: moneyEntriesInclude,
           })
         : merged
       return stampAccountLinks(row.id, resolved, name)
     }
   }
   const ownerCode = resolved.farmer?.code || resolved.buyer?.code || name
-  const notes = `ID ${ownerCode}`
   try {
     const created = await prisma.registerParty.create({
       data: {
@@ -600,10 +661,16 @@ export async function ensureRegisterPartyForAccount(code: string, extraName?: st
         linkedFarmerId: resolved.farmer?.id ?? null,
         linkedBuyerId: resolved.buyer?.id ?? null,
       },
-      include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+      include: moneyEntriesInclude,
     })
     return stampAccountLinks(created.id, resolved, name)
   } catch {
+    const blocked = await findDeletedLinkedParty(resolved.farmer?.id, resolved.buyer?.id)
+    if (blocked) {
+      if (!options?.reviveDeleted) return null
+      const restored = await restoreDeletedParty(blocked.id, { name: label, notes: blocked.notes || notes })
+      return stampAccountLinks(restored.id, resolved, name)
+    }
     const created = await prisma.registerParty.create({
       data: {
         kind: 'PERSON',
@@ -611,7 +678,7 @@ export async function ensureRegisterPartyForAccount(code: string, extraName?: st
         address: null,
         notes,
       },
-      include: { entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } } },
+      include: moneyEntriesInclude,
     })
     return stampAccountLinks(created.id, resolved, name)
   }
@@ -619,7 +686,7 @@ export async function ensureRegisterPartyForAccount(code: string, extraName?: st
 
 /** Make sure every live farmer and buyer has a searchable Arhat Register person. */
 export async function syncAllAccountsToRegister() {
-  const [farmers, buyers, parties] = await Promise.all([
+  const [farmers, buyers, parties, hidden] = await Promise.all([
     prisma.farmer.findMany({
       where: { deleted: false },
       select: { id: true, farmerId: true, name: true },
@@ -632,6 +699,7 @@ export async function syncAllAccountsToRegister() {
       where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
       select: { id: true, name: true, ownerCode: true, linkedFarmerId: true, linkedBuyerId: true },
     }),
+    hiddenRegisterAccountLinks(),
   ])
   const linkedFarmers = new Set(
     parties.filter((row) => row.linkedFarmerId != null).map((row) => String(row.linkedFarmerId)),
@@ -645,6 +713,7 @@ export async function syncAllAccountsToRegister() {
     ),
   )
   for (const farmer of farmers) {
+    if (hidden.farmerIds.has(Number(farmer.id))) continue
     const already =
       linkedFarmers.has(String(farmer.id)) &&
       partyKeys.has(normalizeAccountKey(farmer.farmerId))
@@ -652,10 +721,11 @@ export async function syncAllAccountsToRegister() {
     try {
       await ensureRegisterPartyForAccount(farmer.farmerId, farmer.name)
     } catch {
-      /* listParties still overlays this farmer so the ID cannot go missing */
+      /* overlay lists this farmer only when a real register person can be created */
     }
   }
   for (const buyer of buyers) {
+    if (hidden.buyerIds.has(Number(buyer.id))) continue
     const already =
       linkedBuyers.has(String(buyer.id)) &&
       partyKeys.has(normalizeAccountKey(buyer.buyerId))
@@ -663,7 +733,7 @@ export async function syncAllAccountsToRegister() {
     try {
       await ensureRegisterPartyForAccount(buyer.buyerId, buyer.name)
     } catch {
-      /* same: buyer still appears from the accounts overlay */
+      /* same: buyer appears only with a real register person */
     }
   }
 }
