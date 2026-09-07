@@ -1,4 +1,4 @@
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/4645c741-d08c-40ce-806d-7a8b8791de9b" /># 🌾 Arhat Management System
+🌾 Arhat Management System
 
 ### Rehmani Trading ERP
 
