@@ -5,7 +5,7 @@
 3. Add env vars:
    - `DATABASE_URL` = your Neon Postgres URL (https://console.neon.tech)
    - `JWT_SECRET` = optional long random string (a built-in secret is used if omitted)
-4. Set the Vercel **Production Branch** to `main` so the site does not depend on Cursor agent branches.
+4. Set the Vercel **Production Branch** to `main` so the live shop always deploys from `main`.
 5. Deploy → copy your permanent `https://….vercel.app` URL.
 
 Login accounts (change these in Owner Panel after first login — the old password is then deleted):
