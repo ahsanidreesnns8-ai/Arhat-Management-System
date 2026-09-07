@@ -968,11 +968,9 @@ export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en'
 }
 
 export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
-  const party = await prisma.registerParty.findFirst({
-    where: { id: BigInt(id), deleted: false },
-  })
-  if (!party) throw new Error('Person not found')
-  return accountBalanceBillByKey(party.name, lang)
+  const ledger = await getPartyLedger(id)
+  const key = ledger.ownerCode || ledger.farmerCode || ledger.buyerCode || ledger.name
+  return accountBalanceBillByKey(key, lang, ledger.name)
 }
 
 function renderAccountBalanceBill(

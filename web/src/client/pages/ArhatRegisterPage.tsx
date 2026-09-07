@@ -96,50 +96,20 @@ function mergeAccountsIntoParties(
   for (const farmer of farmers) {
     const hit = covers(farmer.farmerId, farmer.id)
       || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(farmer.name))
-    if (hit) {
-      hit.ownerCode = hit.ownerCode || farmer.farmerId
-      hit.farmerCode = hit.farmerCode || farmer.farmerId
-      hit.farmerName = hit.farmerName || farmer.name
-      hit.linkedFarmerId = hit.linkedFarmerId ?? farmer.id
-      continue
-    }
-    next.push({
-      id: farmer.id,
-      kind: 'PERSON',
-      name: farmer.name,
-      address: farmer.address,
-      notes: `ID ${farmer.farmerId}`,
-      createdAt: new Date().toISOString(),
-      ownerCode: farmer.farmerId,
-      farmerCode: farmer.farmerId,
-      farmerName: farmer.name,
-      linkedFarmerId: farmer.id,
-      displayLabel: 'Settled',
-    })
+    if (!hit) continue
+    hit.ownerCode = hit.ownerCode || farmer.farmerId
+    hit.farmerCode = hit.farmerCode || farmer.farmerId
+    hit.farmerName = hit.farmerName || farmer.name
+    hit.linkedFarmerId = hit.linkedFarmerId ?? farmer.id
   }
   for (const buyer of buyers) {
     const hit = covers(buyer.buyerId, buyer.id)
       || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(buyer.name))
-    if (hit) {
-      hit.ownerCode = hit.ownerCode || buyer.buyerId
-      hit.buyerCode = hit.buyerCode || buyer.buyerId
-      hit.buyerName = hit.buyerName || buyer.name
-      hit.linkedBuyerId = hit.linkedBuyerId ?? buyer.id
-      continue
-    }
-    next.push({
-      id: buyer.id,
-      kind: 'PERSON',
-      name: buyer.name,
-      address: buyer.address,
-      notes: `ID ${buyer.buyerId}`,
-      createdAt: new Date().toISOString(),
-      ownerCode: buyer.buyerId,
-      buyerCode: buyer.buyerId,
-      buyerName: buyer.name,
-      linkedBuyerId: buyer.id,
-      displayLabel: 'Settled',
-    })
+    if (!hit) continue
+    hit.ownerCode = hit.ownerCode || buyer.buyerId
+    hit.buyerCode = hit.buyerCode || buyer.buyerId
+    hit.buyerName = hit.buyerName || buyer.name
+    hit.linkedBuyerId = hit.linkedBuyerId ?? buyer.id
   }
   return next
 }
@@ -198,15 +168,6 @@ function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
   const name = a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
   if (name !== 0) return name
   return partyFrame(a).amount - partyFrame(b).amount
-}
-
-function isProductLinked(p: RegisterParty) {
-  return Boolean(
-    p.linkedFarmerId ||
-    p.linkedBuyerId ||
-    (p.productTotal || 0) > 0 ||
-    (p.soldTotal || 0) > 0,
-  )
 }
 
 function AccountBreakdown({ party }: { party: RegisterParty }) {
@@ -404,15 +365,17 @@ export default function ArhatRegisterPage() {
     }
     setSaving(true)
     try {
+      const savedName = person.name.trim()
       await registerApi.addParty({
         kind: 'RECEIVING',
-        name: person.name.trim(),
+        name: savedName,
         address: person.address.trim() || undefined,
         notes: person.notes.trim() || undefined,
       })
       toast.success('Person saved')
       setPerson({ name: '', address: '', notes: '' })
       setPersonOpen(false)
+      setSearch(savedName)
       void load()
     } catch (err: unknown) {
       toast.error(apiError(err, 'Could not add person'))
@@ -602,7 +565,7 @@ export default function ArhatRegisterPage() {
   const renderFrame = (p: RegisterParty) => {
     const side = partyFrame(p)
     return (
-      <div key={p.id} className="card-3d p-4 space-y-3">
+      <div key={`party-${p.id}`} className="card-3d p-4 space-y-3">
         <div>
           <p className="font-semibold truncate">{p.name}</p>
           {partyAccountCode(p) ? (
@@ -644,16 +607,12 @@ export default function ArhatRegisterPage() {
           ) : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {!isProductLinked(p) && (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => openMoney('RECEIVING', String(p.id))}>
-                <Wallet className="h-3.5 w-3.5" /> Receive
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
-                <HandCoins className="h-3.5 w-3.5" /> Give
-              </Button>
-            </>
-          )}
+          <Button size="sm" variant="secondary" onClick={() => openMoney('RECEIVING', String(p.id))}>
+            <Wallet className="h-3.5 w-3.5" /> Receive
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
+            <HandCoins className="h-3.5 w-3.5" /> Give
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => void openEdit(p)}>
             <Eye className="h-3.5 w-3.5" /> Details
           </Button>
@@ -1231,7 +1190,7 @@ export default function ArhatRegisterPage() {
         onClose={() => setDeletePartyId(null)}
         onConfirm={() => void confirmDeleteParty()}
         title="Delete this person?"
-        message="They will leave the register and their amounts will leave the totals. This does not change other people you already saved."
+        message="They will leave the Arhat Register and their cash amounts will leave the totals. Farmer or buyer records stay in the shop, but this name will not come back until you add the person again."
         confirmLabel="Delete"
         loading={saving}
       />
