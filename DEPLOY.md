@@ -1,6 +1,6 @@
 # Deploy
 
-This ERP is a **standalone Vercel app**. It does not use Cursor Cloud Agents, tunnels, or any temporary demo URL. Cancelling a Cursor plan does **not** stop the website once it is deployed on Vercel.
+This ERP is a **standalone Vercel app**. The live site uses only GitHub + Vercel + Postgres (Neon). Cancelling a coding-editor subscription does **not** stop the website.
 
 Production URL: `https://arhat-management-system.vercel.app`
 
@@ -12,13 +12,13 @@ Production URL: `https://arhat-management-system.vercel.app`
 | `JWT_SECRET` | No | Optional. A built-in secret is used if this is missing so login does not break. |
 | `GEMINI_API_KEY` | No | AI assistant only |
 
-Cursor is **not** an environment variable and is **not** part of runtime.
+No coding editor is an environment variable. None of them run as part of the website.
 
 ## Vercel project settings (one-time)
 
 1. Import this GitHub repository at [vercel.com/new](https://vercel.com/new).
 2. **Root Directory:** `web` (Settings → Build and Deployment). If this is empty, `npm install` fails with ENOENT.
-3. **Production Branch:** `main` (so the site does not depend on Cloud Agent branches).
+3. **Production Branch:** `main` (the live shop always deploys from `main`).
 4. Add `DATABASE_URL`.
 5. Deploy. Build command is `npm run vercel-build` (Prisma generate → db push → seed → Next build).
 
