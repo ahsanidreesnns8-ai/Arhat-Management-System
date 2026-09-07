@@ -493,7 +493,7 @@ const MONEY_PARTY_KINDS = ['GIVING', 'RECEIVING', 'PERSON'] as const
 
 const moneyEntriesInclude = {
   entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
-} as const
+}
 
 export type EnsureRegisterPartyOptions = {
   /** Restore a person the owner already removed from Arhat Register. Default stays hidden. */
