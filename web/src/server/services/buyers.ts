@@ -61,6 +61,12 @@ const includeTotals = {
 } as const
 
 export async function listBuyers() {
+  try {
+    const { purgeMixedRanaPeopleOnce } = await import('@/server/services/register')
+    await purgeMixedRanaPeopleOnce()
+  } catch {
+    /* still list live buyers if cleanup cannot run */
+  }
   const [rows, billed, paid] = await Promise.all([
     prisma.buyer.findMany({
       where: { deleted: false },

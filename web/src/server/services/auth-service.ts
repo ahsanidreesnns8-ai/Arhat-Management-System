@@ -126,9 +126,15 @@ export async function login(
     userAgent: meta?.userAgent,
   })
 
-  const settings = await runWithWorkspace(workspace, async () =>
-    prisma.businessSettings.findFirst({ select: { companyName: true } }),
-  )
+  const settings = await runWithWorkspace(workspace, async () => {
+    try {
+      const { purgeMixedRanaPeopleOnce } = await import('@/server/services/register')
+      await purgeMixedRanaPeopleOnce()
+    } catch {
+      /* login still succeeds if cleanup cannot run */
+    }
+    return prisma.businessSettings.findFirst({ select: { companyName: true } })
+  })
   const liveFallback =
     !settings?.companyName && workspace === WORKSPACE_DEMO
       ? await getLiveSettingsCompanyName()

@@ -106,6 +106,12 @@ const includeTotals = {
 } as const
 
 export async function listFarmers() {
+  try {
+    const { purgeMixedRanaPeopleOnce } = await import('@/server/services/register')
+    await purgeMixedRanaPeopleOnce()
+  } catch {
+    /* still list live farmers if cleanup cannot run */
+  }
   const [rows, billed, paid] = await Promise.all([
     prisma.farmer.findMany({
       where: { deleted: false },
