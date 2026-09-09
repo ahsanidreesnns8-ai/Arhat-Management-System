@@ -178,7 +178,9 @@ export async function updateBuyer(id: number | bigint, input: PartyInput) {
 }
 
 export async function deleteBuyer(id: number | bigint) {
-  await getBuyer(id)
+  const buyer = await getBuyer(id)
+  const { hideAccountsForBuyer } = await import('@/server/services/register')
+  await hideAccountsForBuyer(buyer.id, buyer.name, buyer.buyerId)
   await prisma.buyer.update({
     where: { id: BigInt(id) },
     data: { deleted: true },

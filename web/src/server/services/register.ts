@@ -2,6 +2,7 @@ import { prisma } from '@/server/db'
 import { normalizeAccountKey } from '@/server/ids'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
+import { logAudit } from '@/server/services/audit'
 import {
   accountPosition,
   ensureRegisterPartyForAccount,
@@ -276,12 +277,13 @@ function moneyEntryInclude() {
 
 function partyHasAccountCode(dto: PartyDto, code: string, linkedId?: number | null) {
   const key = normalizeAccountKey(code)
+  if (!key) return false
   if (linkedId != null && (dto.linkedFarmerId === linkedId || dto.linkedBuyerId === linkedId)) {
     return true
   }
-  return [dto.ownerCode, dto.farmerCode, dto.buyerCode, dto.name, dto.notes].some(
-    (value) => normalizeAccountKey(value) === key || normalizeAccountKey(value).includes(key),
-  )
+  return [dto.ownerCode, dto.farmerCode, dto.buyerCode].some((value) => normalizeAccountKey(value) === key)
+    || normalizeAccountKey(dto.notes) === key
+    || normalizeAccountKey(dto.notes) === normalizeAccountKey(`ID ${code}`)
 }
 
 function stampPartyFromFarmer(
@@ -368,6 +370,11 @@ async function overlayAccountsOnParties(dtos: PartyDto[]) {
 
 export async function listParties(kind: string) {
   if (kind) parseKind(kind, ['GIVING', 'RECEIVING'])
+  try {
+    await purgeKnownDuplicatePeopleOnce()
+  } catch {
+    /* continue listing even if a one-time cleanup cannot run */
+  }
   try {
     await syncAllAccountsToRegister()
   } catch {
@@ -634,14 +641,7 @@ async function farmerForAccountKey(key: string, farmerId?: number | null) {
   if (byName.length === 1) {
     return prisma.farmer.findFirst({ where: { id: byName[0].id, deleted: false } })
   }
-  const token = String(raw).trim().split(/\s+/)[0] || raw
-  const tokenKey = normalizeAccountKey(token)
-  const byFirst = farmers.filter((row) => {
-    const first = row.name.trim().split(/\s+/)[0] || row.name
-    return normalizeAccountKey(first) === tokenKey || normalizeAccountKey(first) === norm
-  })
-  if (byFirst.length !== 1) return null
-  return prisma.farmer.findFirst({ where: { id: byFirst[0].id, deleted: false } })
+  return null
 }
 
 export async function getStatement(key: unknown) {
@@ -784,11 +784,148 @@ export async function updateParty(
   return getPartyLedger(party.id)
 }
 
+export async function hideAccountsForFarmer(farmerId: number | bigint, name?: string | null, code?: string | null) {
+  await retireMatchingRegisterParties({
+    farmerId: BigInt(farmerId),
+    name,
+    code,
+  })
+  await prisma.dheri.updateMany({
+    where: { farmerId: BigInt(farmerId), deleted: false },
+    data: { deleted: true },
+  })
+}
+
+export async function hideAccountsForBuyer(buyerId: number | bigint, name?: string | null, code?: string | null) {
+  await retireMatchingRegisterParties({
+    buyerId: BigInt(buyerId),
+    name,
+    code,
+  })
+}
+
+async function retireMatchingRegisterParties(input: {
+  partyId?: bigint
+  farmerId?: bigint | null
+  buyerId?: bigint | null
+  name?: string | null
+  code?: string | null
+}) {
+  const nameKey = normalizeAccountKey(input.name)
+  const codeKey = normalizeAccountKey(input.code)
+  const or: Array<Record<string, unknown>> = [
+    ...(input.partyId ? [{ id: input.partyId }] : []),
+    ...(input.farmerId ? [{ linkedFarmerId: input.farmerId }] : []),
+    ...(input.buyerId ? [{ linkedBuyerId: input.buyerId }] : []),
+    ...(codeKey ? [{ ownerCode: { equals: String(input.code).trim(), mode: 'insensitive' as const } }] : []),
+  ]
+  const rows = or.length
+    ? await prisma.registerParty.findMany({
+        where: { kind: { in: [...MONEY_PARTY_KINDS] }, OR: or },
+      })
+    : []
+  const extra = nameKey
+    ? (await prisma.registerParty.findMany({
+        where: { kind: { in: [...MONEY_PARTY_KINDS] } },
+      })).filter((row) => normalizeAccountKey(row.name) === nameKey)
+    : []
+  const seen = new Set<string>()
+  const all = [...rows, ...extra].filter((row) => {
+    const key = String(row.id)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  for (const row of all) {
+    await prisma.registerEntry.deleteMany({
+      where: { partyId: row.id, kind: { in: [...MONEY_ENTRY_KINDS] } },
+    })
+    await prisma.registerParty.update({
+      where: { id: row.id },
+      data: {
+        deleted: true,
+        name: `Removed ${row.id}`,
+        notes: null,
+        ownerCode: null,
+        linkedFarmerId: null,
+        linkedBuyerId: null,
+      },
+    })
+  }
+}
+
 export async function deleteParty(id: number | bigint) {
   const party = await liveMoneyParty(id)
-  await prisma.registerParty.update({
-    where: { id: party.id },
-    data: { deleted: true },
+  if (party.linkedFarmerId) {
+    await prisma.dheri.updateMany({
+      where: { farmerId: party.linkedFarmerId, deleted: false },
+      data: { deleted: true },
+    })
+    await prisma.farmer.updateMany({
+      where: { id: party.linkedFarmerId, deleted: false },
+      data: { deleted: true },
+    })
+  }
+  if (party.linkedBuyerId) {
+    await prisma.buyer.updateMany({
+      where: { id: party.linkedBuyerId, deleted: false },
+      data: { deleted: true },
+    })
+  }
+  await retireMatchingRegisterParties({
+    partyId: party.id,
+    farmerId: party.linkedFarmerId,
+    buyerId: party.linkedBuyerId,
+    name: party.name,
+    code: party.ownerCode,
+  })
+}
+
+const SHOP_PURGE_NAMES = ['Rana Ghulam Mustafa', 'Rana Allahwasya']
+
+export async function removePeopleFromShop(names: string[] = SHOP_PURGE_NAMES) {
+  const wanted = new Set(names.map((name) => normalizeAccountKey(name)).filter(Boolean))
+  if (!wanted.size) return { farmers: 0, buyers: 0, register: 0 }
+  const [farmers, buyers, parties] = await Promise.all([
+    prisma.farmer.findMany(),
+    prisma.buyer.findMany(),
+    prisma.registerParty.findMany({ where: { kind: { in: [...MONEY_PARTY_KINDS] } } }),
+  ])
+  const hitFarmers = farmers.filter((row) => wanted.has(normalizeAccountKey(row.name)))
+  const hitBuyers = buyers.filter((row) => wanted.has(normalizeAccountKey(row.name)))
+  for (const farmer of hitFarmers) {
+    await hideAccountsForFarmer(farmer.id, farmer.name, farmer.farmerId)
+    if (!farmer.deleted) {
+      await prisma.farmer.update({ where: { id: farmer.id }, data: { deleted: true } })
+    }
+  }
+  for (const buyer of hitBuyers) {
+    await hideAccountsForBuyer(buyer.id, buyer.name, buyer.buyerId)
+    if (!buyer.deleted) {
+      await prisma.buyer.update({ where: { id: buyer.id }, data: { deleted: true } })
+    }
+  }
+  const leftover = parties.filter((row) => wanted.has(normalizeAccountKey(row.name)) && !row.deleted)
+  for (const party of leftover) {
+    await retireMatchingRegisterParties({ partyId: party.id, name: party.name, code: party.ownerCode })
+  }
+  return {
+    farmers: hitFarmers.length,
+    buyers: hitBuyers.length,
+    register: leftover.length + hitFarmers.length + hitBuyers.length,
+  }
+}
+
+const PURGE_ACTION = 'PURGE_RANA_GHULAM_MUSTAFA_ALLAHWASYA'
+
+async function purgeKnownDuplicatePeopleOnce() {
+  const done = await prisma.auditLog.findFirst({ where: { action: PURGE_ACTION } })
+  if (done) return
+  const result = await removePeopleFromShop()
+  await logAudit({
+    action: PURGE_ACTION,
+    entityType: 'register_party',
+    newValue: result,
   })
 }
 

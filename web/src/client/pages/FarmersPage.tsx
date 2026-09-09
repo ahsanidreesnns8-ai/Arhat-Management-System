@@ -267,7 +267,7 @@ export default function FarmersPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Delete Farmer"
-        message="Are you sure you want to delete this farmer?"
+        message="This farmer leaves Farmers, Farmer Product, and Arhat Register. Adding them later creates a new ID."
       />
 
       {payFarmer && (
