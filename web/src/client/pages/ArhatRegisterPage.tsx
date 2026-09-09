@@ -55,6 +55,26 @@ function partyAccountCode(party: Pick<RegisterParty, 'ownerCode' | 'farmerCode' 
   return party.ownerCode || party.farmerCode || party.buyerCode || ''
 }
 
+function isIdOnlyNote(
+  party: Pick<RegisterParty, 'ownerCode' | 'farmerCode' | 'buyerCode'>,
+  notes?: string | null,
+) {
+  const text = String(notes || '').trim()
+  if (!text) return true
+  const code = partyAccountCode(party)
+  if (!code) return false
+  return (
+    normalizeAccountKey(text) === normalizeAccountKey(code)
+    || normalizeAccountKey(text) === normalizeAccountKey(`ID ${code}`)
+  )
+}
+
+function partyPlaceLine(party: Pick<RegisterParty, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'address' | 'notes'>) {
+  if (party.address) return party.address
+  if (party.notes && !isIdOnlyNote(party, party.notes)) return party.notes
+  return ''
+}
+
 function matchesSearch(party: RegisterParty, query: string) {
   if (!query) return true
   const code = partyAccountCode(party)
@@ -363,7 +383,7 @@ export default function ArhatRegisterPage() {
         code: partyAccountCode(ledger),
         name: ledger.name,
         address: ledger.address || '',
-        notes: ledger.notes || '',
+        notes: isIdOnlyNote(ledger, ledger.notes) ? '' : (ledger.notes || ''),
         lines: lines.map((row) => ({
           id: row.id,
           amount: String(row.amount),
@@ -603,9 +623,11 @@ export default function ArhatRegisterPage() {
         <div>
           <p className="font-semibold truncate">{p.name}</p>
           {partyAccountCode(p) ? (
-            <p className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate">ID {partyAccountCode(p)}</p>
+            <p className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate whitespace-nowrap">ID {partyAccountCode(p)}</p>
           ) : null}
-          <p className="text-[11px] text-slate-500 truncate">{p.address || p.notes || 'No address'}</p>
+          {partyPlaceLine(p) ? (
+            <p className="text-[11px] text-slate-500 truncate">{partyPlaceLine(p)}</p>
+          ) : null}
           {p.farmerName ? (
             <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}</p>
           ) : null}
