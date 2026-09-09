@@ -444,6 +444,17 @@ async function findPartyByExactName(name: string, deleted: boolean) {
   return matches.length === 1 ? matches[0] : null
 }
 
+async function findPartyByOwnerCode(code: string, deleted = false) {
+  const key = normalizeAccountKey(code)
+  if (!key) return null
+  const rows = await prisma.registerParty.findMany({
+    where: { deleted, kind: { in: [...MONEY_PARTY_KINDS] } },
+    include: moneyEntryInclude(),
+    orderBy: { updatedAt: 'desc' },
+  })
+  return rows.find((row) => normalizeAccountKey(row.ownerCode) === key) ?? null
+}
+
 async function findExactAccountCode(name: string) {
   const norm = normalizeAccountKey(name)
   if (!norm) return null
@@ -496,8 +507,9 @@ export async function createParty(input: {
   const code = normalizeOwnerCode(input.code ?? input.ownerCode)
 
   if (code) {
+    const existing = await findPartyByOwnerCode(code)
     const account = (await findExactAccountCode(code)) || { code, name }
-    const linked = await ensureRegisterPartyForAccount(account.code, name, { reviveDeleted: true })
+    const linked = existing || await ensureRegisterPartyForAccount(account.code, name, { reviveDeleted: true })
     if (!linked) throw new Error('Could not open this ID')
     const row = await prisma.registerParty.update({
       where: { id: linked.id },

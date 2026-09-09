@@ -402,6 +402,12 @@ async function findRegisterPartiesForAccount(resolved: ResolvedAccount) {
   const byId = parties.filter((row) => partyMatchesResolvedAccount(row, resolved))
   if (byId.length) return byId
 
+  const ownerKey = resolved.norm
+  if (ownerKey) {
+    const byOwner = parties.filter((row) => normalizeAccountKey(row.ownerCode) === ownerKey)
+    if (byOwner.length) return byOwner
+  }
+
   const label = normalizeAccountKey(
     resolved.farmer?.name || resolved.buyer?.name || (!resolved.farmer && !resolved.buyer ? resolved.raw : ''),
   )
