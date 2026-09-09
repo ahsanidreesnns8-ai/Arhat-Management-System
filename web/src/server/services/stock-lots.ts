@@ -62,6 +62,47 @@ export async function listStockLots(productId?: number, includeEmpty = false) {
   return rows.map(stockLotDto)
 }
 
+export async function deleteStockLot(id: number) {
+  return prisma.$transaction(async (tx) => {
+    const lot = await tx.stockLot.findFirst({
+      where: { id: BigInt(id) },
+      include: { product: true, farmer: true, dheri: true },
+    })
+    if (!lot) throw new Error('Stock entry not found')
+    const remaining = d(lot.remainingKg.toString())
+    const stock = await tx.stock.findFirst({ where: { productId: lot.productId } })
+    if (stock && remaining.gt(0)) {
+      const previous = d(stock.quantity.toString())
+      const next = previous.sub(remaining)
+      const qty = next.lt(0) ? d(0) : next
+      const settings = await tx.businessSettings.findFirst()
+      await tx.stock.update({
+        where: { id: stock.id },
+        data: {
+          quantity: qty.toFixed(2),
+          lowStockAlert: qty.lt(d(settings?.lowStockThreshold?.toString() ?? 100)),
+        },
+      })
+      await tx.stockTransaction.create({
+        data: {
+          productId: lot.productId,
+          transactionType: 'ADJUSTMENT',
+          quantity: remaining.toFixed(2),
+          previousQuantity: previous.toFixed(2),
+          newQuantity: qty.toFixed(2),
+          referenceType: 'STOCK_LOT_DELETE',
+          referenceId: lot.id,
+          farmerId: lot.farmerId,
+          dheriId: lot.dheriId,
+          notes: `Deleted Extra KG batch · ${lot.product.name}${lot.dheri?.dheriId ? ` · ${lot.dheri.dheriId}` : ''}`,
+        },
+      })
+    }
+    await tx.stockLot.delete({ where: { id: lot.id } })
+    return { id: Number(lot.id) }
+  })
+}
+
 /** Manual top-up kg so leftover Extra KG can form another whole bag */
 export async function topUpStockKg(input: {
   productId: number

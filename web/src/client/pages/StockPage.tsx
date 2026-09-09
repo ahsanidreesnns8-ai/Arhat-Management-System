@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Package, Plus, Scale } from 'lucide-react'
+import { AlertTriangle, Package, Plus, Scale, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
@@ -23,6 +24,12 @@ export default function StockPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ productId: '', quantity: '', type: 'INCOMING', notes: '' })
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'item'; id: number; label: string }
+    | { kind: 'lot'; id: number; label: string }
+    | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback((soft = false) => {
     if (!soft) setLoading(true)
@@ -81,6 +88,23 @@ export default function StockPage() {
     }
   }
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      if (deleteTarget.kind === 'item') await stockApi.deleteItem(deleteTarget.id)
+      else await stockApi.deleteLot(deleteTarget.id)
+      toast.success('Stock entry deleted')
+      setDeleteTarget(null)
+      load(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not delete stock entry')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   useVoicePageActions({
     openCreate: () => setModalOpen(true),
     save: () => { void handleAdjust() },
@@ -119,7 +143,7 @@ export default function StockPage() {
               const extraKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
               return (
                 <div key={item.id} className={`stat-card ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm text-gray-500">{item.productName}</p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
@@ -132,9 +156,25 @@ export default function StockPage() {
                         </p>
                       )}
                     </div>
-                    {item.lowStockAlert && (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                    )}
+                    <div className="flex items-center gap-1">
+                      {item.lowStockAlert && (
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                      )}
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() =>
+                          setDeleteTarget({
+                            kind: 'item',
+                            id: item.id,
+                            label: `${item.productName} (${formatNumber(item.quantity)} kg)`,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )
@@ -174,6 +214,7 @@ export default function StockPage() {
                       <th className="p-3 font-semibold text-gray-600">Rate/40kg</th>
                       <th className="p-3 font-semibold text-gray-600">Value</th>
                       <th className="p-3 font-semibold text-gray-600">Note</th>
+                      <th className="p-3 font-semibold text-gray-600"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,6 +234,22 @@ export default function StockPage() {
                         <td className="p-3">{formatCurrency(lot.ratePer40Kg)}</td>
                         <td className="p-3">{formatCurrency(lot.amountValue)}</td>
                         <td className="p-3 text-xs text-gray-500 max-w-[12rem] truncate" title={lot.notes || ''}>{lot.notes || '—'}</td>
+                        <td className="p-3">
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() =>
+                              setDeleteTarget({
+                                kind: 'lot',
+                                id: lot.id,
+                                label: `${lot.productName || 'Batch'} · ${formatNumber(lot.remainingKg)} kg remaining`,
+                              })
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -269,6 +326,19 @@ export default function StockPage() {
           <Button onClick={handleAdjust} loading={saving}>Save Adjustment</Button>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDelete()}
+        title="Delete stock entry"
+        message={
+          deleteTarget?.kind === 'item'
+            ? `Remove ${deleteTarget.label} from stock? Remaining Extra KG batches for this product will also leave stock.`
+            : `Delete ${deleteTarget?.label || 'this Extra KG batch'}? Remaining kg will be deducted from stock.`
+        }
+        loading={deleting}
+      />
     </div>
   )
 }

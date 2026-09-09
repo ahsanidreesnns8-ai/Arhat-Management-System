@@ -154,3 +154,32 @@ export async function adjustStock(input: StockAdjustmentInput) {
   if (!row) throw new Error('Stock not found')
   return stockDto(row)
 }
+
+export async function deleteStockItem(id: number) {
+  await prisma.$transaction(async (tx) => {
+    const stock = await tx.stock.findFirst({
+      where: { id: BigInt(id) },
+      include: { product: true },
+    })
+    if (!stock) throw new Error('Stock entry not found')
+    const previous = d(stock.quantity.toString())
+    await tx.stockLot.updateMany({
+      where: { productId: stock.productId, remainingKg: { gt: 0 } },
+      data: { remainingKg: '0.00' },
+    })
+    await tx.stockTransaction.create({
+      data: {
+        productId: stock.productId,
+        transactionType: 'ADJUSTMENT',
+        quantity: previous.toFixed(2),
+        previousQuantity: previous.toFixed(2),
+        newQuantity: '0.00',
+        referenceType: 'STOCK_DELETE',
+        referenceId: stock.id,
+        notes: `Deleted stock entry · ${stock.product.name}`,
+      },
+    })
+    await tx.stock.delete({ where: { id: stock.id } })
+  })
+  return { id }
+}

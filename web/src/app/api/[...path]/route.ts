@@ -407,11 +407,17 @@ async function dispatch(
       const bag = Number(url.searchParams.get('bagWeight') ?? 40)
       return result(stockLots.previewBagsFromKg(kg, bag))
     }
+    if (path[1] === 'lots' && path[2] && method === 'DELETE') {
+      return result(await stockLots.deleteStockLot(numericId(path[2])), 'Stock entry deleted')
+    }
     if (path[1] === 'adjust' && method === 'POST') {
       return result(
         await stock.adjustStock(payload as stock.StockAdjustmentInput),
         'Stock updated',
       )
+    }
+    if (path.length === 2 && method === 'DELETE') {
+      return result(await stock.deleteStockItem(numericId(path[1])), 'Stock entry deleted')
     }
   }
 
