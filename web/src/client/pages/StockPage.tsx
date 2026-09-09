@@ -27,6 +27,7 @@ export default function StockPage() {
   const [deleteTarget, setDeleteTarget] = useState<
     | { kind: 'item'; id: number; label: string }
     | { kind: 'lot'; id: number; label: string }
+    | { kind: 'history'; id: number; label: string }
     | null
   >(null)
   const [deleting, setDeleting] = useState(false)
@@ -93,7 +94,8 @@ export default function StockPage() {
     setDeleting(true)
     try {
       if (deleteTarget.kind === 'item') await stockApi.deleteItem(deleteTarget.id)
-      else await stockApi.deleteLot(deleteTarget.id)
+      else if (deleteTarget.kind === 'lot') await stockApi.deleteLot(deleteTarget.id)
+      else await stockApi.deleteHistory(deleteTarget.id)
       toast.success('Stock entry deleted')
       setDeleteTarget(null)
       load(true)
@@ -142,7 +144,7 @@ export default function StockPage() {
               const productLots = lotsByProduct.get(item.productId) || []
               const extraKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
               return (
-                <div key={item.id} className={`stat-card ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
+                <div key={item.id} className={`stat-card space-y-3 ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm text-gray-500">{item.productName}</p>
@@ -156,26 +158,25 @@ export default function StockPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      {item.lowStockAlert && (
-                        <AlertTriangle className="h-5 w-5 text-red-500" />
-                      )}
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() =>
-                          setDeleteTarget({
-                            kind: 'item',
-                            id: item.id,
-                            label: `${item.productName} (${formatNumber(item.quantity)} kg)`,
-                          })
-                        }
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </Button>
-                    </div>
+                    {item.lowStockAlert && (
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                    )}
                   </div>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    className="w-full"
+                    onClick={() =>
+                      setDeleteTarget({
+                        kind: 'item',
+                        id: item.id,
+                        label: `${item.productName} (${formatNumber(item.quantity)} kg)`,
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </Button>
                 </div>
               )
             })}
@@ -272,12 +273,13 @@ export default function StockPage() {
                     <th className="text-right p-4 font-semibold text-gray-600">Previous</th>
                     <th className="text-right p-4 font-semibold text-gray-600">New</th>
                     <th className="text-left p-4 font-semibold text-gray-600">Date</th>
+                    <th className="text-left p-4 font-semibold text-gray-600"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-500">No stock movements yet</td>
+                      <td colSpan={7} className="p-8 text-center text-gray-500">No stock movements yet</td>
                     </tr>
                   ) : history.slice(0, 20).map((tx) => (
                     <tr key={tx.id} className="border-b border-gray-100 dark:border-gray-800">
@@ -287,6 +289,22 @@ export default function StockPage() {
                       <td className="p-4 text-right">{formatNumber(tx.previousQuantity)}</td>
                       <td className="p-4 text-right font-medium">{formatNumber(tx.newQuantity)}</td>
                       <td className="p-4 text-gray-500">{formatDateTime(tx.createdAt)}</td>
+                      <td className="p-4">
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() =>
+                            setDeleteTarget({
+                              kind: 'history',
+                              id: tx.id,
+                              label: `${tx.productName} · ${tx.transactionType} · ${formatNumber(tx.quantity)} kg`,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -335,7 +353,9 @@ export default function StockPage() {
         message={
           deleteTarget?.kind === 'item'
             ? `Remove ${deleteTarget.label} from stock? Remaining Extra KG batches for this product will also leave stock.`
-            : `Delete ${deleteTarget?.label || 'this Extra KG batch'}? Remaining kg will be deducted from stock.`
+            : deleteTarget?.kind === 'history'
+              ? `Delete ${deleteTarget.label}? This movement is removed and stock kg is reversed.`
+              : `Delete ${deleteTarget?.label || 'this Extra KG batch'}? Remaining kg will be deducted from stock.`
         }
         loading={deleting}
       />

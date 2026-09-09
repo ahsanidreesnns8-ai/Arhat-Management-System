@@ -381,6 +381,9 @@ async function dispatch(
     if (path[1] === 'history' && method === 'GET') {
       return result(await stock.listStockHistory())
     }
+    if (path[1] === 'history' && path[2] && method === 'DELETE') {
+      return result(await stock.deleteStockTransaction(numericId(path[2])), 'Stock entry deleted')
+    }
     if (path[1] === 'lots' && method === 'GET') {
       const productId = url.searchParams.get('productId')
       const includeEmpty = url.searchParams.get('all') === '1'

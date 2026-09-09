@@ -183,3 +183,39 @@ export async function deleteStockItem(id: number) {
   })
   return { id }
 }
+
+export async function deleteStockTransaction(id: number) {
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.stockTransaction.findFirst({
+      where: { id: BigInt(id) },
+      include: { product: true },
+    })
+    if (!row) throw new Error('Stock entry not found')
+    const stock = await tx.stock.findFirst({ where: { productId: row.productId } })
+    if (stock) {
+      const current = d(stock.quantity.toString())
+      const previous = d(row.previousQuantity.toString())
+      const nextQty = d(row.newQuantity.toString())
+      const restored = current.add(previous).sub(nextQty)
+      const qty = restored.lt(0) ? d(0) : restored
+      const settings = await tx.businessSettings.findFirst()
+      if (qty.eq(0)) {
+        await tx.stockLot.updateMany({
+          where: { productId: row.productId, remainingKg: { gt: 0 } },
+          data: { remainingKg: '0.00' },
+        })
+        await tx.stock.delete({ where: { id: stock.id } })
+      } else {
+        await tx.stock.update({
+          where: { id: stock.id },
+          data: {
+            quantity: qty.toFixed(2),
+            lowStockAlert: qty.lt(d(settings?.lowStockThreshold?.toString() ?? 100)),
+          },
+        })
+      }
+    }
+    await tx.stockTransaction.delete({ where: { id: row.id } })
+  })
+  return { id }
+}
