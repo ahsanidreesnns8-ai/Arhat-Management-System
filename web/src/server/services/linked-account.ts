@@ -106,10 +106,17 @@ function aliasUniqueName(
   const row = slot(map, rawCode)
   if (!row) return
   const nameKey = normalizeAccountKey(rawName)
-  if (nameKey && uniqueNames.has(nameKey)) {
-    const existing = map.get(nameKey)
-    if (!existing || existing === row) map.set(nameKey, row)
+  if (!nameKey || !uniqueNames.has(nameKey)) return
+  const existing = map.get(nameKey)
+  if (!existing || existing === row) {
+    map.set(nameKey, row)
+    return
   }
+  const samePerson =
+    (existing.farmerId && row.farmerId && existing.farmerId === row.farmerId)
+    || (existing.buyerId && row.buyerId && existing.buyerId === row.buyerId)
+  if (samePerson) return
+  map.delete(nameKey)
 }
 
 function slot(map: Map<string, LinkedTrade>, raw: string) {
@@ -390,7 +397,8 @@ function partyMatchesResolvedAccount(row: LiveMoneyParty, resolved: ResolvedAcco
   const codes = accountIdCodes(resolved)
   if (!codes.size) return false
   const owner = normalizeAccountKey(row.ownerCode)
-  if (owner && codes.has(owner)) return true
+  if (owner) return codes.has(owner)
+  if (!partyHasNoAccountIdentity(row)) return false
   const nameAsId = normalizeAccountKey(row.name)
   if (nameAsId && codes.has(nameAsId)) return true
   return [...codes].some((code) => notesHoldAccountCode(row.notes, code))
@@ -489,15 +497,36 @@ async function resolveAccountKeys(key: string, _extraName?: string | null) {
   }
 }
 
+function partiesForThisId<T extends {
+  ownerCode?: string | null
+  linkedFarmerId?: bigint | null
+  linkedBuyerId?: bigint | null
+}>(parties: T[], resolved: ResolvedAccount) {
+  const code = normalizeAccountKey(resolved.farmer?.code || resolved.buyer?.code || resolved.norm)
+  const byLink = parties.filter((row) =>
+    Boolean(
+      (resolved.farmer && row.linkedFarmerId === resolved.farmer.id)
+      || (resolved.buyer && row.linkedBuyerId === resolved.buyer.id),
+    ),
+  )
+  if (byLink.length) return byLink
+  if (code) {
+    const byOwner = parties.filter((row) => normalizeAccountKey(row.ownerCode) === code)
+    if (byOwner.length) return byOwner
+  }
+  return parties.filter((row) => partyHasNoAccountIdentity(row))
+}
+
 export async function findRegisterPartyByKey(key: string, extraName?: string | null) {
   const resolved = await resolveAccountKeys(key, extraName)
-  const parties = await findRegisterPartiesForAccount(resolved)
+  const parties = partiesForThisId(await findRegisterPartiesForAccount(resolved), resolved)
   if (!parties.length) return null
   const code = normalizeAccountKey(resolved.farmer?.code || resolved.buyer?.code || key)
   return (
     parties.find((row) => normalizeAccountKey(row.ownerCode) === code) ||
-    parties.find((row) => normalizeAccountKey(row.name) === code) ||
-    parties[0]
+    parties.find((row) => resolved.farmer && row.linkedFarmerId === resolved.farmer.id) ||
+    parties.find((row) => resolved.buyer && row.linkedBuyerId === resolved.buyer.id) ||
+    (parties.length === 1 ? parties[0] : null)
   )
 }
 
@@ -755,7 +784,8 @@ export async function syncAllAccountsToRegister() {
 }
 
 export async function registerCashForKey(key: string, extraName?: string | null) {
-  const parties = await findRegisterPartiesForAccount(await resolveAccountKeys(key, extraName))
+  const resolved = await resolveAccountKeys(key, extraName)
+  const parties = partiesForThisId(await findRegisterPartiesForAccount(resolved), resolved)
   if (!parties.length) {
     return { partyId: null as number | null, registerReceived: 0, registerGiven: 0 }
   }
@@ -982,10 +1012,11 @@ export async function loadTradeForKey(key: string): Promise<LinkedTrade> {
 export async function getAccountStatement(key: string, extraName?: string | null): Promise<AccountStatement> {
   const resolved = await resolveAccountKeys(key, extraName)
   const tradeKey = resolved.farmer?.code || resolved.buyer?.code || key
-  const [parties, trade] = await Promise.all([
+  const [matched, trade] = await Promise.all([
     findRegisterPartiesForAccount(resolved),
     loadTradeForKey(tradeKey),
   ])
+  const parties = partiesForThisId(matched, resolved)
   const entries = parties.flatMap((party) => party.entries)
   const cashReceived = entries
     .filter((row) => row.kind === 'RECEIVING')

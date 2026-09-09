@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
-import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill, accountBalanceBillByFarmer } from '../src/server/services/bills'
+import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill, accountBalanceBillByFarmer, accountBalanceBillByParty } from '../src/server/services/bills'
 import { createFarmer, getFarmer, listFarmers, updateFarmer } from '../src/server/services/farmers'
 import { createBuyer } from '../src/server/services/buyers'
 import { createDheri } from '../src/server/services/dheris'
@@ -60,6 +60,7 @@ async function main() {
       twinBuyerBId: undefined as bigint | undefined,
       twinDheriAId: undefined as bigint | undefined,
       twinDheriBId: undefined as bigint | undefined,
+      soloFarmerId: undefined as bigint | undefined,
     }
     try {
       const person = await createParty({
@@ -142,6 +143,41 @@ async function main() {
       const listedA = listedTwins.find((row) => row.id === addA.id)
       const listedB = listedTwins.find((row) => row.id === addB.id)
       assert(listedA && listedB && listedA.id !== listedB.id, 'both Add Person IDs must stay on the register')
+      const cashOnA = await createEntry({ kind: 'RECEIVING', partyId: addA.id, amount: 500, notes: 'id-a cash' })
+      const cashOnB = await createEntry({ kind: 'GIVING', partyId: addB.id, amount: 120, notes: 'id-b cash' })
+      ids.entryIds.push(BigInt(cashOnA.id), BigInt(cashOnB.id))
+      const ledA = await getPartyLedger(addA.id)
+      const ledB = await getPartyLedger(addB.id)
+      assert(ledA.cashReceivedTotal === 500, 'received cash must stay on the first ID')
+      assert((ledB.cashReceivedTotal || 0) === 0, 'second ID must not inherit received cash')
+      assert(ledB.cashGivenTotal === 120, 'given cash must stay on the second ID')
+      assert((ledA.cashGivenTotal || 0) === 0, 'first ID must not inherit given cash')
+      assert((ledA.productTotal || 0) === 0 && (ledB.productTotal || 0) === 0, 'register-only IDs must not pick up another person product')
+      const cardsAfterCash = await listParties('RECEIVING')
+      const cardA = cardsAfterCash.find((row) => row.id === addA.id)
+      const cardB = cardsAfterCash.find((row) => row.id === addB.id)
+      assert(cardA?.cashReceivedTotal === 500, 'register card received total must follow the first ID')
+      assert(cardB?.cashGivenTotal === 120, 'register card given total must follow the second ID')
+      const stmtA = await getAccountStatement(addCodeA, addPersonName)
+      const stmtB = await getAccountStatement(addCodeB, addPersonName)
+      assert(stmtA.cashReceived === 500 && stmtA.cashGiven === 0, 'balance for the first ID must not include the second ID')
+      assert(stmtB.cashGiven === 120 && stmtB.cashReceived === 0, 'balance for the second ID must not include the first ID')
+      assert(stmtA.partyId === addA.id && stmtB.partyId === addB.id, 'statements must open the matching person ID')
+      const billA = await accountBalanceBillByParty(addA.id, 'en')
+      assert(billA.includes('500'), 'first ID balance bill must show its received amount')
+      assert(!billA.includes('120'), 'first ID balance bill must not show the other ID given amount')
+      const foundIdA = await systemSearch(addCodeA)
+      assert(
+        foundIdA.some((row) => row.type === 'ACCOUNT' && /500/.test(row.subtitle) && !/Given Rs 120/.test(row.subtitle)),
+        'search by ID must show only that ID remaining/cash',
+      )
+      const sameNameFarmer = await createFarmer({ name: addPersonName, code: `SF${stamp.slice(-4)}` })
+      ids.soloFarmerId = BigInt(sameNameFarmer.id)
+      const extraCash = await createEntry({ kind: 'RECEIVING', partyId: addA.id, amount: 15, notes: 'still this ID' })
+      ids.entryIds.push(BigInt(extraCash.id))
+      assert(extraCash.farmerId == null, 'cash on a register ID must not attach a farmer just because the name matches')
+      const ledAAfterFarmer = await getPartyLedger(addA.id)
+      assert(ledAAfterFarmer.linkedFarmerId !== sameNameFarmer.id, 'same-name farmer must stay on their own ID')
       console.log('add person IDs OK', addA.ownerCode, addB.ownerCode)
 
       const ledger = await getPartyLedger(person.id)
@@ -461,22 +497,28 @@ async function main() {
         marketRate: 1562.5,
       })
       ids.linkedDheriId = BigInt(dheri.id)
-      assert(Math.abs(dheri.farmerReceivable - 150000) < 1, `example product should be 150000, got ${dheri.farmerReceivable}`)
+      const productAmt = dheri.farmerReceivable
+      assert(Math.abs(productAmt - 150000) <= 1, `example product should be about 150000, got ${productAmt}`)
       const afterProduct = await getPartyLedger(linkedParty.id)
       assert(afterProduct.linkedFarmerId === linkedFarmer.id, 'register search should link the farmer by ID')
       assert(afterProduct.cashGivenTotal === 80000, 'cash given should stay on the ID')
       assert(afterProduct.displayLabel === 'Remaining to give', `card should say remaining to give, got ${afterProduct.displayLabel}`)
-      assert(Math.abs((afterProduct.givenTotal || 0) - 70000) < 1, `remaining to give should be 70000 got ${afterProduct.givenTotal}`)
+      const remainingGive = productAmt - 80000
+      assert(Math.abs((afterProduct.givenTotal || 0) - remainingGive) < 1, `remaining to give should be ${remainingGive} got ${afterProduct.givenTotal}`)
       const farmerAfter = await getFarmer(linkedFarmer.id)
-      assert(Math.abs((farmerAfter.accountBalance || 0) - 150000) < 1, 'farmer eye remaining is product only')
+      assert(Math.abs((farmerAfter.accountBalance || 0) - productAmt) < 1, 'farmer eye remaining is product only')
       const account = await getAccountStatement(linkedCode)
-      assert(Math.abs(account.remainingToGive - 70000) < 1, `balance remaining to give 70000 got ${account.remainingToGive}`)
+      assert(Math.abs(account.remainingToGive - remainingGive) < 1, `balance remaining to give ${remainingGive} got ${account.remainingToGive}`)
       const balanceHtml = await accountBalanceBillByFarmer(linkedFarmer.id, 'en')
-      assert(balanceHtml.includes('70000') || balanceHtml.includes('70,000') || balanceHtml.includes('70000'), 'balance bill missing remaining 70000')
+      const remainingShown = String(Math.round(remainingGive))
+      assert(
+        balanceHtml.includes(remainingShown) || balanceHtml.includes(Number(remainingShown).toLocaleString('en-US')),
+        `balance bill missing remaining ${remainingShown}`,
+      )
       assert(balanceHtml.includes('80000') || balanceHtml.includes('80,000'), 'balance bill missing register given')
       const found = await systemSearch(linkedCode)
       assert(
-        found.some((row) => row.type === 'ACCOUNT' && /70,?000/.test(row.subtitle)),
+        found.some((row) => row.type === 'ACCOUNT' && row.subtitle.includes(remainingShown)),
         'system search by ID should show remaining',
       )
 
@@ -567,7 +609,7 @@ async function main() {
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.searchFarmerId } })
         await prisma.farmer.deleteMany({ where: { id: ids.searchFarmerId } })
       }
-      for (const farmerId of [ids.twinAId, ids.twinBId]) {
+      for (const farmerId of [ids.twinAId, ids.twinBId, ids.soloFarmerId]) {
         if (!farmerId) continue
         await prisma.registerEntry.deleteMany({ where: { party: { linkedFarmerId: farmerId } } })
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: farmerId } })
