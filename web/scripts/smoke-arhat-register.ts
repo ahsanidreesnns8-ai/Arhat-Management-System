@@ -333,6 +333,7 @@ async function main() {
       assert(twinBuyerACard && twinBuyerBCard, 'same-name buyers with different IDs must each have a register card')
       assert(twinBuyerACard.id !== twinBuyerBCard.id, 'same-name buyers must not share one register person')
       assert(twinBuyerACard.id !== twinACard.id && twinBuyerACard.id !== twinBCard.id, 'buyer ID must not attach to a farmer of the same name')
+      console.log('same-name different IDs OK', twinA.farmerId, twinB.farmerId, twinBuyerA.buyerId, twinBuyerB.buyerId)
 
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))
