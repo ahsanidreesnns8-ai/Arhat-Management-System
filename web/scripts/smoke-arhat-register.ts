@@ -101,6 +101,49 @@ async function main() {
       })
       assert(reused.id === person.id, 'same person name must reuse the existing account')
 
+      const addPersonName = `Add Person ${stamp}`
+      const addCodeA = `RA${stamp.slice(-6)}`
+      const addCodeB = `RB${stamp.slice(-6)}`
+      const addA = await createParty({
+        kind: 'RECEIVING',
+        name: addPersonName,
+        code: addCodeA,
+      })
+      const addB = await createParty({
+        kind: 'RECEIVING',
+        name: addPersonName,
+        code: addCodeB,
+      })
+      assert(addA.id !== addB.id, 'Add Person with the same name and different IDs must create two people')
+      assert(
+        normalizeAccountKey(addA.ownerCode) === normalizeAccountKey(addCodeA),
+        `first Add Person must keep ID ${addCodeA}`,
+      )
+      assert(
+        normalizeAccountKey(addB.ownerCode) === normalizeAccountKey(addCodeB),
+        `second Add Person must keep ID ${addCodeB}`,
+      )
+      const addAAgain = await createParty({
+        kind: 'RECEIVING',
+        name: addPersonName,
+        code: addCodeA,
+      })
+      assert(addAAgain.id === addA.id, 'Add Person with the same ID must reopen that person')
+      let idClash = ''
+      try {
+        await updateParty(addB.id, { name: addPersonName, code: addCodeA })
+        idClash = 'ok'
+      } catch (err) {
+        idClash = err instanceof Error ? err.message : String(err)
+      }
+      assert(idClash !== 'ok', 'two people must not be allowed to share one ID')
+      assert(/already has this ID/i.test(idClash), `expected ID clash, got ${idClash}`)
+      const listedTwins = await listParties('RECEIVING')
+      const listedA = listedTwins.find((row) => row.id === addA.id)
+      const listedB = listedTwins.find((row) => row.id === addB.id)
+      assert(listedA && listedB && listedA.id !== listedB.id, 'both Add Person IDs must stay on the register')
+      console.log('add person IDs OK', addA.ownerCode, addB.ownerCode)
+
       const ledger = await getPartyLedger(person.id)
       assert(ledger.givenTotal === 1500, `given total expected 1500 got ${ledger.givenTotal}`)
       assert(ledger.receivedTotal === 1000, `received total expected 1000 got ${ledger.receivedTotal}`)
