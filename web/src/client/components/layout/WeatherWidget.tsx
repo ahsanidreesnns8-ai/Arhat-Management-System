@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Cloud, CloudRain, CloudSun, MapPin, MoonStar, Snowflake, Sun, Wind } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext'
 import { useBusiness } from '../../context/BusinessContext'
 import { useSync } from '../../context/SyncContext'
 import { weatherApi } from '../../services/api'
 import type { WeatherCalendar } from '../../types'
 import { hijriInfo, gregorianParts, safeTimeZone } from '@/lib/hijri'
-
-function weatherIcon(code: number) {
-  if (code === 0) return Sun
-  if (code <= 2) return CloudSun
-  if (code <= 48) return Cloud
-  if (code <= 67 || (code >= 80 && code <= 82)) return CloudRain
-  if (code >= 71 && code <= 77) return Snowflake
-  return Wind
-}
 
 function weatherLabel(code: number, urdu: boolean) {
   if (code === 0) return urdu ? 'صاف' : 'Clear'
@@ -29,25 +19,20 @@ function formatGregorian(raw: string, locale: string) {
   const d = new Date(`${raw}T12:00:00`)
   if (Number.isNaN(d.getTime())) return raw
   return d.toLocaleDateString(locale, {
-    weekday: 'long',
+    weekday: 'short',
     day: 'numeric',
-    month: 'long',
+    month: 'short',
     year: 'numeric',
   })
 }
 
 function readClock(timeZone: string) {
-  const now = new Date()
-  const weekdayEn = new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'long' }).format(now)
-  const weekdayUr = new Intl.DateTimeFormat('ur-PK', { timeZone, weekday: 'long' }).format(now)
-  const time = new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat('en-GB', {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: true,
-  }).format(now)
-  return { weekdayEn, weekdayUr, time }
+  }).format(new Date())
 }
 
 async function fetchOpenMeteo(lat: number, lon: number, tz: string, label: string, adjustment: number): Promise<WeatherCalendar> {
@@ -124,82 +109,45 @@ export default function WeatherWidget() {
 
   if (failed && !data) {
     return (
-      <div className="flex items-center gap-2 w-full rounded-2xl border border-[#C5A059]/25 bg-[#002D62]/5 px-3 py-2 text-[11px] text-slate-500">
-        <Cloud className="h-3.5 w-3.5 flex-shrink-0 text-[#C5A059]" />
-        <span className="truncate">{t('weatherUnavailable')}</span>
-      </div>
+      <p className="px-3 py-1 text-center text-[11px] text-slate-500">
+        {t('weatherUnavailable')}
+      </p>
     )
   }
 
   if (!data) {
     return (
-      <div className="flex items-center gap-2 w-full rounded-2xl border border-[#C5A059]/25 bg-[#002D62]/5 px-3 py-2 text-[11px] text-slate-500">
-        <Cloud className="h-3.5 w-3.5 animate-pulse flex-shrink-0 text-[#C5A059]" />
-        <span className="truncate">{t('weatherLoading')}</span>
-      </div>
+      <p className="px-3 py-1 text-center text-[11px] text-slate-400">
+        {t('weatherLoading')}
+      </p>
     )
   }
 
-  const Icon = weatherIcon(data.weatherCode || 0)
   const condition = isUrdu ? data.conditionUr : data.conditionEn
   const hijriEn = data.hijri?.formattedEn || '—'
   const hijriUr = data.hijri?.formattedUr || '—'
   const area = data.locationLabel || settings?.weatherLocationLabel || '—'
   const rawDate = data.gregorianDate || new Date().toISOString().slice(0, 10)
   const gregorianEn = formatGregorian(rawDate, 'en-GB')
-  const gregorianUr = formatGregorian(rawDate, 'ur-PK-u-nu-latn')
-  const weekday = isUrdu ? clock.weekdayUr : clock.weekdayEn
+  const weatherBit =
+    data.weatherAvailable !== false && data.temperatureC != null
+      ? `${data.temperatureC}°C ${condition} · ${area}`
+      : t('weatherUnavailable')
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-[#C5A059]/35 bg-gradient-to-r from-[#002D62] via-[#0B4F8A] to-[#002D62] text-white shadow-[0_10px_28px_rgba(0,45,98,0.22)]">
-      <div className="grid grid-cols-2 lg:grid-cols-4">
-        <div className="relative px-3.5 py-2.5">
-          <div className="absolute inset-y-3 right-0 w-px bg-[#C5A059]/25 hidden lg:block" />
-          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#E8C87A]">{isUrdu ? 'وقت' : 'Time'}</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums leading-none tracking-wide">{clock.time}</p>
-          <p className={`mt-1 text-[11px] text-white/75 ${isUrdu ? 'font-urdu' : ''}`}>{weekday}</p>
-        </div>
-
-        <div className="relative px-3.5 py-2.5 border-l border-white/10 lg:border-l-0">
-          <div className="absolute inset-y-3 right-0 w-px bg-[#C5A059]/25 hidden lg:block" />
-          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#E8C87A]">{isUrdu ? 'عیسوی تاریخ' : 'Gregorian'}</p>
-          <p className="mt-1 text-[12px] font-medium leading-4">{gregorianEn}</p>
-          <p className="mt-1 font-urdu text-[12px] text-[#E8C87A]/90 leading-4" dir="rtl">{gregorianUr}</p>
-        </div>
-
-        <div className="relative px-3.5 py-2.5 border-t border-white/10 lg:border-t-0">
-          <div className="absolute inset-y-3 right-0 w-px bg-[#C5A059]/25 hidden lg:block" />
-          <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#E8C87A]">
-            <MoonStar className="h-3 w-3" />
-            {isUrdu ? 'ہجری تاریخ' : 'Hijri'}
-          </p>
-          <p className="mt-1 text-[12px] font-medium leading-4">{hijriEn}</p>
-          <p className="mt-1 font-urdu text-[12px] text-[#E8C87A]/90 leading-4" dir="rtl">{hijriUr}</p>
-        </div>
-
-        <div className="px-3.5 py-2.5 border-t border-l border-white/10 lg:border-t-0">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#E8C87A]">{isUrdu ? 'موسم' : 'Weather'}</p>
-          {data.weatherAvailable !== false && data.temperatureC != null ? (
-            <div className="mt-1 flex items-center gap-2 min-w-0">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C5A059]/20 text-[#E8C87A]">
-                <Icon className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-lg font-semibold leading-none tabular-nums">{data.temperatureC}°C</p>
-                <p className={`mt-1 truncate text-[11px] text-white/80 ${isUrdu ? 'font-urdu' : ''}`}>
-                  {condition}
-                </p>
-                <p className={`flex items-center gap-1 truncate text-[10px] text-[#E8C87A]/80 ${isUrdu ? 'font-urdu' : ''}`}>
-                  <MapPin className="h-3 w-3 shrink-0" />
-                  {area}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-[11px] text-white/70">{t('weatherUnavailable')}</p>
-          )}
-        </div>
-      </div>
+    <div className="px-3 py-1.5 text-center leading-snug">
+      <p className={`text-[12px] sm:text-[13px] text-slate-600 dark:text-slate-300 ${isUrdu ? 'font-urdu' : ''}`}>
+        {gregorianEn}
+        <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+        <span className="tabular-nums">{clock}</span>
+        <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+        {weatherBit}
+      </p>
+      <p className="mt-0.5 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
+        <span>{hijriEn}</span>
+        <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+        <span className="font-urdu" dir="rtl">{hijriUr}</span>
+      </p>
     </div>
   )
 }
