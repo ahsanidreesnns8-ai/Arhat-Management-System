@@ -144,28 +144,32 @@ export default function StockPage() {
               const productLots = lotsByProduct.get(item.productId) || []
               const extraKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
               return (
-                <div key={item.id} className={`stat-card space-y-3 ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm text-gray-500">{item.productName}</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                        {formatNumber(item.quantity)} kg
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">{item.productCode}</p>
-                      {extraKg > 0 && (
-                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
-                          Extra KG batches: {formatNumber(extraKg)} kg · {productLots.length} batch{productLots.length === 1 ? '' : 'es'}
+                <div key={item.id} className="flex flex-col gap-2">
+                  <div className={`stat-card ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm text-gray-500">{item.productName}</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                          {formatNumber(item.quantity)} kg
                         </p>
+                        <p className="text-xs text-gray-400 mt-1">{item.productCode}</p>
+                        {extraKg > 0 && (
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                            Extra KG batches: {formatNumber(extraKg)} kg · {productLots.length} batch{productLots.length === 1 ? '' : 'es'}
+                          </p>
+                        )}
+                      </div>
+                      {item.lowStockAlert && (
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
                       )}
                     </div>
-                    {item.lowStockAlert && (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                    )}
                   </div>
                   <Button
                     size="sm"
                     variant="danger"
                     className="w-full"
+                    data-testid={`stock-delete-item-${item.id}`}
+                    aria-label={`Delete ${item.productName} stock entry`}
                     onClick={() =>
                       setDeleteTarget({
                         kind: 'item',
@@ -175,7 +179,7 @@ export default function StockPage() {
                     }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Delete
+                    Delete entry
                   </Button>
                 </div>
               )
@@ -239,6 +243,8 @@ export default function StockPage() {
                           <Button
                             size="sm"
                             variant="danger"
+                            data-testid={`stock-delete-lot-${lot.id}`}
+                            aria-label={`Delete Extra KG batch ${lot.productName || ''}`}
                             onClick={() =>
                               setDeleteTarget({
                                 kind: 'lot',
@@ -293,6 +299,8 @@ export default function StockPage() {
                         <Button
                           size="sm"
                           variant="danger"
+                          data-testid={`stock-delete-history-${tx.id}`}
+                          aria-label={`Delete stock history ${tx.productName} ${tx.transactionType}`}
                           onClick={() =>
                             setDeleteTarget({
                               kind: 'history',
