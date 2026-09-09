@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CheckCircle2, FileText, History, Pencil, RefreshCw, Scale, Trash2, Warehouse,
+  CheckCircle2, History, Pencil, RefreshCw, Scale, Trash2, Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
 import FarmerDetailFields from '../components/forms/FarmerDetailFields'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { useLiveReload } from '../context/SyncContext'
 import { buyerApi, dailyTradeApi, dheriApi, farmerApi, saleApi, settingsApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -97,7 +98,6 @@ export default function DailyTradePage() {
   const [showDetails, setShowDetails] = useState(false)
   const [buyerSales, setBuyerSales] = useState<BoardSale[]>([])
   const [pickedItemIds, setPickedItemIds] = useState<number[]>([])
-  const [billLang, setBillLang] = useState<'en' | 'ur'>('en')
 
   const [farmerId, setFarmerId] = useState('')
   const [productId, setProductId] = useState('')
@@ -463,7 +463,7 @@ export default function DailyTradePage() {
     setPickedItemIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const generateItemsBill = async (itemIds: number[], lang: 'en' | 'ur' = billLang) => {
+  const generateItemsBill = async (itemIds: number[], lang: 'en' | 'ur') => {
     if (!buyerId || itemIds.length === 0) {
       toast.error('Select at least one sold dheri')
       return
@@ -786,12 +786,7 @@ export default function DailyTradePage() {
             Cancel edit
           </Button>
         ) : null}
-        <Button variant="secondary" onClick={() => void generateTodayBoardBill('en')}>
-          <FileText className="h-4 w-4" /> Today bills (EN)
-        </Button>
-        <Button variant="secondary" onClick={() => void generateTodayBoardBill('ur')}>
-          <FileText className="h-4 w-4" /> آج کے بل (UR)
-        </Button>
+        <PrintBillButton onPrint={(lang) => void generateTodayBoardBill(lang)} />
         <Button variant="secondary" onClick={() => void resetDesk()}>
           <CheckCircle2 className="h-4 w-4" /> OK — next dheri
         </Button>
@@ -812,29 +807,15 @@ export default function DailyTradePage() {
               {buyer ? ` (${buyer.buyerId})` : ''}
             </span>
             <div className="flex flex-wrap gap-2 items-center">
-              {(['en', 'ur'] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setBillLang(code)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                    billLang === code ? 'bg-[#002D62] text-white border-[#002D62]' : 'border-slate-200'
-                  }`}
-                >
-                  {code === 'en' ? 'English' : 'اردو'}
-                </button>
-              ))}
               <Button
                 variant="secondary"
                 onClick={() => setPickedItemIds(saleItemRows.map((r) => r.id))}
               >
                 Click all
               </Button>
-              <Button
-                onClick={() => void generateItemsBill(pickedItemIds.length ? pickedItemIds : saleItemRows.map((r) => r.id))}
-              >
-                Generate {pickedItemIds.length > 1 || (!pickedItemIds.length && saleItemRows.length > 1) ? 'one bill for all' : 'bill'}
-              </Button>
+              <PrintBillButton
+                onPrint={(lang) => void generateItemsBill(pickedItemIds.length ? pickedItemIds : saleItemRows.map((r) => r.id), lang)}
+              />
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -868,12 +849,7 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">{row.bags}</td>
                     <td className="px-3 py-2">{formatCurrency(row.amount)}</td>
                     <td className="px-3 py-2">
-                      <button type="button" className="text-primary text-xs underline mr-2" onClick={() => void generateItemsBill([row.id], 'en')}>
-                        EN
-                      </button>
-                      <button type="button" className="text-primary text-xs underline" onClick={() => void generateItemsBill([row.id], 'ur')}>
-                        UR
-                      </button>
+                      <PrintBillButton size="sm" onPrint={(lang) => void generateItemsBill([row.id], lang)} />
                     </td>
                     <td className="px-3 py-2">
                       <button

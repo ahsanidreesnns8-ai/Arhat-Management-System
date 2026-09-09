@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { Bot, X } from 'lucide-react'
 import {
   LayoutDashboard, Users, ShoppingBag, Truck, Package, Warehouse,
   Calculator, PackagePlus, ListOrdered, Receipt, FileText, Wallet, BarChart3, Settings, Shield, Scale, BookOpen, Wheat, Sprout, Flower2, BookMarked, Leaf, Coins, Landmark, HardHat, Weight
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAiAssistant } from '../../context/AiAssistantContext'
 import RhmaniLogo from '../brand/RhmaniLogo'
 import CopyrightLine from '../brand/CopyrightLine'
 import { navItem, staggerContainer } from '../../utils/motion'
@@ -49,6 +50,7 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user } = useAuth()
   const { t, isUrdu } = useLanguage()
+  const { setOpen: setAiOpen } = useAiAssistant()
   const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN'
   // Always slide in from the left (menu button sits top-left)
   const fromEdge = '-100%'
@@ -83,6 +85,19 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               initial="hidden"
               animate="show"
             >
+              <motion.div variants={navItem}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiOpen(true)
+                    onClose()
+                  }}
+                  className={`sidebar-link relative flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium min-h-[44px] w-full text-left ${isUrdu ? 'font-urdu' : ''}`}
+                >
+                  <Bot className="relative h-5 w-5 flex-shrink-0 text-[#E8C87A]" />
+                  <span className="relative truncate">{t('aiTitle')}</span>
+                </button>
+              </motion.div>
               {navItems
                 .filter((item) => !item.ownerOnly || isOwner)
                 .map((item) => (

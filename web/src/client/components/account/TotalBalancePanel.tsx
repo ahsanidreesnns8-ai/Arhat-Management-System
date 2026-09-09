@@ -1,6 +1,7 @@
-import { FileText, Wallet } from 'lucide-react'
+import { ArrowDownToLine, Wallet } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
+import PrintBillButton from '../bills/PrintBillButton'
 import { formatCurrency } from '../../utils/format'
 import type { AccountStatement } from '../../types'
 
@@ -115,14 +116,11 @@ export default function TotalBalancePanel({
           ) : null}
           {onReceive ? (
             <Button variant="secondary" onClick={onReceive}>
-              {receiveLabel}
+              <ArrowDownToLine className="h-4 w-4" /> {receiveLabel}
             </Button>
           ) : null}
           <Button variant="secondary" onClick={onClose}>Close</Button>
-          <Button variant="secondary" onClick={() => onPrint('ur')}>Total balance bill (UR)</Button>
-          <Button onClick={() => onPrint('en')}>
-            <FileText className="h-4 w-4" /> Generate total balance bill
-          </Button>
+          <PrintBillButton variant="primary" onPrint={(lang) => onPrint(lang)} />
         </div>
       </div>
     </Modal>
