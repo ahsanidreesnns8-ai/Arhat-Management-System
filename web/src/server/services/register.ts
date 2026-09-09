@@ -226,12 +226,17 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
   }
 }
 
-function tradeKeysForParty(dto: Pick<PartyDto, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'name'>) {
+function tradeKeysForParty(dto: Pick<PartyDto, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'name' | 'linkedFarmerId' | 'linkedBuyerId'>) {
   const codes = [dto.ownerCode, dto.farmerCode, dto.buyerCode].filter(
     (key): key is string => Boolean(key && String(key).trim()),
   )
   if (codes.length) return codes
+  if (dto.linkedFarmerId != null || dto.linkedBuyerId != null) return []
   return dto.name && String(dto.name).trim() ? [dto.name] : []
+}
+
+function partyHasIdentity(dto: Pick<PartyDto, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'linkedFarmerId' | 'linkedBuyerId'>) {
+  return Boolean(dto.ownerCode || dto.farmerCode || dto.buyerCode || dto.linkedFarmerId != null || dto.linkedBuyerId != null)
 }
 
 function tradeForParty(index: Map<string, LinkedTrade>, dto: PartyDto) {
@@ -239,6 +244,7 @@ function tradeForParty(index: Map<string, LinkedTrade>, dto: PartyDto) {
     const row = tradeForKey(index, key)
     if (row.farmerId || row.buyerId || row.farmerCode || row.buyerCode) return row
   }
+  if (partyHasIdentity(dto)) return tradeForKey(index, dto.ownerCode || dto.farmerCode || dto.buyerCode)
   return tradeForKey(index, dto.name)
 }
 
@@ -246,6 +252,9 @@ async function loadTradeForParty(dto: PartyDto) {
   for (const key of tradeKeysForParty(dto)) {
     const trade = await loadTradeForKey(key)
     if (trade.farmerId || trade.buyerId) return trade
+  }
+  if (partyHasIdentity(dto)) {
+    return loadTradeForKey(dto.ownerCode || dto.farmerCode || dto.buyerCode || '')
   }
   return loadTradeForKey(dto.name)
 }
@@ -283,9 +292,16 @@ function partyHasAccountCode(dto: PartyDto, code: string, linkedId?: number | nu
   if (linkedId != null && (dto.linkedFarmerId === linkedId || dto.linkedBuyerId === linkedId)) {
     return true
   }
-  return [dto.ownerCode, dto.farmerCode, dto.buyerCode, dto.name].some((value) => normalizeAccountKey(value) === key)
-    || normalizeAccountKey(dto.notes) === key
+  if ([dto.ownerCode, dto.farmerCode, dto.buyerCode].some((value) => normalizeAccountKey(value) === key)) {
+    return true
+  }
+  const notesMatch =
+    normalizeAccountKey(dto.notes) === key
     || normalizeAccountKey(dto.notes) === normalizeAccountKey(`ID ${code}`)
+  if (notesMatch && (!dto.ownerCode || normalizeAccountKey(dto.ownerCode) === key)) {
+    return true
+  }
+  return !dto.ownerCode && dto.linkedFarmerId == null && dto.linkedBuyerId == null && normalizeAccountKey(dto.name) === key
 }
 
 function stampPartyFromFarmer(
@@ -418,7 +434,7 @@ export async function listParties(kind: string) {
         balance: r.amount - g.amount,
       }
     })
-    return overlayAccountsOnParties(await withTradeAll(dtos, false))
+    return withTradeAll(await overlayAccountsOnParties(dtos), false)
   } catch {
     return overlayAccountsOnParties([])
   }
@@ -647,8 +663,9 @@ export async function createEntry(
   if (input.partyId == null) throw new Error('Choose a person')
   const party = await liveMoneyParty(input.partyId)
   const farmer = await farmerForAccountKey(
-    party.ownerCode || party.name,
+    party.ownerCode || '',
     input.farmerId ?? (party.linkedFarmerId != null ? Number(party.linkedFarmerId) : null),
+    false,
   )
   const row = await prisma.registerEntry.create({
     data: {
@@ -663,7 +680,7 @@ export async function createEntry(
   return entryDto(row)
 }
 
-async function buyerForAccountKey(key: string, buyerId?: number | null) {
+async function buyerForAccountKey(key: string, buyerId?: number | null, allowName = true) {
   if (buyerId != null) {
     const row = await prisma.buyer.findFirst({
       where: { id: BigInt(buyerId), deleted: false },
@@ -681,6 +698,7 @@ async function buyerForAccountKey(key: string, buyerId?: number | null) {
   if (byCode) {
     return prisma.buyer.findFirst({ where: { id: byCode.id, deleted: false } })
   }
+  if (!allowName) return null
   const byName = buyers.filter((row) => normalizeAccountKey(row.name) === norm)
   if (byName.length === 1) {
     return prisma.buyer.findFirst({ where: { id: byName[0].id, deleted: false } })
@@ -688,7 +706,7 @@ async function buyerForAccountKey(key: string, buyerId?: number | null) {
   return null
 }
 
-async function farmerForAccountKey(key: string, farmerId?: number | null) {
+async function farmerForAccountKey(key: string, farmerId?: number | null, allowName = true) {
   if (farmerId != null) {
     const row = await prisma.farmer.findFirst({
       where: { id: BigInt(farmerId), deleted: false },
@@ -706,6 +724,7 @@ async function farmerForAccountKey(key: string, farmerId?: number | null) {
   if (byCode) {
     return prisma.farmer.findFirst({ where: { id: byCode.id, deleted: false } })
   }
+  if (!allowName) return null
   const byName = farmers.filter((row) => normalizeAccountKey(row.name) === norm)
   if (byName.length === 1) {
     return prisma.farmer.findFirst({ where: { id: byName[0].id, deleted: false } })

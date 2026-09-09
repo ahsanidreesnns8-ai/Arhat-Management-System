@@ -1001,7 +1001,8 @@ export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en'
 
 export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
   const ledger = await getPartyLedger(id)
-  const key = ledger.ownerCode || ledger.farmerCode || ledger.buyerCode || ledger.name
+  const key = ledger.ownerCode || ledger.farmerCode || ledger.buyerCode
+  if (!key) throw new Error('This person has no ID')
   return accountBalanceBillByKey(key, lang, ledger.name)
 }
 

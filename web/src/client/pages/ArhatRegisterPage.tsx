@@ -106,12 +106,19 @@ function mergeAccountsIntoParties(
   const next = [...parties]
   const covers = (code: string, linkedId?: number | null) =>
     next.find((party) => {
-      const keys = [party.ownerCode, party.farmerCode, party.buyerCode, party.name, party.notes]
       if (linkedId != null && (party.linkedFarmerId === linkedId || party.linkedBuyerId === linkedId)) {
         return true
       }
-      return keys.some((value) => normalizeAccountKey(value) === normalizeAccountKey(code))
+      const key = normalizeAccountKey(code)
+      if (!key) return false
+      const idKeys = [party.ownerCode, party.farmerCode, party.buyerCode]
+      if (idKeys.some((value) => normalizeAccountKey(value) === key)) return true
+      const notesMatch =
+        normalizeAccountKey(party.notes) === key
         || normalizeAccountKey(party.notes) === normalizeAccountKey(`ID ${code}`)
+      const hasId = Boolean(party.ownerCode || party.linkedFarmerId || party.linkedBuyerId)
+      if (notesMatch && (!party.ownerCode || normalizeAccountKey(party.ownerCode) === key)) return true
+      return !hasId && normalizeAccountKey(party.name) === key
     })
 
   for (const farmer of farmers) {
@@ -724,7 +731,8 @@ export default function ArhatRegisterPage() {
       </div>
 
       {section === 'PEOPLE' && (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
           <Button onClick={() => { setPerson({ code: '', name: '', address: '', notes: '' }); setPersonOpen(true) }}>
             <Plus className="h-4 w-4" /> Add Person
           </Button>
@@ -734,6 +742,10 @@ export default function ArhatRegisterPage() {
           <Button variant="secondary" onClick={() => openMoney('GIVING')}>
             <HandCoins className="h-4 w-4" /> Give amount
           </Button>
+          </div>
+          <p className="text-[12px] text-slate-500">
+            Each ID is its own account — received, given, product, payments, and balance never mix with another person of the same name.
+          </p>
         </div>
       )}
 
