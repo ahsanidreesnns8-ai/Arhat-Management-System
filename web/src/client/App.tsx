@@ -7,6 +7,7 @@ import { LanguageProvider } from './context/LanguageContext'
 import { SyncProvider } from './context/SyncContext'
 import { PrivacyProvider } from './context/PrivacyContext'
 import { VoiceControlProvider } from './context/VoiceControlContext'
+import { AiAssistantProvider } from './context/AiAssistantContext'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import MarketingLayout from './components/marketing/MarketingLayout'
@@ -138,6 +139,7 @@ export default function App() {
               <PrivacyProvider>
                 <BrowserRouter>
                   <VoiceControlProvider>
+                    <AiAssistantProvider>
                     <Toaster
                       position="top-center"
                       gutter={8}
@@ -161,6 +163,7 @@ export default function App() {
                       }}
                     />
                     <AppRoutes />
+                    </AiAssistantProvider>
                   </VoiceControlProvider>
                 </BrowserRouter>
               </PrivacyProvider>

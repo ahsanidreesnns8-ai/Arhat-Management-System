@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Banknote, Coins, FileText, GitMerge, Plus, Wallet } from 'lucide-react'
+import { Banknote, Coins, GitMerge, Plus, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { arhatAmountApi, billApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
@@ -92,10 +93,10 @@ export default function ArhatAmountPage() {
     }
   }
 
-  const openArhatBill = async () => {
+  const openArhatBill = async (lang: 'en' | 'ur') => {
     setBilling(true)
     try {
-      const res = await billApi.arhatAmount()
+      const res = await billApi.arhatAmount(lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
@@ -118,10 +119,10 @@ export default function ArhatAmountPage() {
     }
   }
 
-  const openMergeBill = async () => {
+  const openMergeBill = async (lang: 'en' | 'ur') => {
     setBilling(true)
     try {
-      const res = await billApi.arhatAmountMerge()
+      const res = await billApi.arhatAmountMerge(lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate merge bill'))
@@ -167,9 +168,7 @@ export default function ArhatAmountPage() {
         title="Arhat Amount"
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => void openArhatBill()} loading={billing}>
-              <FileText className="h-4 w-4" /> Bill
-            </Button>
+            <PrintBillButton onPrint={(lang) => void openArhatBill(lang)} loading={billing} />
             {isOwner && (
               <Button onClick={() => void openMerge()} loading={mergeLoading}>
                 <GitMerge className="h-4 w-4" /> Merge all amount
@@ -313,9 +312,7 @@ export default function ArhatAmountPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setMergeOpen(false)}>Close</Button>
-              <Button onClick={() => void openMergeBill()} loading={billing}>
-                <FileText className="h-4 w-4" /> Bill
-              </Button>
+              <PrintBillButton onPrint={(lang) => void openMergeBill(lang)} loading={billing} />
             </div>
           </div>
         )}

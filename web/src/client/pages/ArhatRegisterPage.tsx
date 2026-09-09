@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BookOpen, ClipboardList, Eye, HandCoins, Landmark, Pencil, Plus, Printer, Search, Sprout, Trash2, Wallet } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, BookOpen, ClipboardList, Landmark, Pencil, Plus, Search, Sprout, Trash2, UserRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -7,6 +7,7 @@ import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { TableSkeleton } from '../components/ui/Skeleton'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { buyerApi, farmerApi, registerApi, billApi } from '../services/api'
 import { compactSearchText, normalizeAccountKey } from '@/lib/account-key'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -580,41 +581,43 @@ export default function ArhatRegisterPage() {
     }
   }
 
-  const openEntryBill = async (row: RegisterEntry) => {
+  const openEntryBill = async (row: RegisterEntry, lang: 'en' | 'ur') => {
     try {
       if (row.partyId) {
-        const res = await billApi.registerParty(row.partyId, 'en')
+        const res = await billApi.registerParty(row.partyId, lang)
         openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
         return
       }
-      const res = await billApi.register(row.id, 'en')
+      const res = await billApi.register(row.id, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
     }
   }
 
-  const openPartyBill = async (id: number) => {
+  const openPartyBill = async (id: number, lang: 'en' | 'ur', kind?: string) => {
     try {
-      const res = await billApi.registerParty(id, 'en')
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Bill')
+      const res = kind === 'balance'
+        ? await billApi.registerBalance(id, lang)
+        : await billApi.registerParty(id, lang)
+      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), kind === 'balance' ? 'Balance' : 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
     }
   }
 
-  const openBalanceBill = async (id: number) => {
+  const openBalanceBill = async (id: number, lang: 'en' | 'ur') => {
     try {
-      const res = await billApi.registerBalance(id, 'en')
+      const res = await billApi.registerBalance(id, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Balance')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate balance'))
     }
   }
 
-  const openLedgerBill = async () => {
+  const openLedgerBill = async (lang: 'en' | 'ur') => {
     try {
-      const res = await billApi.registerBook('en')
+      const res = await billApi.registerBook(lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Ledger')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate ledger'))
@@ -671,18 +674,15 @@ export default function ArhatRegisterPage() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" variant="secondary" onClick={() => openMoney('RECEIVING', String(p.id))}>
-            <Wallet className="h-3.5 w-3.5" /> Receive
+            <ArrowDownToLine className="h-3.5 w-3.5" /> Receive
           </Button>
           <Button size="sm" variant="secondary" onClick={() => openMoney('GIVING', String(p.id))}>
-            <HandCoins className="h-3.5 w-3.5" /> Give
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void openEdit(p)}>
-            <Eye className="h-3.5 w-3.5" /> Details
+            <ArrowUpFromLine className="h-3.5 w-3.5" /> Give
           </Button>
           {p.linkedFarmerId ? (
             <Link to={`/farmers/${p.linkedFarmerId}`} className="inline-flex">
               <Button size="sm" variant="secondary">
-                Farmer
+                <UserRound className="h-3.5 w-3.5" /> Farmer
               </Button>
             </Link>
           ) : null}
@@ -692,12 +692,14 @@ export default function ArhatRegisterPage() {
           <Button size="sm" variant="danger" onClick={() => setDeletePartyId(p.id)}>
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void openPartyBill(p.id)}>
-            <Printer className="h-3.5 w-3.5" /> Bill
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => void openBalanceBill(p.id)}>
-            Balance
-          </Button>
+          <PrintBillButton
+            size="sm"
+            kinds={[
+              { id: 'statement', label: 'Statement' },
+              { id: 'balance', label: 'Balance' },
+            ]}
+            onPrint={(lang, kind) => void openPartyBill(p.id, lang, kind)}
+          />
         </div>
       </div>
     )
@@ -737,10 +739,10 @@ export default function ArhatRegisterPage() {
             <Plus className="h-4 w-4" /> Add Person
           </Button>
           <Button variant="secondary" onClick={() => openMoney('RECEIVING')}>
-            <Wallet className="h-4 w-4" /> Receive amount
+            <ArrowDownToLine className="h-4 w-4" /> Receive amount
           </Button>
           <Button variant="secondary" onClick={() => openMoney('GIVING')}>
-            <HandCoins className="h-4 w-4" /> Give amount
+            <ArrowUpFromLine className="h-4 w-4" /> Give amount
           </Button>
           </div>
           <p className="text-[12px] text-slate-500">
@@ -751,9 +753,7 @@ export default function ArhatRegisterPage() {
 
       {section === 'LEDGER' && (
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void openLedgerBill()} disabled={!parties.length}>
-            <Printer className="h-4 w-4" /> Print ledger
-          </Button>
+          <PrintBillButton onPrint={(lang) => void openLedgerBill(lang)} disabled={!parties.length} />
         </div>
       )}
 
@@ -1014,9 +1014,7 @@ export default function ArhatRegisterPage() {
                           </Button>
                         ) : null}
                         {isCashKind(row.kind) || row.kind === 'ZAKAT' || row.kind === 'FARMER_ADVANCE' ? (
-                          <Button variant="secondary" className="!py-1.5 !px-2" onClick={() => void openEntryBill(row)}>
-                            <Printer className="h-3.5 w-3.5" /> Bill
-                          </Button>
+                          <PrintBillButton size="sm" onPrint={(lang) => void openEntryBill(row, lang)} />
                         ) : null}
                       </div>
                     </td>
@@ -1138,9 +1136,7 @@ export default function ArhatRegisterPage() {
         <div className="space-y-3">
           {editLedger ? <AccountBreakdown party={editLedger} /> : null}
           {editForm.id ? (
-            <Button variant="secondary" onClick={() => void openBalanceBill(editForm.id)}>
-              Print balance
-            </Button>
+            <PrintBillButton onPrint={(lang) => void openBalanceBill(editForm.id, lang)} />
           ) : null}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input

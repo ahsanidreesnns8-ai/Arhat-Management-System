@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Scale, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
 import { dheriApi, farmerApi, paymentApi, registerApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -114,10 +115,10 @@ export default function FarmerDetailPage() {
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {settled ? 'Paid' : 'Pay / Settle remaining'}
               </Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill</Button>
-              <Button variant="secondary" onClick={() => openBill('ur')}>پروڈکٹ بل</Button>
-              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>Total balance</Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print product bill</Button>
+              <PrintBillButton label={t('print')} onPrint={(lang) => void openBill(lang)} />
+              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
+                <Scale className="h-4 w-4" /> Total balance
+              </Button>
             </div>
           }
         />

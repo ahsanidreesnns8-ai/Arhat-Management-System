@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { BarChart3, Eye, Printer } from 'lucide-react'
+import { BarChart3, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { useBusiness } from '../context/BusinessContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { reportApi } from '../services/api'
@@ -194,22 +195,11 @@ export default function ReportsPage() {
               >
                 <Eye className="h-3.5 w-3.5" /> Preview
               </Button>
-              <Button
+              <PrintBillButton
                 size="sm"
-                variant="secondary"
-                onClick={() => printReport(report.key, 'en')}
-                loading={printing === `${report.key}-en`}
-              >
-                <Printer className="h-3.5 w-3.5" /> Print (EN)
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => printReport(report.key, 'ur')}
-                loading={printing === `${report.key}-ur`}
-              >
-                <Printer className="h-3.5 w-3.5" /> پرنٹ (UR)
-              </Button>
+                loading={printing?.startsWith(`${report.key}-`)}
+                onPrint={(lang) => void printReport(report.key, lang)}
+              />
             </div>
           </div>
         ))}
@@ -220,12 +210,10 @@ export default function ReportsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold capitalize">{active} summary</h3>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => printReport(active, 'en')}>
-                <Printer className="h-3.5 w-3.5" /> Print (EN)
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => printReport(active, 'ur')}>
-                <Printer className="h-3.5 w-3.5" /> پرنٹ (UR)
-              </Button>
+            <PrintBillButton
+              size="sm"
+              onPrint={(lang) => void printReport(active, lang)}
+            />
             </div>
           </div>
 

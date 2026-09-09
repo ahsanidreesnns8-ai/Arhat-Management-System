@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { ArrowLeft, Menu, X, Sun, Moon, Monitor, LogOut, User, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, Bot, Eye, EyeOff, LogOut, Menu, Mic, MicOff, Monitor, Moon, RefreshCw, Sun, User, Volume2, VolumeX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { usePrivacy } from '../../context/PrivacyContext'
+import { useAiAssistant } from '../../context/AiAssistantContext'
+import { useVoiceControl } from '../../context/VoiceControlContext'
 import GlobalSearch from './GlobalSearch'
 import WeatherWidget from './WeatherWidget'
 import type { ThemeMode } from '../../types'
@@ -21,6 +23,17 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
   const { theme, setTheme } = useTheme()
   const { t, isUrdu } = useLanguage()
   const { amountsHidden, toggleAmountsHidden } = usePrivacy()
+  const { setOpen: setAiOpen } = useAiAssistant()
+  const {
+    supported,
+    listening,
+    interim,
+    lastHeard,
+    lastResult,
+    speakEnabled,
+    setSpeakEnabled,
+    toggleListening,
+  } = useVoiceControl()
   const navigate = useNavigate()
   const location = useLocation()
   const isHome = location.pathname === '/dashboard'
@@ -45,6 +58,20 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
 
   const ThemeIcon = themeOptions.find((x) => x.value === theme)?.icon || Monitor
   const [refreshing, setRefreshing] = useState(false)
+  const [showVoiceStatus, setShowVoiceStatus] = useState(false)
+
+  useEffect(() => {
+    if (listening || interim) {
+      setShowVoiceStatus(true)
+      return
+    }
+    if (lastHeard || lastResult) {
+      setShowVoiceStatus(true)
+      const id = window.setTimeout(() => setShowVoiceStatus(false), 3000)
+      return () => window.clearTimeout(id)
+    }
+    setShowVoiceStatus(false)
+  }, [listening, interim, lastHeard, lastResult])
 
   const refreshSystem = () => {
     if (refreshing) return
@@ -88,6 +115,40 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          <motion.button
+            type="button"
+            onClick={() => setSpeakEnabled(!speakEnabled)}
+            className={`nav-icon-btn ${speakEnabled ? 'text-[#0B4F8A] dark:text-cyan-300' : 'text-slate-400'}`}
+            title={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
+            whileTap={{ scale: 0.94 }}
+            aria-label={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
+          >
+            {speakEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={toggleListening}
+            disabled={!supported}
+            className={`nav-icon-btn ${listening ? 'text-rose-500' : 'text-[#002D62] dark:text-[#E8C87A]'}`}
+            title={listening ? t('voiceStop') : t('voiceStart')}
+            whileTap={{ scale: 0.94 }}
+            aria-label={listening ? t('voiceStop') : t('voiceStart')}
+          >
+            {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={() => setAiOpen(true)}
+            className="nav-icon-btn text-[#C5A059]"
+            title={t('aiTitle')}
+            whileTap={{ scale: 0.94 }}
+            aria-label={t('aiTitle')}
+          >
+            <Bot className="h-5 w-5" />
+          </motion.button>
+
           <motion.button
             type="button"
             onClick={refreshSystem}
@@ -147,8 +208,30 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         </div>
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-2 space-y-2">
         <WeatherWidget />
+        <AnimatePresence>
+          {(listening || interim || ((lastHeard || lastResult) && showVoiceStatus)) && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className={`rounded-xl border border-[#C5A059]/30 bg-white/80 dark:bg-white/5 px-3 py-2 text-[11px] ${isUrdu ? 'font-urdu text-right' : ''}`}
+            >
+              <p className="font-semibold text-[#002D62] dark:text-[#E8C87A]">
+                {listening ? t('voiceListening') : t('voiceReady')}
+              </p>
+              {listening && interim ? <p className="mt-0.5 italic text-slate-500">{interim}</p> : null}
+              {!listening && lastHeard ? (
+                <p className="mt-0.5 text-slate-600 dark:text-slate-300">
+                  <span className="text-slate-400">{t('voiceYouSaid')} </span>
+                  {lastHeard}
+                </p>
+              ) : null}
+              {!listening && lastResult ? <p className="mt-0.5 text-slate-500">{lastResult}</p> : null}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </header>
   )

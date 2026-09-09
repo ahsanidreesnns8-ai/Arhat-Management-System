@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  Archive, ArchiveRestore, ArrowLeft, Banknote, FileText, History, Leaf, Lock, Package, Pencil, Plus, ShoppingBag, Trash2, Truck, Wallet,
+  Archive, ArchiveRestore, ArrowLeft, Banknote, History, Leaf, Lock, Package, Pencil, Plus, ShoppingBag, Trash2, Truck, Wallet,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from '../utils/format'
 import { useLiveReload } from '../context/SyncContext'
 import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
 import KhataPersonLedger from '../components/khata/KhataPersonLedger'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import type { PaddyKhataBook, PaddyKhataBookSummary, PaddyKhataParty } from '../types'
 
 type Section =
@@ -189,15 +190,15 @@ export default function PaddyKhataPage() {
     }
   }
 
-  const openBill = async (module?: string, partyId?: number) => {
+  const openBill = async (module?: string, partyId?: number, lang: 'en' | 'ur' = 'en') => {
     if (!book) return
     setBilling(true)
     try {
       const res = partyId
-        ? await billApi.paddyKhataParty(book.id, partyId, secret)
+        ? await billApi.paddyKhataParty(book.id, partyId, secret, lang)
         : module === 'all'
-          ? await billApi.paddyKhataAll(book.id, secret)
-          : await billApi.paddyKhata(book.id, secret, module)
+          ? await billApi.paddyKhataAll(book.id, secret, lang)
+          : await billApi.paddyKhata(book.id, secret, module, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Paddy Khata bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
@@ -726,12 +727,14 @@ export default function PaddyKhataPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" loading={billing} onClick={() => void openBill(section === 'HOME' ? 'all' : section.toLowerCase())}>
-          <FileText className="h-4 w-4" /> Bill this module
-        </Button>
-        <Button variant="secondary" loading={billing} onClick={() => void openBill('all')}>
-          <FileText className="h-4 w-4" /> All bills
-        </Button>
+        <PrintBillButton
+          loading={billing}
+          kinds={[
+            { id: 'module', label: 'This module' },
+            { id: 'all', label: 'All bills' },
+          ]}
+          onPrint={(lang, kind) => void openBill(kind === 'all' ? 'all' : (section === 'HOME' ? 'all' : section.toLowerCase()), undefined, lang)}
+        />
       </div>
 
       {section === 'HOME' && (
@@ -876,7 +879,7 @@ export default function PaddyKhataPage() {
             parties={book.purchaseParties}
             mode="PURCHASE"
             empty="Add a party, then purchase product."
-            onBill={(p) => void openBill(undefined, p.id)}
+            onBill={(p, lang) => void openBill(undefined, p.id, lang)}
             onCash={(p) => { setGiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setGiveOpen(true) }}
             onEdit={(p) => {
               setEditPartyId(p.id)
@@ -1048,7 +1051,7 @@ export default function PaddyKhataPage() {
             parties={book.saleParties}
             mode="SALE"
             empty="Add a rice party, then sell rice from the frames above."
-            onBill={(p) => void openBill(undefined, p.id)}
+            onBill={(p, lang) => void openBill(undefined, p.id, lang)}
             onCash={(p) => { setReceiveForm({ partyId: String(p.id), amount: p.remaining > 0 ? String(p.remaining) : '', notes: '' }); setReceiveOpen(true) }}
             onEdit={(p) => {
               setEditPartyId(p.id)
@@ -1337,7 +1340,7 @@ function PartyCards({
   parties: PaddyKhataParty[]
   empty: string
   mode: 'PURCHASE' | 'SALE'
-  onBill: (party: PaddyKhataParty) => void
+  onBill: (party: PaddyKhataParty, lang: 'en' | 'ur') => void
   onCash?: (party: PaddyKhataParty) => void
   onEdit?: (party: PaddyKhataParty) => void
   onDelete?: (party: PaddyKhataParty) => void
@@ -1356,7 +1359,7 @@ function PartyCards({
                 <p className="font-semibold">{party.name}</p>
                 <p className="text-xs text-slate-500">{party.address || 'No address'}</p>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => onBill(party)}>Bill</Button>
+              <PrintBillButton size="sm" onPrint={(lang) => onBill(party, lang)} />
             </div>
             {lines.length ? (
               <div className="space-y-1">

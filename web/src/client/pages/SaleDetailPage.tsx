@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import { billApi, buyerApi, saleApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -102,14 +103,16 @@ export default function SaleDetailPage() {
           description={`${sale.buyerName} · ${sale.saleDate}`}
           action={
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => openBill('buyer', 'en')}><FileText className="h-4 w-4" /> Full buyer bill</Button>
-              <Button variant="secondary" onClick={() => openBill('buyer', 'ur')}><FileText className="h-4 w-4" /> خریدار بل</Button>
-              {hasFarmerLines && (
-                <>
-                  <Button variant="secondary" onClick={() => openBill('farmer', 'en')}><FileText className="h-4 w-4" /> Farmer Bill (EN)</Button>
-                  <Button variant="secondary" onClick={() => openBill('farmer', 'ur')}><FileText className="h-4 w-4" /> کسان بل</Button>
-                </>
-              )}
+              <PrintBillButton
+                label={t('print')}
+                kinds={hasFarmerLines
+                  ? [
+                      { id: 'buyer', label: 'Buyer bill' },
+                      { id: 'farmer', label: 'Farmer bill' },
+                    ]
+                  : undefined}
+                onPrint={(lang, kind) => void openBill(kind === 'farmer' ? 'farmer' : 'buyer', lang)}
+              />
               <Button variant="danger" onClick={() => setDeleteOpen(true)}>
                 <Trash2 className="h-4 w-4" /> Delete
               </Button>
@@ -145,9 +148,11 @@ export default function SaleDetailPage() {
             >
               Tick all
             </button>
-            <Button variant="secondary" onClick={() => void openSelectedBuyerBill('en')}>
-              <FileText className="h-4 w-4" /> Bill selected dheris
-            </Button>
+            <PrintBillButton
+              label={t('print')}
+              disabled={!selectedItems.length}
+              onPrint={(lang) => void openSelectedBuyerBill(lang)}
+            />
           </div>
         </div>
         <div className="overflow-x-auto">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calculator, FileText, PackagePlus, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { Calculator, PackagePlus, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Input from '../components/ui/Input'
@@ -10,6 +10,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import PartyCombobox from '../components/forms/PartyCombobox'
 import BagsExtraRow from '../components/forms/BagsExtraRow'
 import FarmerDetailFields from '../components/forms/FarmerDetailFields'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import { useLanguage } from '../context/LanguageContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import { arhatApi, calculatorApi, dailyTradeApi, dheriApi, farmerApi, settingsApi } from '../services/api'
@@ -200,14 +201,14 @@ export default function FarmerProductPage() {
     }
   }
 
-  const openProductBill = async () => {
+  const openProductBill = async (lang: 'en' | 'ur') => {
     const id = Number(farmerId)
     if (!id) {
       toast.error('Choose a farmer first')
       return
     }
     try {
-      const res = await farmerApi.getBillHtml(id, 'en')
+      const res = await farmerApi.getBillHtml(id, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Farmer product bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate product bill'))
@@ -390,9 +391,7 @@ export default function FarmerProductPage() {
             <div className="flex flex-wrap gap-3 pt-2">
               <Button variant="secondary" onClick={reset}><RotateCcw className="h-4 w-4" /> Reset</Button>
               <Button variant="secondary" onClick={runCalculation}><Calculator className="h-4 w-4" /> Calculate</Button>
-              <Button variant="secondary" onClick={() => void openProductBill()} disabled={!farmerId}>
-                <FileText className="h-4 w-4" /> Generate bill
-              </Button>
+              <PrintBillButton disabled={!farmerId} onPrint={(lang) => void openProductBill(lang)} />
               {farmerId ? (
                 <Link to={`/farmers/${farmerId}`}>
                   <Button variant="secondary">Total balance</Button>

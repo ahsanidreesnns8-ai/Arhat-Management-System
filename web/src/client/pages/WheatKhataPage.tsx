@@ -18,6 +18,7 @@ import { useLiveReload } from '../context/SyncContext'
 import { useVoicePageActions } from '../context/VoiceControlContext'
 import KhataTreasuryPanel from '../components/khata/KhataTreasuryPanel'
 import KhataPersonLedger from '../components/khata/KhataPersonLedger'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import type { WheatKhataBook, WheatKhataParty } from '../types'
 
 type Section = 'MONEY' | 'PARTY' | 'COMPANY'
@@ -251,10 +252,10 @@ export default function WheatKhataPage({
     setPaymentOpen(true)
   }
 
-  const openEntityBill = async (party: WheatKhataParty) => {
+  const openEntityBill = async (party: WheatKhataParty, lang: 'en' | 'ur') => {
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataParty(party.id, 'en', bookKey, secret || undefined)
+      const res = await billApi.wheatKhataParty(party.id, lang, bookKey, secret || undefined)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         `${party.name} bill`,
@@ -266,7 +267,7 @@ export default function WheatKhataPage({
     }
   }
 
-  const openAllBills = async () => {
+  const openAllBills = async (lang: 'en' | 'ur') => {
     const companySection = section === 'COMPANY'
     const list = companySection ? book.companies : book.parties
     if (!list.length) {
@@ -275,7 +276,7 @@ export default function WheatKhataPage({
     }
     setBilling(true)
     try {
-      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY', 'en', bookKey, secret || undefined)
+      const res = await billApi.wheatKhataAll(companySection ? 'COMPANY' : 'PARTY', lang, bookKey, secret || undefined)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         'Bill',
@@ -735,10 +736,11 @@ export default function WheatKhataPage({
               <Wallet className="h-4 w-4" />
               {isCompany ? 'Receive Amount' : 'Give Amount'}
             </Button>
-            <Button variant="secondary" onClick={() => void openAllBills()} loading={billing} disabled={!entities.length}>
-              <FileText className="h-4 w-4" />
-              All bills
-            </Button>
+            <PrintBillButton
+              onPrint={(lang) => void openAllBills(lang)}
+              loading={billing}
+              disabled={!entities.length}
+            />
           </div>
           <div className="px-1">
             <h3 className="text-sm font-semibold">{isCompany ? 'Companies' : 'Parties'}</h3>
@@ -788,10 +790,7 @@ export default function WheatKhataPage({
                     <Button size="sm" variant="secondary" onClick={() => openPayment(section, String(p.id))}>
                       {isCompany ? 'Receive Amount' : 'Give Amount'}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void openEntityBill(p)} loading={billing}>
-                      <FileText className="h-3.5 w-3.5" />
-                      Bill
-                    </Button>
+                    <PrintBillButton size="sm" variant="ghost" onPrint={(lang) => void openEntityBill(p, lang)} loading={billing} />
                     <Button size="sm" variant="secondary" onClick={() => openEditEntity(section, p)}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
@@ -1119,10 +1118,7 @@ export default function WheatKhataPage({
 
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setDetailParty(null)}>Close</Button>
-              <Button variant="secondary" onClick={() => void openEntityBill(detailParty)} loading={billing}>
-                <FileText className="h-4 w-4" />
-                Bill
-              </Button>
+              <PrintBillButton onPrint={(lang) => void openEntityBill(detailParty, lang)} loading={billing} />
               <Button variant="secondary" onClick={() => {
                 const kind = detailParty.kind === 'GIVING' ? 'COMPANY' : 'PARTY'
                 setDetailParty(null)

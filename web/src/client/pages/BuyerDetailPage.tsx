@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Printer, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Scale, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal'
 import SettledBadge, { isPartySettled } from '../components/ui/SettledBadge'
 import { TableSkeleton } from '../components/ui/Skeleton'
 import PaymentModal from '../components/payments/PaymentModal'
+import PrintBillButton from '../components/bills/PrintBillButton'
 import TotalBalancePanel, { statementSummary, TotalBalancePreview } from '../components/account/TotalBalancePanel'
 import { buyerApi, paymentApi, registerApi, saleApi } from '../services/api'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
@@ -146,10 +147,10 @@ export default function BuyerDetailPage() {
                 {settled ? <CheckCircle2 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                 {settled ? 'Paid' : 'Receive / Settle remaining'}
               </Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><FileText className="h-4 w-4" /> Product bill (EN)</Button>
-              <Button variant="secondary" onClick={() => openBill('ur')}><FileText className="h-4 w-4" /> پروڈکٹ بل</Button>
-              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>Total balance</Button>
-              <Button variant="secondary" onClick={() => openBill('en')}><Printer className="h-4 w-4" /> Print product bill</Button>
+              <PrintBillButton label={t('print')} onPrint={(lang) => void openBill(lang)} />
+              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
+                <Scale className="h-4 w-4" /> Total balance
+              </Button>
             </div>
           }
         />
@@ -297,12 +298,11 @@ export default function BuyerDetailPage() {
               className="w-36 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
               title="Optional: e.g. 3 = bill of 3 dheris, then another bill for the rest"
             />
-            <Button variant="secondary" onClick={() => void openSelectedBill('en')}>
-              <FileText className="h-4 w-4" /> Bill selected ({selectedItems.length})
-            </Button>
-            <Button variant="secondary" onClick={() => void openSelectedBill('ur')}>
-              <FileText className="h-4 w-4" /> بل منتخب
-            </Button>
+            <PrintBillButton
+              label={`${t('print')} (${selectedItems.length})`}
+              disabled={!selectedItems.length}
+              onPrint={(lang) => void openSelectedBill(lang)}
+            />
             <button
               type="button"
               className="text-sm text-primary"

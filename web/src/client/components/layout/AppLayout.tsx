@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import AmbientScene from './AmbientScene'
-import MobileToolsDock from './MobileToolsDock'
+import AiAssistantPanel from '../ai/AiAssistantPanel'
 import { usePrivacy } from '../../context/PrivacyContext'
 import { pageVariants } from '../../utils/motion'
 import CopyrightLine from '../brand/CopyrightLine'
@@ -46,9 +46,9 @@ export default function AppLayout() {
 
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <div className="relative z-10 min-h-screen flex flex-col pb-[5.25rem]">
+      <div className="relative z-10 min-h-screen flex flex-col">
         <Navbar menuOpen={menuOpen} onToggleMenu={() => setMenuOpen((v) => !v)} />
-        <main className="flex-1 p-3 min-h-[calc(100vh-4rem-5.25rem)]">
+        <main className="flex-1 p-3 min-h-[calc(100vh-4rem)]">
           <div className="content-stage content-stage-mobile">
             <AnimatePresence mode="wait">
               <motion.div
@@ -68,7 +68,7 @@ export default function AppLayout() {
         </footer>
       </div>
 
-      <MobileToolsDock />
+      <AiAssistantPanel />
     </div>
   )
 }
