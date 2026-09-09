@@ -181,15 +181,14 @@ export default function AiAssistantPanel() {
             <PanelLeftClose className="h-4 w-4" />
           </button>
         </div>
-        <Button
+        <button
           type="button"
-          size="sm"
-          className="mt-3 w-full bg-[#C5A059] text-[#002D62] hover:brightness-110"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C5A059] px-3 py-2.5 text-sm font-semibold text-[#002D62]"
           onClick={startNewChat}
         >
           <Plus className="h-3.5 w-3.5" />
           {t('aiNewChat')}
-        </Button>
+        </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {threads.map((thread) => (

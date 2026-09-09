@@ -237,7 +237,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
           </IconBtn>
         </div>
         <div className="flex items-center justify-between gap-2 h-11 px-2 border-t border-slate-200/60 dark:border-white/10">
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1.5">
             <IconBtn
               onClick={goBack}
               disabled={isHome}
