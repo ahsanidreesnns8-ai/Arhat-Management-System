@@ -127,8 +127,8 @@ export async function search(query: string, userId?: bigint) {
     }
   }
   for (const item of registerParties) {
-    remember(item.name)
     if (item.ownerCode) remember(item.ownerCode)
+    else remember(item.name)
   }
   for (const item of farmers) remember(item.farmerId)
   for (const item of buyers) remember(item.buyerId)
@@ -147,7 +147,7 @@ export async function search(query: string, userId?: bigint) {
           ? `${statement.name} · ${statement.farmerName || statement.buyerName}`
           : statement.name,
         subtitle: `${remaining} · Product Rs ${Math.round(statement.productTotal)} · Given Rs ${Math.round(statement.cashGiven)} · Received Rs ${Math.round(statement.cashReceived)} · Sold Rs ${Math.round(statement.soldTotal)}`,
-        link: `/arhat-register?q=${encodeURIComponent(statement.name)}`,
+        link: `/arhat-register?q=${encodeURIComponent(statement.farmerCode || statement.buyerCode || statement.name)}`,
       }
     }),
   )

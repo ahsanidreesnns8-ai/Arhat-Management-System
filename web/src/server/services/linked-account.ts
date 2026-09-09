@@ -67,6 +67,36 @@ function matchPerson<T extends { id: bigint; code: string; name: string }>(rows:
   return byName.length === 1 ? byName[0] : null
 }
 
+function notesHoldAccountCode(notes: string | null | undefined, code: string) {
+  const notesKey = normalizeAccountKey(notes)
+  const codeKey = normalizeAccountKey(code)
+  return Boolean(codeKey) && (notesKey === codeKey || notesKey === normalizeAccountKey(`ID ${code}`))
+}
+
+function partyHasNoAccountIdentity(row: {
+  ownerCode?: string | null
+  linkedFarmerId?: bigint | null
+  linkedBuyerId?: bigint | null
+}) {
+  return !row.ownerCode && row.linkedFarmerId == null && row.linkedBuyerId == null
+}
+
+function identitiesCompatible(
+  left: { ownerCode?: string | null; linkedFarmerId?: bigint | null; linkedBuyerId?: bigint | null },
+  right: { ownerCode?: string | null; linkedFarmerId?: bigint | null; linkedBuyerId?: bigint | null },
+) {
+  const leftCode = normalizeAccountKey(left.ownerCode)
+  const rightCode = normalizeAccountKey(right.ownerCode)
+  if (leftCode && rightCode && leftCode !== rightCode) return false
+  if (left.linkedFarmerId != null && right.linkedFarmerId != null && left.linkedFarmerId !== right.linkedFarmerId) {
+    return false
+  }
+  if (left.linkedBuyerId != null && right.linkedBuyerId != null && left.linkedBuyerId !== right.linkedBuyerId) {
+    return false
+  }
+  return true
+}
+
 function aliasUniqueName(
   map: Map<string, LinkedTrade>,
   rawCode: string,
@@ -328,35 +358,71 @@ function expandAlias(value: string | null | undefined) {
   return raw ? [raw] : []
 }
 
-async function findRegisterPartiesForKeys(keys: Array<string | null | undefined>) {
-  const wanted = new Set<string>()
-  for (const key of keys) {
-    const norm = normalizeAccountKey(key)
-    if (norm) wanted.add(norm)
-  }
-  if (!wanted.size) return []
-  const parties = await prisma.registerParty.findMany({
+async function loadLiveMoneyParties() {
+  return prisma.registerParty.findMany({
     where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] } },
     include: {
       entries: { where: { kind: { in: ['GIVING', 'RECEIVING'] } } },
     },
     orderBy: { createdAt: 'asc' },
   })
-  const matched = new Map<string, (typeof parties)[number]>()
-  for (const row of parties) {
-    const nameKey = normalizeAccountKey(row.name)
-    const codeKey = normalizeAccountKey(row.ownerCode)
-    const notesKey = normalizeAccountKey(row.notes)
-    const exact =
-      wanted.has(nameKey) ||
-      (Boolean(codeKey) && wanted.has(codeKey)) ||
-      [...wanted].some((key) => notesKey === key || notesKey === normalizeAccountKey(`ID ${key}`))
-    if (exact) matched.set(String(row.id), row)
-  }
-  return [...matched.values()]
 }
 
-async function mergeRegisterParties<T extends { id: bigint; entries?: unknown[] }>(parties: T[]) {
+type ResolvedAccount = Awaited<ReturnType<typeof resolveAccountKeys>>
+type LiveMoneyParty = Awaited<ReturnType<typeof loadLiveMoneyParties>>[number]
+
+function accountIdCodes(resolved: ResolvedAccount) {
+  const codes = new Set<string>()
+  const farmerCode = normalizeAccountKey(resolved.farmer?.code)
+  const buyerCode = normalizeAccountKey(resolved.buyer?.code)
+  if (farmerCode) codes.add(farmerCode)
+  if (buyerCode) codes.add(buyerCode)
+  const lookupIsCode =
+    (Boolean(farmerCode) && farmerCode === resolved.norm) ||
+    (Boolean(buyerCode) && buyerCode === resolved.norm)
+  if (lookupIsCode) codes.add(resolved.norm)
+  return codes
+}
+
+function partyMatchesResolvedAccount(row: LiveMoneyParty, resolved: ResolvedAccount) {
+  if (resolved.farmer && row.linkedFarmerId === resolved.farmer.id) return true
+  if (resolved.buyer && row.linkedBuyerId === resolved.buyer.id) return true
+  const codes = accountIdCodes(resolved)
+  if (!codes.size) return false
+  const owner = normalizeAccountKey(row.ownerCode)
+  if (owner && codes.has(owner)) return true
+  const nameAsId = normalizeAccountKey(row.name)
+  if (nameAsId && codes.has(nameAsId)) return true
+  return [...codes].some((code) => notesHoldAccountCode(row.notes, code))
+}
+
+/** Find register people by farmer/buyer ID. Same display names with different IDs stay separate. */
+async function findRegisterPartiesForAccount(resolved: ResolvedAccount) {
+  const parties = await loadLiveMoneyParties()
+  const byId = parties.filter((row) => partyMatchesResolvedAccount(row, resolved))
+  if (byId.length) return byId
+
+  const label = normalizeAccountKey(
+    resolved.farmer?.name || resolved.buyer?.name || (!resolved.farmer && !resolved.buyer ? resolved.raw : ''),
+  )
+  if (!label) return []
+  if (resolved.farmer && !resolved.farmerNameUnique) return []
+  if (resolved.buyer && !resolved.buyerNameUnique) return []
+  const unlinked = parties.filter(
+    (row) => normalizeAccountKey(row.name) === label && partyHasNoAccountIdentity(row),
+  )
+  return unlinked.length === 1 ? unlinked : []
+}
+
+async function mergeRegisterParties<
+  T extends {
+    id: bigint
+    entries?: unknown[]
+    ownerCode?: string | null
+    linkedFarmerId?: bigint | null
+    linkedBuyerId?: bigint | null
+  },
+>(parties: T[]) {
   if (parties.length <= 1) return parties[0] ?? null
   const ranked = [...parties].sort((a, b) => {
     const ae = Array.isArray(a.entries) ? a.entries.length : 0
@@ -366,6 +432,7 @@ async function mergeRegisterParties<T extends { id: bigint; entries?: unknown[] 
   })
   const canonical = ranked[0]
   for (const extra of ranked.slice(1)) {
+    if (!identitiesCompatible(canonical, extra)) continue
     await prisma.registerEntry.updateMany({
       where: { partyId: extra.id },
       data: { partyId: canonical.id },
@@ -383,9 +450,9 @@ async function mergeRegisterParties<T extends { id: bigint; entries?: unknown[] 
   })
 }
 
-async function resolveAccountKeys(key: string, extraName?: string | null) {
+async function resolveAccountKeys(key: string, _extraName?: string | null) {
   const raw = String(key ?? '').trim()
-  const aliases = new Set<string>([...expandAlias(raw), ...expandAlias(extraName)])
+  const aliases = new Set<string>(expandAlias(raw))
   const norm = normalizeAccountKey(raw)
   const [farmers, buyers] = await Promise.all([
     prisma.farmer.findMany({
@@ -397,42 +464,35 @@ async function resolveAccountKeys(key: string, extraName?: string | null) {
       select: { id: true, buyerId: true, name: true },
     }),
   ])
-  const farmer = matchPerson(
-    farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
+  const farmerRows = farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name }))
+  const buyerRows = buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name }))
+  const uniqueFarmerNames = uniqueNameKeys(farmers)
+  const uniqueBuyerNames = uniqueNameKeys(buyers)
+  const farmer = matchPerson(farmerRows, norm)
+  const buyer = matchPerson(buyerRows, norm)
+  if (farmer) aliases.add(farmer.code)
+  if (buyer) aliases.add(buyer.code)
+  return {
+    aliases: [...aliases],
+    farmer,
+    buyer,
     norm,
-  ) || (extraName
-    ? matchPerson(
-        farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
-        normalizeAccountKey(extraName),
-      )
-    : null)
-  const buyer = matchPerson(
-    buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
-    norm,
-  ) || (extraName
-    ? matchPerson(
-        buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
-        normalizeAccountKey(extraName),
-      )
-    : null)
-  if (farmer) {
-    aliases.add(farmer.code)
-    aliases.add(farmer.name)
+    raw,
+    farmerNameUnique: farmer ? uniqueFarmerNames.has(normalizeAccountKey(farmer.name)) : false,
+    buyerNameUnique: buyer ? uniqueBuyerNames.has(normalizeAccountKey(buyer.name)) : false,
   }
-  if (buyer) {
-    aliases.add(buyer.code)
-    aliases.add(buyer.name)
-  }
-  return { aliases: [...aliases], farmer, buyer, norm }
 }
 
 export async function findRegisterPartyByKey(key: string, extraName?: string | null) {
-  const parties = await findRegisterPartiesForKeys(
-    (await resolveAccountKeys(key, extraName)).aliases,
-  )
+  const resolved = await resolveAccountKeys(key, extraName)
+  const parties = await findRegisterPartiesForAccount(resolved)
   if (!parties.length) return null
-  const norm = normalizeAccountKey(key)
-  return parties.find((row) => normalizeAccountKey(row.name) === norm) ?? parties[0]
+  const code = normalizeAccountKey(resolved.farmer?.code || resolved.buyer?.code || key)
+  return (
+    parties.find((row) => normalizeAccountKey(row.ownerCode) === code) ||
+    parties.find((row) => normalizeAccountKey(row.name) === code) ||
+    parties[0]
+  )
 }
 
 export function tradeForKey(index: Map<string, LinkedTrade>, name: string | null | undefined) {
@@ -563,7 +623,7 @@ async function stampAccountLinks(
   }
 }
 
-/** Reuse the Arhat Register person when farmer/buyer ID or name matches. Merge split records. */
+/** Reuse the Arhat Register person when farmer/buyer ID matches. Same names with different IDs stay separate. */
 export async function ensureRegisterPartyForAccount(
   code: string,
   extraName?: string | null,
@@ -580,7 +640,7 @@ export async function ensureRegisterPartyForAccount(
     const restored = await restoreDeletedParty(tombstone.id, { name: label, notes: tombstone.notes || notes })
     return stampAccountLinks(restored.id, resolved, name)
   }
-  const parties = await findRegisterPartiesForKeys(resolved.aliases)
+  const parties = await findRegisterPartiesForAccount(resolved)
   if (parties.length) {
     const merged = await mergeRegisterParties(parties)
     if (merged) {
@@ -689,9 +749,7 @@ export async function syncAllAccountsToRegister() {
 }
 
 export async function registerCashForKey(key: string, extraName?: string | null) {
-  const parties = await findRegisterPartiesForKeys(
-    (await resolveAccountKeys(key, extraName)).aliases,
-  )
+  const parties = await findRegisterPartiesForAccount(await resolveAccountKeys(key, extraName))
   if (!parties.length) {
     return { partyId: null as number | null, registerReceived: 0, registerGiven: 0 }
   }
@@ -919,7 +977,7 @@ export async function getAccountStatement(key: string, extraName?: string | null
   const resolved = await resolveAccountKeys(key, extraName)
   const tradeKey = resolved.farmer?.code || resolved.buyer?.code || key
   const [parties, trade] = await Promise.all([
-    findRegisterPartiesForKeys(resolved.aliases),
+    findRegisterPartiesForAccount(resolved),
     loadTradeForKey(tradeKey),
   ])
   const entries = parties.flatMap((party) => party.entries)
@@ -955,7 +1013,13 @@ export async function getAccountStatement(key: string, extraName?: string | null
   const additionTotal = lines.reduce((sum, row) => sum + row.addition, 0)
   const deductionTotal = lines.reduce((sum, row) => sum + row.deduction, 0)
   const remaining = additionTotal - deductionTotal
-  const party = parties.find((row) => normalizeAccountKey(row.name) === resolved.norm) ?? parties[0] ?? null
+  const code = normalizeAccountKey(tradeKey)
+  const party =
+    parties.find((row) => normalizeAccountKey(row.ownerCode) === code) ??
+    parties.find((row) => resolved.farmer && row.linkedFarmerId === resolved.farmer.id) ??
+    parties.find((row) => resolved.buyer && row.linkedBuyerId === resolved.buyer.id) ??
+    parties[0] ??
+    null
   return {
     key: resolved.norm,
     name: trade.farmerName || trade.buyerName || party?.name || key,

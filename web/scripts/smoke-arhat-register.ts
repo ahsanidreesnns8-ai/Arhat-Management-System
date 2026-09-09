@@ -7,7 +7,8 @@ config({ path: '.env' })
 
 import { prisma } from '../src/server/db'
 import { formatMann, splitMann, farmerBill, registerPartyBill, registerBookBill, accountBalanceBillByFarmer } from '../src/server/services/bills'
-import { createFarmer, getFarmer, listFarmers } from '../src/server/services/farmers'
+import { createFarmer, getFarmer, listFarmers, updateFarmer } from '../src/server/services/farmers'
+import { createBuyer } from '../src/server/services/buyers'
 import { createDheri } from '../src/server/services/dheris'
 import { normalizeAccountKey } from '../src/server/ids'
 import { getAccountStatement } from '../src/server/services/linked-account'
@@ -53,6 +54,12 @@ async function main() {
       searchFarmerId: undefined as bigint | undefined,
       linkedDheriId: undefined as bigint | undefined,
       linkedDheriId2: undefined as bigint | undefined,
+      twinAId: undefined as bigint | undefined,
+      twinBId: undefined as bigint | undefined,
+      twinBuyerAId: undefined as bigint | undefined,
+      twinBuyerBId: undefined as bigint | undefined,
+      twinDheriAId: undefined as bigint | undefined,
+      twinDheriBId: undefined as bigint | undefined,
     }
     try {
       const person = await createParty({
@@ -242,6 +249,91 @@ async function main() {
       assert(mustafaLedger.linkedFarmerId === ranaMustafa.id, 'Mustafa register must link to Mustafa farmer')
       assert(allahLedger.linkedFarmerId === ranaAllah.id, 'Allahwasya register must link to Allahwasya farmer')
 
+      const sameName = `Ali Ahmad ${stamp}`
+      const twinA = await createFarmer({ name: sameName, code: `TA${stamp.slice(-4)}` })
+      const twinB = await createFarmer({ name: sameName, code: `TB${stamp.slice(-4)}` })
+      ids.twinAId = BigInt(twinA.id)
+      ids.twinBId = BigInt(twinB.id)
+      const twinList = await listParties('RECEIVING')
+      const twinACards = twinList.filter((row) => row.linkedFarmerId === twinA.id)
+      const twinBCards = twinList.filter((row) => row.linkedFarmerId === twinB.id)
+      assert(twinACards.length === 1 && twinBCards.length === 1, 'same name + different IDs must each have one register card')
+      const twinACard = twinACards[0]
+      const twinBCard = twinBCards[0]
+      assert(twinACard.id !== twinBCard.id, 'identical names must not share one register person')
+      assert(twinACard.ownerCode === twinA.farmerId, 'first Ali card must keep its own farmer ID')
+      assert(twinBCard.ownerCode === twinB.farmerId, 'second Ali card must keep its own farmer ID')
+      const twinACash = await createEntry({ kind: 'RECEIVING', partyId: twinACard.id, amount: 300, notes: 'ali-a cash' })
+      const twinBCash = await createEntry({ kind: 'GIVING', partyId: twinBCard.id, amount: 80, notes: 'ali-b cash' })
+      ids.entryIds.push(BigInt(twinACash.id), BigInt(twinBCash.id))
+      const twinProduct = await prisma.product.findFirst({ where: { deleted: false, active: true } })
+      assert(twinProduct, 'need a product to keep same-name farmer product on the matching ID')
+      const twinDheriA = await createDheri({
+        farmerId: twinA.id,
+        productId: Number(twinProduct.id),
+        dheriCode: `PA${stamp.slice(-6)}`,
+        numberOfBags: 2,
+        weightPerBag: 40,
+        partialBagWeight: 0,
+        marketRate: 400,
+      })
+      const twinDheriB = await createDheri({
+        farmerId: twinB.id,
+        productId: Number(twinProduct.id),
+        dheriCode: `PB${stamp.slice(-6)}`,
+        numberOfBags: 5,
+        weightPerBag: 40,
+        partialBagWeight: 0,
+        marketRate: 400,
+      })
+      ids.twinDheriAId = BigInt(twinDheriA.id)
+      ids.twinDheriBId = BigInt(twinDheriB.id)
+      const twinALedger = await getPartyLedger(twinACard.id)
+      const twinBLedger = await getPartyLedger(twinBCard.id)
+      assert(twinALedger.cashReceivedTotal === 300, 'Ali A cash must stay on Ali A')
+      assert((twinBLedger.cashReceivedTotal || 0) === 0, 'Ali B must not inherit Ali A received cash')
+      assert(twinBLedger.cashGivenTotal === 80, 'Ali B cash must stay on Ali B')
+      assert((twinALedger.cashGivenTotal || 0) === 0, 'Ali A must not inherit Ali B given cash')
+      assert(Math.abs((twinALedger.productTotal || 0) - twinDheriA.farmerReceivable) < 1, 'Ali A product must stay on Ali A')
+      assert(Math.abs((twinBLedger.productTotal || 0) - twinDheriB.farmerReceivable) < 1, 'Ali B product must stay on Ali B')
+      const twinAStatement = await getAccountStatement(twinA.farmerId, sameName)
+      const twinBStatement = await getAccountStatement(twinB.farmerId, sameName)
+      assert(twinAStatement.cashReceived === 300, 'Ali A statement cash must follow Ali A ID')
+      assert(twinBStatement.cashGiven === 80, 'Ali B statement cash must follow Ali B ID')
+      assert(Math.abs(twinAStatement.productTotal - twinDheriA.farmerReceivable) < 1, 'Ali A statement product must follow Ali A ID')
+      assert(Math.abs(twinBStatement.productTotal - twinDheriB.farmerReceivable) < 1, 'Ali B statement product must follow Ali B ID')
+      const renamedTwin = await updateParty(twinACard.id, { name: sameName, address: 'Okara A' })
+      assert(renamedTwin.id === twinACard.id, 'edit must update this ID in place')
+      const twinBAfterEdit = await getPartyLedger(twinBCard.id)
+      assert(twinBAfterEdit.cashGivenTotal === 80, 'editing Ali A must not change Ali B')
+      assert(twinBAfterEdit.linkedFarmerId === twinB.id, 'Ali B must keep its own farmer link after Ali A edit')
+      const updatedTwinFarmer = await updateFarmer(twinA.id, { name: sameName, code: twinA.farmerId, city: 'Nankana' })
+      assert(updatedTwinFarmer.farmerId === twinA.farmerId, 'farmer update must keep this ID')
+      const twinListAfterUpdate = await listParties('RECEIVING')
+      const twinAAfterUpdate = twinListAfterUpdate.find((row) => row.linkedFarmerId === twinA.id)
+      const twinBAfterUpdate = twinListAfterUpdate.find((row) => row.linkedFarmerId === twinB.id)
+      assert(twinAAfterUpdate && twinBAfterUpdate && twinAAfterUpdate.id !== twinBAfterUpdate.id, 'farmer update must not merge same-name IDs')
+      const foundTwinA = await systemSearch(twinA.farmerId)
+      const foundTwinB = await systemSearch(twinB.farmerId)
+      assert(
+        foundTwinA.some((row) => row.type === 'FARMER' && row.id === twinA.farmerId),
+        'search by Ali A ID must find Ali A',
+      )
+      assert(
+        foundTwinB.some((row) => row.type === 'FARMER' && row.id === twinB.farmerId),
+        'search by Ali B ID must find Ali B',
+      )
+      const twinBuyerA = await createBuyer({ name: sameName, code: `BA${stamp.slice(-4)}` })
+      const twinBuyerB = await createBuyer({ name: sameName, code: `BB${stamp.slice(-4)}` })
+      ids.twinBuyerAId = BigInt(twinBuyerA.id)
+      ids.twinBuyerBId = BigInt(twinBuyerB.id)
+      const twinBuyerList = await listParties('RECEIVING')
+      const twinBuyerACard = twinBuyerList.find((row) => row.linkedBuyerId === twinBuyerA.id)
+      const twinBuyerBCard = twinBuyerList.find((row) => row.linkedBuyerId === twinBuyerB.id)
+      assert(twinBuyerACard && twinBuyerBCard, 'same-name buyers with different IDs must each have a register card')
+      assert(twinBuyerACard.id !== twinBuyerBCard.id, 'same-name buyers must not share one register person')
+      assert(twinBuyerACard.id !== twinACard.id && twinBuyerACard.id !== twinBCard.id, 'buyer ID must not attach to a farmer of the same name')
+
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))
       const summary = await zakatSummary()
@@ -378,8 +470,10 @@ async function main() {
       if (ids.entryIds.length) {
         await prisma.registerEntry.deleteMany({ where: { id: { in: ids.entryIds } } })
       }
-      if (ids.linkedDheriId || ids.linkedDheriId2) {
-        const dheriIds = [ids.linkedDheriId, ids.linkedDheriId2].filter((id): id is bigint => id != null)
+      if (ids.linkedDheriId || ids.linkedDheriId2 || ids.twinDheriAId || ids.twinDheriBId) {
+        const dheriIds = [ids.linkedDheriId, ids.linkedDheriId2, ids.twinDheriAId, ids.twinDheriBId].filter(
+          (id): id is bigint => id != null,
+        )
         await prisma.queueEntry.deleteMany({ where: { dheriId: { in: dheriIds } } })
         await prisma.stockLot.deleteMany({ where: { dheriId: { in: dheriIds } } })
         await prisma.stockTransaction.deleteMany({ where: { dheriId: { in: dheriIds } } })
@@ -428,6 +522,20 @@ async function main() {
       if (ids.searchFarmerId) {
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.searchFarmerId } })
         await prisma.farmer.deleteMany({ where: { id: ids.searchFarmerId } })
+      }
+      for (const farmerId of [ids.twinAId, ids.twinBId]) {
+        if (!farmerId) continue
+        await prisma.registerEntry.deleteMany({ where: { party: { linkedFarmerId: farmerId } } })
+        await prisma.registerParty.deleteMany({ where: { linkedFarmerId: farmerId } })
+        await prisma.payment.deleteMany({ where: { farmerId } })
+        await prisma.farmer.deleteMany({ where: { id: farmerId } })
+      }
+      for (const buyerId of [ids.twinBuyerAId, ids.twinBuyerBId]) {
+        if (!buyerId) continue
+        await prisma.registerEntry.deleteMany({ where: { party: { linkedBuyerId: buyerId } } })
+        await prisma.registerParty.deleteMany({ where: { linkedBuyerId: buyerId } })
+        await prisma.payment.deleteMany({ where: { buyerId } })
+        await prisma.buyer.deleteMany({ where: { id: buyerId } })
       }
     }
   })
