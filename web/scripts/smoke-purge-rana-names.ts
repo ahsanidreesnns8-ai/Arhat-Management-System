@@ -10,10 +10,13 @@ function assert(cond: unknown, message: string): asserts cond {
 
 assert(isShopPurgePersonName('Rana Ghulam Mustafa'), 'exact Ghulam Mustafa')
 assert(isShopPurgePersonName('rana  ghulam  mustafa'), 'spaces and case')
+assert(isShopPurgePersonName('RANA GHALAM MUSTAFA'), 'live shop Ghalam spelling')
+assert(isShopPurgePersonName('Rana Ghalam Mustafa'), 'Ghalam title case')
 assert(isShopPurgePersonName('Rana Allahwasya'), 'exact Allahwasya')
 assert(isShopPurgePersonName('Rana Allah wasya'), 'Allah wasya with space')
 assert(isShopPurgePersonName('Rana Allah Wasaya'), 'Allah Wasaya spelling')
 assert(!isShopPurgePersonName('Rana Ghulam Mustafa REG123'), 'test copies with digits stay')
+assert(!isShopPurgePersonName('RANA GHALAM MUSTAFA R74'), 'id in the name stays')
 assert(!isShopPurgePersonName('Rana Ali'), 'other Ranas stay')
 assert(!isShopPurgePersonName('Ali Ahmad'), 'unrelated names stay')
 console.log('purge name match OK')

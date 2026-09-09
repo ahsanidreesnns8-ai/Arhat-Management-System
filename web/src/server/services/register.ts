@@ -942,7 +942,7 @@ export async function removePeopleFromShop(names: string[] = SHOP_PURGE_NAMES) {
   }
 }
 
-const PURGE_ACTION = 'PURGE_RANA_OWNER_FARMERS_V2'
+const PURGE_ACTION = 'PURGE_RANA_OWNER_FARMERS_V3'
 
 /** Remove the mixed Rana people from this shop once. Runs on the owner (live) shop too. */
 export async function purgeMixedRanaPeopleOnce() {

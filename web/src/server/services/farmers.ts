@@ -58,7 +58,7 @@ function farmerDtoFromTotals(
     phone: farmer.phone,
     address: farmer.address,
     city: farmer.city,
-    outstandingBalance: farmer.outstandingBalance.toNumber(),
+    outstandingBalance: totalBilled - totalPaid,
     totalBilled,
     totalPaid,
     notes: farmer.notes,
