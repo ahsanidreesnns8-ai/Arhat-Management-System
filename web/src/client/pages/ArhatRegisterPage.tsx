@@ -234,7 +234,7 @@ export default function ArhatRegisterPage() {
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const [person, setPerson] = useState({ name: '', address: '', notes: '' })
+  const [person, setPerson] = useState({ code: '', name: '', address: '', notes: '' })
   const [money, setMoney] = useState({ partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
   const [zakatForm, setZakatForm] = useState({ amount: '', notes: '' })
   const [advance, setAdvance] = useState({ farmerId: '', amount: '', notes: '' })
@@ -243,6 +243,7 @@ export default function ArhatRegisterPage() {
   const [editLedger, setEditLedger] = useState<RegisterParty | null>(null)
   const [editForm, setEditForm] = useState({
     id: 0,
+    code: '',
     name: '',
     address: '',
     notes: '',
@@ -306,6 +307,24 @@ export default function ArhatRegisterPage() {
     () => [...parties].filter((p) => matchesSearch(p, query)).sort(byNameThenAmount),
     [parties, query],
   )
+
+  const personIdKey = normalizeAccountKey(person.code)
+  const personNameKey = normalizeAccountKey(person.name)
+  const existingIdPerson = useMemo(
+    () => parties.find((row) => {
+      const code = normalizeAccountKey(partyAccountCode(row))
+      return Boolean(personIdKey) && Boolean(code) && code === personIdKey
+    }) || null,
+    [parties, personIdKey],
+  )
+  const sameNamePeople = useMemo(
+    () => parties.filter((row) => {
+      if (!personNameKey || normalizeAccountKey(row.name) !== personNameKey) return false
+      const code = normalizeAccountKey(partyAccountCode(row))
+      return !personIdKey || code !== personIdKey
+    }),
+    [parties, personNameKey, personIdKey],
+  )
   const ledgerPeople = useMemo(
     () => [...parties].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })),
     [parties],
@@ -341,6 +360,7 @@ export default function ArhatRegisterPage() {
       setEditLedger(ledger)
       setEditForm({
         id: ledger.id,
+        code: partyAccountCode(ledger),
         name: ledger.name,
         address: ledger.address || '',
         notes: ledger.notes || '',
@@ -358,23 +378,33 @@ export default function ArhatRegisterPage() {
   }
 
   const savePerson = async () => {
+    if (!person.code.trim()) {
+      toast.error('ID is required — enter the ID you assign')
+      return
+    }
     if (!person.name.trim()) {
       toast.error('Name is required')
       return
     }
     setSaving(true)
     try {
+      const savedCode = person.code.trim()
       const savedName = person.name.trim()
       await registerApi.addParty({
         kind: 'RECEIVING',
+        code: savedCode,
         name: savedName,
         address: person.address.trim() || undefined,
         notes: person.notes.trim() || undefined,
       })
-      toast.success('Person saved')
-      setPerson({ name: '', address: '', notes: '' })
+      toast.success(
+        existingIdPerson
+          ? `Opened existing ID ${savedCode}`
+          : 'Person saved',
+      )
+      setPerson({ code: '', name: '', address: '', notes: '' })
       setPersonOpen(false)
-      setSearch(savedName)
+      setSearch(savedCode)
       void load()
     } catch (err: unknown) {
       toast.error(apiError(err, 'Could not add person'))
@@ -413,6 +443,10 @@ export default function ArhatRegisterPage() {
   }
 
   const saveEdit = async () => {
+    if (!editForm.code.trim()) {
+      toast.error('ID is required — enter the ID you assign')
+      return
+    }
     if (!editForm.name.trim()) {
       toast.error('Name is required')
       return
@@ -428,6 +462,7 @@ export default function ArhatRegisterPage() {
     setSaving(true)
     try {
       await registerApi.updateParty(editForm.id, {
+        code: editForm.code.trim(),
         name: editForm.name.trim(),
         address: editForm.address.trim(),
         notes: editForm.notes.trim(),
@@ -668,7 +703,7 @@ export default function ArhatRegisterPage() {
 
       {section === 'PEOPLE' && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => { setPerson({ name: '', address: '', notes: '' }); setPersonOpen(true) }}>
+          <Button onClick={() => { setPerson({ code: '', name: '', address: '', notes: '' }); setPersonOpen(true) }}>
             <Plus className="h-4 w-4" /> Add Person
           </Button>
           <Button variant="secondary" onClick={() => openMoney('RECEIVING')}>
@@ -962,7 +997,44 @@ export default function ArhatRegisterPage() {
 
       <Modal open={personOpen} onClose={() => setPersonOpen(false)} title="Add person">
         <div className="space-y-3">
-          <Input label="Name *" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="ID *"
+              autoFocus
+              value={person.code}
+              onChange={(e) => setPerson({ ...person, code: e.target.value })}
+              placeholder="e.g. R74.A"
+            />
+            <Input
+              label="Name *"
+              value={person.name}
+              onChange={(e) => setPerson({ ...person, name: e.target.value })}
+            />
+          </div>
+          <p className="text-[12px] text-slate-500">
+            Same name with a different ID is a different person. Use the Farmer/Buyer ID when this person already has one.
+          </p>
+          {existingIdPerson ? (
+            <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+              ID {partyAccountCode(existingIdPerson) || person.code.trim()} already belongs to {existingIdPerson.name}. Saving will open that person, not create another.
+            </p>
+          ) : null}
+          {!existingIdPerson && sameNamePeople.length ? (
+            <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+              {sameNamePeople[0].name} already exists
+              {sameNamePeople
+                .map((row) => partyAccountCode(row))
+                .filter(Boolean)
+                .length
+                ? ` with ${sameNamePeople
+                    .map((row) => partyAccountCode(row))
+                    .filter(Boolean)
+                    .map((code) => `ID ${code}`)
+                    .join(', ')}`
+                : ''}
+              . Keep this ID different so they stay separate.
+            </p>
+          ) : null}
           <Input label="Address (optional)" value={person.address} onChange={(e) => setPerson({ ...person, address: e.target.value })} />
           <Input label="Note (optional)" value={person.notes} onChange={(e) => setPerson({ ...person, notes: e.target.value })} />
           <div className="flex justify-end gap-2 pt-2">
@@ -1036,11 +1108,22 @@ export default function ArhatRegisterPage() {
               Print balance
             </Button>
           ) : null}
-          <Input
-            label="Name *"
-            value={editForm.name}
-            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="ID *"
+              value={editForm.code}
+              onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
+              placeholder="e.g. R74.A"
+            />
+            <Input
+              label="Name *"
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            />
+          </div>
+          <p className="text-[12px] text-slate-500">
+            Changing the ID keeps this person separate from anyone else with the same name.
+          </p>
           <Input
             label="Address (optional)"
             value={editForm.address}

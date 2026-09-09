@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { normalizeAccountKey } from '@/server/ids'
+import { normalizeAccountKey, normalizeOwnerCode } from '@/server/ids'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 import { logAudit } from '@/server/services/audit'
@@ -483,6 +483,8 @@ export async function getPartyLedger(id: number | bigint) {
 export async function createParty(input: {
   kind?: string
   name?: string
+  code?: string | null
+  ownerCode?: string | null
   address?: string | null
   notes?: string | null
 }) {
@@ -491,6 +493,24 @@ export async function createParty(input: {
   if (!name) throw new Error('Name is required')
   const address = String(input.address ?? '').trim() || null
   const notes = String(input.notes ?? '').trim() || null
+  const code = normalizeOwnerCode(input.code ?? input.ownerCode)
+
+  if (code) {
+    const account = (await findExactAccountCode(code)) || { code, name }
+    const linked = await ensureRegisterPartyForAccount(account.code, name, { reviveDeleted: true })
+    if (!linked) throw new Error('Could not open this ID')
+    const row = await prisma.registerParty.update({
+      where: { id: linked.id },
+      data: {
+        name,
+        address: address ?? linked.address,
+        notes: notes || linked.notes || `ID ${account.code}`,
+        ownerCode: linked.ownerCode || account.code,
+      },
+      include: moneyEntryInclude(),
+    })
+    return withTrade(partyDto(row, true), true)
+  }
 
   const account = await findExactAccountCode(name)
   if (account) {
@@ -756,6 +776,8 @@ export async function updateParty(
   id: number | bigint,
   input: {
     name?: string
+    code?: string | null
+    ownerCode?: string | null
     address?: string | null
     notes?: string | null
     entries?: Array<{
@@ -770,23 +792,41 @@ export async function updateParty(
   const party = await liveMoneyParty(id)
   const name = input.name != null ? String(input.name).trim() : party.name
   if (!name) throw new Error('Name is required')
+  const code = input.code !== undefined || input.ownerCode !== undefined
+    ? normalizeOwnerCode(input.code ?? input.ownerCode)
+    : party.ownerCode
   const nameKey = normalizeAccountKey(name)
-  if (nameKey) {
+  const codeKey = normalizeAccountKey(code)
+  if (nameKey || codeKey) {
     const others = await prisma.registerParty.findMany({
       where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] }, id: { not: party.id } },
       select: { ownerCode: true },
     })
-    const idTaken = others.some((row) => normalizeAccountKey(row.ownerCode) === nameKey)
+    const idTaken = others.some((row) => {
+      const owner = normalizeAccountKey(row.ownerCode)
+      return Boolean(owner) && (owner === codeKey || owner === nameKey)
+    })
     if (idTaken) throw new Error('Another person already has this ID')
   }
+  const nextNotes = input.notes !== undefined
+    ? (String(input.notes ?? '').trim() || null)
+    : party.notes
   await prisma.registerParty.update({
     where: { id: party.id },
     data: {
       name,
       address: input.address !== undefined ? (String(input.address ?? '').trim() || null) : undefined,
-      notes: input.notes !== undefined ? (String(input.notes ?? '').trim() || null) : undefined,
+      notes: nextNotes || (code ? `ID ${code}` : null),
+      ...(code ? { ownerCode: code } : {}),
     },
   })
+  if (code) {
+    try {
+      await ensureRegisterPartyForAccount(code, name)
+    } catch {
+      /* person ID is already saved on the register card */
+    }
+  }
   for (const line of input.entries || []) {
     if (line.id == null) continue
     const owned = await prisma.registerEntry.findFirst({
