@@ -6,7 +6,6 @@ import { logAudit } from '@/server/services/audit'
 import {
   accountPosition,
   ensureRegisterPartyForAccount,
-  findRegisterPartyByKey,
   getAccountStatement,
   hiddenRegisterAccountLinks,
   loadTradeForKey,
@@ -227,9 +226,11 @@ function attachTrade(dto: PartyDto, trade: LinkedTrade, includeEntries = false):
 }
 
 function tradeKeysForParty(dto: Pick<PartyDto, 'ownerCode' | 'farmerCode' | 'buyerCode' | 'name'>) {
-  return [dto.ownerCode, dto.farmerCode, dto.buyerCode, dto.name].filter(
+  const codes = [dto.ownerCode, dto.farmerCode, dto.buyerCode].filter(
     (key): key is string => Boolean(key && String(key).trim()),
   )
+  if (codes.length) return codes
+  return dto.name && String(dto.name).trim() ? [dto.name] : []
 }
 
 function tradeForParty(index: Map<string, LinkedTrade>, dto: PartyDto) {
@@ -281,7 +282,7 @@ function partyHasAccountCode(dto: PartyDto, code: string, linkedId?: number | nu
   if (linkedId != null && (dto.linkedFarmerId === linkedId || dto.linkedBuyerId === linkedId)) {
     return true
   }
-  return [dto.ownerCode, dto.farmerCode, dto.buyerCode].some((value) => normalizeAccountKey(value) === key)
+  return [dto.ownerCode, dto.farmerCode, dto.buyerCode, dto.name].some((value) => normalizeAccountKey(value) === key)
     || normalizeAccountKey(dto.notes) === key
     || normalizeAccountKey(dto.notes) === normalizeAccountKey(`ID ${code}`)
 }
@@ -332,7 +333,6 @@ async function overlayAccountsOnParties(dtos: PartyDto[]) {
     if (hidden.farmerIds.has(id)) continue
     const row = { id, farmerId: farmer.farmerId, name: farmer.name }
     const hit = next.find((dto) => partyHasAccountCode(dto, farmer.farmerId, id))
-      || next.find((dto) => normalizeAccountKey(dto.name) === normalizeAccountKey(farmer.name))
     if (hit) {
       Object.assign(hit, stampPartyFromFarmer(hit, row))
       continue
@@ -351,7 +351,6 @@ async function overlayAccountsOnParties(dtos: PartyDto[]) {
     if (hidden.buyerIds.has(id)) continue
     const row = { id, buyerId: buyer.buyerId, name: buyer.name }
     const hit = next.find((dto) => partyHasAccountCode(dto, buyer.buyerId, id))
-      || next.find((dto) => normalizeAccountKey(dto.name) === normalizeAccountKey(buyer.name))
     if (hit) {
       Object.assign(hit, stampPartyFromBuyer(hit, row))
       continue
@@ -424,6 +423,14 @@ export async function listParties(kind: string) {
   }
 }
 
+function partyHasNoAccountIdentity(row: {
+  ownerCode?: string | null
+  linkedFarmerId?: bigint | null
+  linkedBuyerId?: bigint | null
+}) {
+  return !row.ownerCode && row.linkedFarmerId == null && row.linkedBuyerId == null
+}
+
 async function findPartyByExactName(name: string, deleted: boolean) {
   const norm = normalizeAccountKey(name)
   if (!norm) return null
@@ -432,7 +439,8 @@ async function findPartyByExactName(name: string, deleted: boolean) {
     include: moneyEntryInclude(),
     orderBy: { updatedAt: 'desc' },
   })
-  return rows.find((row) => normalizeAccountKey(row.name) === norm) ?? null
+  const matches = rows.filter((row) => normalizeAccountKey(row.name) === norm)
+  return matches.length === 1 ? matches[0] : null
 }
 
 async function findExactAccountCode(name: string) {
@@ -500,7 +508,7 @@ export async function createParty(input: {
   }
 
   const live = await findPartyByExactName(name, false)
-  if (live) {
+  if (live && partyHasNoAccountIdentity(live)) {
     const row = await prisma.registerParty.update({
       where: { id: live.id },
       data: {
@@ -513,7 +521,7 @@ export async function createParty(input: {
   }
 
   const tombstone = await findPartyByExactName(name, true)
-  if (tombstone) {
+  if (tombstone && partyHasNoAccountIdentity(tombstone)) {
     const row = await prisma.registerParty.update({
       where: { id: tombstone.id },
       data: {
@@ -605,7 +613,10 @@ export async function createEntry(
 
   if (input.partyId == null) throw new Error('Choose a person')
   const party = await liveMoneyParty(input.partyId)
-  const farmer = await farmerForAccountKey(party.name, input.farmerId)
+  const farmer = await farmerForAccountKey(
+    party.ownerCode || party.name,
+    input.farmerId ?? (party.linkedFarmerId != null ? Number(party.linkedFarmerId) : null),
+  )
   const row = await prisma.registerEntry.create({
     data: {
       kind,
@@ -617,6 +628,31 @@ export async function createEntry(
     include: { party: true, farmer: true },
   })
   return entryDto(row)
+}
+
+async function buyerForAccountKey(key: string, buyerId?: number | null) {
+  if (buyerId != null) {
+    const row = await prisma.buyer.findFirst({
+      where: { id: BigInt(buyerId), deleted: false },
+    })
+    if (row) return row
+  }
+  const raw = String(key ?? '').trim()
+  const norm = normalizeAccountKey(raw)
+  if (!norm) return null
+  const buyers = await prisma.buyer.findMany({
+    where: { deleted: false },
+    select: { id: true, buyerId: true, name: true },
+  })
+  const byCode = buyers.find((row) => normalizeAccountKey(row.buyerId) === norm)
+  if (byCode) {
+    return prisma.buyer.findFirst({ where: { id: byCode.id, deleted: false } })
+  }
+  const byName = buyers.filter((row) => normalizeAccountKey(row.name) === norm)
+  if (byName.length === 1) {
+    return prisma.buyer.findFirst({ where: { id: byName[0].id, deleted: false } })
+  }
+  return null
 }
 
 async function farmerForAccountKey(key: string, farmerId?: number | null) {
@@ -648,17 +684,7 @@ export async function getStatement(key: unknown) {
   const raw = String(key ?? '').trim()
   if (!raw) throw new Error('Enter an ID')
   const farmer = await farmerForAccountKey(raw)
-  const buyer = farmer
-    ? null
-    : await prisma.buyer.findFirst({
-        where: {
-          deleted: false,
-          OR: [
-            { buyerId: { equals: raw, mode: 'insensitive' } },
-            { name: { equals: raw, mode: 'insensitive' } },
-          ],
-        },
-      })
+  const buyer = farmer ? null : await buyerForAccountKey(raw)
   return getAccountStatement(raw, farmer?.name || buyer?.name)
 }
 
@@ -677,19 +703,7 @@ export async function adjustAccount(
   if (!key) throw new Error('Enter the ID')
   const kind = parseKind(input.kind, [...MONEY_ENTRY_KINDS])
   const farmer = await farmerForAccountKey(key, input.farmerId)
-  const buyer = farmer
-    ? null
-    : input.buyerId != null
-      ? await prisma.buyer.findFirst({ where: { id: BigInt(input.buyerId), deleted: false } })
-      : await prisma.buyer.findFirst({
-          where: {
-            deleted: false,
-            OR: [
-              { buyerId: { equals: key, mode: 'insensitive' } },
-              { name: { equals: key, mode: 'insensitive' } },
-            ],
-          },
-        })
+  const buyer = farmer ? null : await buyerForAccountKey(key, input.buyerId)
   const extraName = farmer?.name || buyer?.name
   const party = await ensureRegisterPartyForAccount(key, extraName)
   if (!party) throw new Error('Could not open this ID')
@@ -755,8 +769,15 @@ export async function updateParty(
   const party = await liveMoneyParty(id)
   const name = input.name != null ? String(input.name).trim() : party.name
   if (!name) throw new Error('Name is required')
-  const clash = await findRegisterPartyByKey(name)
-  if (clash && clash.id !== party.id) throw new Error('Another person already has this name')
+  const nameKey = normalizeAccountKey(name)
+  if (nameKey) {
+    const others = await prisma.registerParty.findMany({
+      where: { deleted: false, kind: { in: [...MONEY_PARTY_KINDS] }, id: { not: party.id } },
+      select: { ownerCode: true },
+    })
+    const idTaken = others.some((row) => normalizeAccountKey(row.ownerCode) === nameKey)
+    if (idTaken) throw new Error('Another person already has this ID')
+  }
   await prisma.registerParty.update({
     where: { id: party.id },
     data: {
@@ -824,11 +845,12 @@ async function retireMatchingRegisterParties(input: {
         where: { kind: { in: [...MONEY_PARTY_KINDS] }, OR: or },
       })
     : []
-  const extra = nameKey
-    ? (await prisma.registerParty.findMany({
-        where: { kind: { in: [...MONEY_PARTY_KINDS] } },
-      })).filter((row) => normalizeAccountKey(row.name) === nameKey)
-    : []
+  const extra =
+    nameKey && !input.partyId && !input.farmerId && !input.buyerId && !codeKey
+      ? (await prisma.registerParty.findMany({
+          where: { kind: { in: [...MONEY_PARTY_KINDS] } },
+        })).filter((row) => normalizeAccountKey(row.name) === nameKey && partyHasNoAccountIdentity(row))
+      : []
   const seen = new Set<string>()
   const all = [...rows, ...extra].filter((row) => {
     const key = String(row.id)

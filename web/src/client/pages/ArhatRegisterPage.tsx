@@ -91,11 +91,11 @@ function mergeAccountsIntoParties(
         return true
       }
       return keys.some((value) => normalizeAccountKey(value) === normalizeAccountKey(code))
+        || normalizeAccountKey(party.notes) === normalizeAccountKey(`ID ${code}`)
     })
 
   for (const farmer of farmers) {
     const hit = covers(farmer.farmerId, farmer.id)
-      || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(farmer.name))
     if (!hit) continue
     hit.ownerCode = hit.ownerCode || farmer.farmerId
     hit.farmerCode = hit.farmerCode || farmer.farmerId
@@ -104,7 +104,6 @@ function mergeAccountsIntoParties(
   }
   for (const buyer of buyers) {
     const hit = covers(buyer.buyerId, buyer.id)
-      || next.find((party) => normalizeAccountKey(party.name) === normalizeAccountKey(buyer.name))
     if (!hit) continue
     hit.ownerCode = hit.ownerCode || buyer.buyerId
     hit.buyerCode = hit.buyerCode || buyer.buyerId
