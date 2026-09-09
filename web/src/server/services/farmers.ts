@@ -206,7 +206,9 @@ export async function updateFarmer(id: number | bigint, input: PartyInput) {
 }
 
 export async function deleteFarmer(id: number | bigint) {
-  await getFarmer(id)
+  const farmer = await getFarmer(id)
+  const { hideAccountsForFarmer } = await import('@/server/services/register')
+  await hideAccountsForFarmer(farmer.id, farmer.name, farmer.farmerId)
   await prisma.farmer.update({
     where: { id: BigInt(id) },
     data: { deleted: true },

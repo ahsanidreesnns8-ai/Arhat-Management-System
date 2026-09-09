@@ -59,25 +59,12 @@ function uniqueNameKeys<T extends { name: string }>(rows: T[]) {
   return new Set([...counts.entries()].filter(([, count]) => count === 1).map(([key]) => key))
 }
 
-function uniqueFirstTokenKeys<T extends { name: string }>(rows: T[]) {
-  const counts = new Map<string, number>()
-  for (const row of rows) {
-    const token = firstTokenKey(row.name)
-    if (!token || token.length < 3) continue
-    counts.set(token, (counts.get(token) ?? 0) + 1)
-  }
-  return new Set([...counts.entries()].filter(([, count]) => count === 1).map(([key]) => key))
-}
-
 function matchPerson<T extends { id: bigint; code: string; name: string }>(rows: T[], norm: string) {
   if (!norm) return null
   const byCode = rows.find((row) => normalizeAccountKey(row.code) === norm)
   if (byCode) return byCode
   const byName = rows.filter((row) => normalizeAccountKey(row.name) === norm)
-  if (byName.length === 1) return byName[0]
-  const token = firstTokenKey(norm) || norm
-  const byFirst = rows.filter((row) => firstTokenKey(row.name) === token || firstTokenKey(row.name) === norm)
-  return byFirst.length === 1 ? byFirst[0] : null
+  return byName.length === 1 ? byName[0] : null
 }
 
 function aliasUniqueName(
@@ -85,7 +72,6 @@ function aliasUniqueName(
   rawCode: string,
   rawName: string,
   uniqueNames: Set<string>,
-  uniqueFirstTokens?: Set<string>,
 ) {
   const row = slot(map, rawCode)
   if (!row) return
@@ -93,11 +79,6 @@ function aliasUniqueName(
   if (nameKey && uniqueNames.has(nameKey)) {
     const existing = map.get(nameKey)
     if (!existing || existing === row) map.set(nameKey, row)
-  }
-  const token = firstTokenKey(rawName)
-  if (token && uniqueFirstTokens?.has(token) && token !== nameKey) {
-    const existing = map.get(token)
-    if (!existing || existing === row) map.set(token, row)
   }
 }
 
@@ -149,8 +130,6 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
   const map = new Map<string, LinkedTrade>()
   const uniqueFarmerNames = uniqueNameKeys(farmers)
   const uniqueBuyerNames = uniqueNameKeys(buyers)
-  const uniqueFarmerTokens = uniqueFirstTokenKeys(farmers)
-  const uniqueBuyerTokens = uniqueFirstTokenKeys(buyers)
   const dheriByFarmer = new Map(
     dheriSums.map((row) => [
       String(row.farmerId),
@@ -184,7 +163,7 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
     row.productTotal = dheri?.total ?? 0
     row.productCount = dheri?.count ?? 0
     row.farmerPaid = farmerPaidByFarmer.get(String(farmer.id)) ?? 0
-    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames, uniqueFarmerTokens)
+    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames)
   }
 
   for (const buyer of buyers) {
@@ -197,7 +176,7 @@ async function loadTradeTotalsIndex(): Promise<Map<string, LinkedTrade>> {
     row.soldTotal = sold?.total ?? 0
     row.soldCount = sold?.count ?? 0
     row.buyerPaid = buyerPaidByBuyer.get(String(buyer.id)) ?? 0
-    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames, uniqueBuyerTokens)
+    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames)
   }
 
   return map
@@ -255,8 +234,6 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
   const map = new Map<string, LinkedTrade>()
   const uniqueFarmerNames = uniqueNameKeys(farmers)
   const uniqueBuyerNames = uniqueNameKeys(buyers)
-  const uniqueFarmerTokens = uniqueFirstTokenKeys(farmers)
-  const uniqueBuyerTokens = uniqueFirstTokenKeys(buyers)
 
   for (const farmer of farmers) {
     const row = slot(map, farmer.farmerId)
@@ -295,7 +272,7 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
         })
       }
     }
-    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames, uniqueFarmerTokens)
+    aliasUniqueName(map, farmer.farmerId, farmer.name, uniqueFarmerNames)
   }
 
   for (const buyer of buyers) {
@@ -335,7 +312,7 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
         })
       }
     }
-    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames, uniqueBuyerTokens)
+    aliasUniqueName(map, buyer.buyerId, buyer.name, uniqueBuyerNames)
   }
 
   if (includeLines) {
@@ -346,27 +323,16 @@ export async function loadTradeIndex(includeLines = true): Promise<Map<string, L
   return map
 }
 
-function firstTokenKey(value: string | null | undefined) {
-  const first = String(value ?? '').trim().split(/\s+/)[0] || ''
-  return normalizeAccountKey(first)
-}
-
 function expandAlias(value: string | null | undefined) {
   const raw = String(value ?? '').trim()
-  if (!raw) return [] as string[]
-  const aliases = [raw]
-  const first = raw.split(/\s+/)[0]
-  if (first && first !== raw && first.length >= 3) aliases.push(first)
-  return aliases
+  return raw ? [raw] : []
 }
 
 async function findRegisterPartiesForKeys(keys: Array<string | null | undefined>) {
   const wanted = new Set<string>()
   for (const key of keys) {
-    for (const alias of expandAlias(key)) {
-      const norm = normalizeAccountKey(alias)
-      if (norm) wanted.add(norm)
-    }
+    const norm = normalizeAccountKey(key)
+    if (norm) wanted.add(norm)
   }
   if (!wanted.size) return []
   const parties = await prisma.registerParty.findMany({
@@ -376,24 +342,16 @@ async function findRegisterPartiesForKeys(keys: Array<string | null | undefined>
     },
     orderBy: { createdAt: 'asc' },
   })
-  const firstCounts = new Map<string, number>()
-  for (const row of parties) {
-    const token = firstTokenKey(row.name)
-    if (!token) continue
-    firstCounts.set(token, (firstCounts.get(token) ?? 0) + 1)
-  }
   const matched = new Map<string, (typeof parties)[number]>()
   for (const row of parties) {
     const nameKey = normalizeAccountKey(row.name)
     const codeKey = normalizeAccountKey(row.ownerCode)
     const notesKey = normalizeAccountKey(row.notes)
-    const token = firstTokenKey(row.name)
     const exact =
       wanted.has(nameKey) ||
       (Boolean(codeKey) && wanted.has(codeKey)) ||
-      (Boolean(notesKey) && [...wanted].some((key) => notesKey.includes(key)))
-    const first = token.length >= 3 && wanted.has(token) && firstCounts.get(token) === 1
-    if (exact || first) matched.set(String(row.id), row)
+      [...wanted].some((key) => notesKey === key || notesKey === normalizeAccountKey(`ID ${key}`))
+    if (exact) matched.set(String(row.id), row)
   }
   return [...matched.values()]
 }
@@ -446,9 +404,6 @@ async function resolveAccountKeys(key: string, extraName?: string | null) {
     ? matchPerson(
         farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
         normalizeAccountKey(extraName),
-      ) || matchPerson(
-        farmers.map((row) => ({ id: row.id, code: row.farmerId, name: row.name })),
-        firstTokenKey(extraName),
       )
     : null)
   const buyer = matchPerson(
@@ -458,20 +413,15 @@ async function resolveAccountKeys(key: string, extraName?: string | null) {
     ? matchPerson(
         buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
         normalizeAccountKey(extraName),
-      ) || matchPerson(
-        buyers.map((row) => ({ id: row.id, code: row.buyerId, name: row.name })),
-        firstTokenKey(extraName),
       )
     : null)
   if (farmer) {
     aliases.add(farmer.code)
     aliases.add(farmer.name)
-    for (const alias of expandAlias(farmer.name)) aliases.add(alias)
   }
   if (buyer) {
     aliases.add(buyer.code)
     aliases.add(buyer.name)
-    for (const alias of expandAlias(buyer.name)) aliases.add(alias)
   }
   return { aliases: [...aliases], farmer, buyer, norm }
 }

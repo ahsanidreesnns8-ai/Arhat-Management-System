@@ -44,6 +44,8 @@ async function main() {
     const ids = {
       farmerId: undefined as bigint | undefined,
       hideFarmerId: undefined as bigint | undefined,
+      ranaMustafaId: undefined as bigint | undefined,
+      ranaAllahId: undefined as bigint | undefined,
       partyId: undefined as bigint | undefined,
       entryIds: [] as bigint[],
       linkedPartyId: undefined as bigint | undefined,
@@ -205,11 +207,40 @@ async function main() {
         !stillHidden.some((row) => row.id === hideCard.id || row.linkedFarmerId === hideFarmer.id),
         'loading farmers must not put a deleted register person back',
       )
-      const restored = await createParty({ kind: 'RECEIVING', name: hideFarmer.name })
-      assert(restored.id === hideCard.id, 'adding the same person again should restore them')
-      const restoredList = await listParties('RECEIVING')
-      assert(restoredList.some((row) => row.id === hideCard.id), 'restored person should be visible again')
-      await deleteParty(hideCard.id)
+      const farmersAfterHide = await listFarmers()
+      assert(
+        !farmersAfterHide.some((row) => row.id === hideFarmer.id),
+        'register delete must also remove the farmer from the shop',
+      )
+      const freshPerson = await createParty({ kind: 'RECEIVING', name: hideFarmer.name })
+      assert(freshPerson.id !== hideCard.id, 'adding the same name again must create a new person ID')
+      ids.entryIds = ids.entryIds.filter((id) => id !== BigInt(hideCash.id))
+      await deleteParty(freshPerson.id)
+
+      const ranaMustafa = await createFarmer({
+        name: `Rana Ghulam Mustafa ${stamp}`,
+        code: `RG${stamp.slice(-4)}`,
+      })
+      const ranaAllah = await createFarmer({
+        name: `Rana Allahwasya ${stamp}`,
+        code: `RA${stamp.slice(-4)}`,
+      })
+      ids.ranaMustafaId = BigInt(ranaMustafa.id)
+      ids.ranaAllahId = BigInt(ranaAllah.id)
+      const ranaList = await listParties('RECEIVING')
+      const mustafaCard = ranaList.find((row) => row.linkedFarmerId === ranaMustafa.id)
+      const allahCard = ranaList.find((row) => row.linkedFarmerId === ranaAllah.id)
+      assert(mustafaCard && allahCard, 'each Rana farmer must have their own register person')
+      assert(mustafaCard.id !== allahCard.id, 'Rana names must not share one register person')
+      const mustafaCash = await createEntry({ kind: 'RECEIVING', partyId: mustafaCard.id, amount: 100 })
+      const allahCash = await createEntry({ kind: 'RECEIVING', partyId: allahCard.id, amount: 50 })
+      ids.entryIds.push(BigInt(mustafaCash.id), BigInt(allahCash.id))
+      const mustafaLedger = await getPartyLedger(mustafaCard.id)
+      const allahLedger = await getPartyLedger(allahCard.id)
+      assert(mustafaLedger.cashReceivedTotal === 100, 'Mustafa cash must stay on Mustafa')
+      assert(allahLedger.cashReceivedTotal === 50, 'Allahwasya cash must stay on Allahwasya')
+      assert(mustafaLedger.linkedFarmerId === ranaMustafa.id, 'Mustafa register must link to Mustafa farmer')
+      assert(allahLedger.linkedFarmerId === ranaAllah.id, 'Allahwasya register must link to Allahwasya farmer')
 
       const zakat = await createEntry({ kind: 'ZAKAT', amount: 250 })
       ids.entryIds.push(BigInt(zakat.id))
@@ -364,6 +395,22 @@ async function main() {
       }
       if (ids.linkedPartyId) {
         await prisma.registerParty.deleteMany({ where: { id: ids.linkedPartyId } })
+      }
+      if (ids.ranaMustafaId) {
+        await prisma.registerEntry.deleteMany({
+          where: { party: { linkedFarmerId: ids.ranaMustafaId } },
+        })
+        await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.ranaMustafaId } })
+        await prisma.payment.deleteMany({ where: { farmerId: ids.ranaMustafaId } })
+        await prisma.farmer.deleteMany({ where: { id: ids.ranaMustafaId } })
+      }
+      if (ids.ranaAllahId) {
+        await prisma.registerEntry.deleteMany({
+          where: { party: { linkedFarmerId: ids.ranaAllahId } },
+        })
+        await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.ranaAllahId } })
+        await prisma.payment.deleteMany({ where: { farmerId: ids.ranaAllahId } })
+        await prisma.farmer.deleteMany({ where: { id: ids.ranaAllahId } })
       }
       if (ids.hideFarmerId) {
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.hideFarmerId } })

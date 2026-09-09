@@ -913,6 +913,12 @@ async function dispatch(
         201,
       )
     }
+    if (path[1] === 'remove-from-shop' && method === 'POST') {
+      const names = Array.isArray((payload as { names?: unknown }).names)
+        ? (payload as { names: unknown[] }).names.map((name) => String(name || '').trim()).filter(Boolean)
+        : []
+      return result(await register.removePeopleFromShop(names.length ? names : undefined), 'People removed from the shop')
+    }
     if (path[1] === 'zakat' && method === 'GET') {
       return result(await register.zakatSummary())
     }

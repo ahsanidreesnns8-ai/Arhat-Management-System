@@ -1190,7 +1190,7 @@ export default function ArhatRegisterPage() {
         onClose={() => setDeletePartyId(null)}
         onConfirm={() => void confirmDeleteParty()}
         title="Delete this person?"
-        message="They will leave the Arhat Register and their cash amounts will leave the totals. Farmer or buyer records stay in the shop, but this name will not come back until you add the person again."
+        message="They will leave Arhat Register, farmer/buyer lists, and farmer product. Cash lines for this name are removed. If you add the same person later, they get a new ID of their own."
         confirmLabel="Delete"
         loading={saving}
       />
