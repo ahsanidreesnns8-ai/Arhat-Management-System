@@ -8,7 +8,7 @@ config({ path: '.env' })
 import { writeFileSync } from 'node:fs'
 import { prisma } from '../src/server/db'
 import { farmerBill, buyerBill, buyerBillSelected } from '../src/server/services/bills'
-import { createSale, deleteSale } from '../src/server/services/sales'
+import { createSale } from '../src/server/services/sales'
 import { createFarmer } from '../src/server/services/farmers'
 import { createBuyer } from '../src/server/services/buyers'
 import { settle } from '../src/server/services/arhat'
@@ -27,6 +27,7 @@ async function main() {
     const ids = {
       farmerId: undefined as bigint | undefined,
       buyerId: undefined as bigint | undefined,
+      saleId: undefined as bigint | undefined,
       dheriIds: [] as bigint[],
     }
     let stockQtyBefore: Array<{ id: bigint; quantity: unknown }> = []
@@ -137,22 +138,6 @@ async function main() {
       assert(html.includes('010'), 'farmer bill bags should use 3 digits')
       assert(html.includes('0400'), 'farmer bill rate should use 4 digits')
 
-      const buyerHtml = await buyerBill(buyer.id, 'en')
-      writeFileSync('/opt/cursor/artifacts/buyer_bill_layout.html', buyerHtml)
-      assert(!buyerHtml.includes('buyer note should not appear'), 'buyer notes leaked onto bill')
-      assert(!buyerHtml.includes('<th>Dheri</th>'), 'buyer bill still has Dheri column')
-      assert(!buyerHtml.includes('Dheri date'), 'buyer bill still has Dheri date')
-      assert(buyerHtml.includes('Bags'), 'buyer bill missing Bags column')
-      assert(buyerHtml.includes('>Qt.<') || buyerHtml.includes('Qt.'), 'buyer bill missing Qt. heading')
-      assert(buyerHtml.includes('class="product-over-cell"'), 'buyer bill missing product above first two columns')
-      assert(buyerHtml.includes(product.name), 'buyer bill missing full product name')
-      assert(!buyerHtml.includes('Qty of one bag'), 'buyer bill still has Qty of one bag heading')
-      assert(!buyerHtml.includes('>Product</th>'), 'buyer bill still has a Product table column')
-      assert(buyerHtml.includes('aria-label="RTC"'), 'buyer bill missing RTC logo')
-      assert(!buyerHtml.includes('Buyer Bill / Payment Receipt'), 'buyer bill still has module title')
-      assert(!html.includes('Wheat Khata · Company'), 'farmer bill should not stamp Wheat Khata labels')
-      assert(!buyerHtml.includes('Wheat Khata · Party'), 'buyer bill should not stamp Wheat Khata labels')
-
       const sold = await createSale({
         buyerId: buyer.id,
         items: [
@@ -179,21 +164,39 @@ async function main() {
       })
       const farmerLine = sold.items.find((item) => item.sourceType === 'FARMER')
       assert(farmerLine, 'sale farmer line missing')
+      ids.saleId = BigInt(sold.id)
+
+      const buyerHtml = await buyerBill(buyer.id, 'en')
+      writeFileSync('/opt/cursor/artifacts/buyer_bill_layout.html', buyerHtml)
+      assert(!buyerHtml.includes('buyer note should not appear'), 'buyer notes leaked onto bill')
+      assert(!buyerHtml.includes('<th>Dheri</th>'), 'buyer bill still has Dheri column')
+      assert(!buyerHtml.includes('Dheri date'), 'buyer bill still has Dheri date')
+      assert(buyerHtml.includes('Bags'), 'buyer bill missing Bags column')
+      assert(buyerHtml.includes('>Qt.<') || buyerHtml.includes('Qt.'), 'buyer bill missing Qt. heading')
+      assert(buyerHtml.includes('class="product-over-cell"'), 'buyer bill missing product above first two columns')
+      assert(buyerHtml.includes(product.name), 'buyer bill missing full product name')
+      assert(!buyerHtml.includes('Qty of one bag'), 'buyer bill still has Qty of one bag heading')
+      assert(!buyerHtml.includes('>Product</th>'), 'buyer bill still has a Product table column')
+      assert(buyerHtml.includes('aria-label="RTC"'), 'buyer bill missing RTC logo')
+      assert(!buyerHtml.includes('Buyer Bill / Payment Receipt'), 'buyer bill still has module title')
+      assert(!html.includes('Wheat Khata · Company'), 'farmer bill should not stamp Wheat Khata labels')
+      assert(!buyerHtml.includes('Wheat Khata · Party'), 'buyer bill should not stamp Wheat Khata labels')
+      assert(buyerHtml.includes('Stock bags'), 'full buyer bill must mention Stock bags')
+      assert(buyerHtml.includes('This bill includes stock bags'), 'full buyer bill missing stock bags note')
+
       const stockHtml = await buyerBillSelected(buyer.id, [farmerLine.id], 'en')
       writeFileSync('/opt/cursor/artifacts/buyer_bill_stock_bags.html', stockHtml)
-      assert(stockHtml.includes('Stock bags'), 'buyer bill must mention Stock bags on the stock line')
-      assert(stockHtml.includes('This bill includes stock bags'), 'buyer bill missing collective stock bags note')
-      assert(stockHtml.includes('2 bags'), 'buyer bill should mention 2 stock bags')
-      assert(stockHtml.includes('96 kg') || stockHtml.includes('96'), 'buyer bill should include stock weight 96 kg')
+      assert(stockHtml.includes('Stock bags'), 'selected buyer bill must mention Stock bags on the stock line')
+      assert(stockHtml.includes('This bill includes stock bags'), 'selected buyer bill missing collective stock bags note')
+      assert(stockHtml.includes('2 bags'), 'selected buyer bill should mention 2 stock bags')
+      assert(stockHtml.includes('96'), 'selected buyer bill should include stock weight 96 kg')
       const urduStock = await buyerBillSelected(buyer.id, [farmerLine.id], 'ur')
       assert(urduStock.includes('اسٹاک بوریاں'), 'Urdu buyer bill must mention stock bags')
-      await deleteSale(sold.id)
 
       const dheriRow = await prisma.dheri.findFirst({ where: { id: { in: ids.dheriIds } } })
       assert(dheriRow, 'settled farmer product missing')
       const reusedCode = dheriRow.dheriId
       const comm = dheriRow.commissionAmount.toNumber()
-      const lotsBefore = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
       const bookBefore = await getBook()
       await deleteDheri(dheriRow.id)
       const bookAfter = await getBook()
@@ -206,7 +209,7 @@ async function main() {
         `Arhat Amount commission should drop by ${comm}, before ${bookBefore.totals.commission} after ${bookAfter.totals.commission}`,
       )
       const lotsAfter = await prisma.stockLot.count({ where: { dheriId: dheriRow.id } })
-      assert(lotsAfter === lotsBefore, 'Extra KG stock must stay when a farmer product is deleted')
+      assert(lotsAfter === 0, 'deleted farmer product should remove its Extra KG stock')
       const reused = await createDheri({
         farmerId: farmer.id,
         productId: Number(product.id),
@@ -227,6 +230,14 @@ async function main() {
           where: { id: row.id },
           data: { quantity: row.quantity as never },
         })
+      }
+      if (ids.saleId) {
+        await prisma.saleItem.deleteMany({ where: { saleId: ids.saleId } })
+        await prisma.sale.deleteMany({ where: { id: ids.saleId } })
+      }
+      if (ids.buyerId) {
+        await prisma.saleItem.deleteMany({ where: { sale: { buyerId: ids.buyerId } } })
+        await prisma.sale.deleteMany({ where: { buyerId: ids.buyerId } })
       }
       if (ids.dheriIds.length) {
         await prisma.stockLot.deleteMany({ where: { dheriId: { in: ids.dheriIds } } })
