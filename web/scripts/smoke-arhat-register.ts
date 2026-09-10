@@ -61,6 +61,8 @@ async function main() {
       twinDheriAId: undefined as bigint | undefined,
       twinDheriBId: undefined as bigint | undefined,
       soloFarmerId: undefined as bigint | undefined,
+      attachFarmerId: undefined as bigint | undefined,
+      idOnlyFarmerId: undefined as bigint | undefined,
     }
     try {
       const person = await createParty({
@@ -79,6 +81,35 @@ async function main() {
       ids.entryIds.push(BigInt(given.id))
       assert(given.amount === 1500, 'giving amount not stored')
       assert(given.day && given.date && given.time, 'giving entry missing day/date/time')
+      assert(!person.ownerCode, 'name-only Add Person must not invent an ID')
+
+      const reused = await createParty({
+        kind: 'RECEIVING',
+        name: `Register Person ${stamp}`,
+        address: 'Lahore',
+      })
+      assert(reused.id === person.id, 'same person name must reuse the existing account')
+
+      const attachName = `NameOnly ${stamp}`
+      const namedOnly = await createParty({ kind: 'RECEIVING', name: attachName })
+      assert(!namedOnly.ownerCode, 'named-only person should wait for a farmer ID')
+      const attachFarmer = await createFarmer({ name: attachName, code: `NA${stamp.slice(-4)}` })
+      ids.attachFarmerId = BigInt(attachFarmer.id)
+      const attached = await getPartyLedger(namedOnly.id)
+      assert(attached.linkedFarmerId === attachFarmer.id, 'farmer ID must attach to the named register person')
+      assert(
+        normalizeAccountKey(attached.ownerCode) === normalizeAccountKey(attachFarmer.farmerId),
+        'farmer ID must fill the named register person',
+      )
+
+      const idOnlyCode = `IO${stamp.slice(-4)}`
+      const idOnly = await createParty({ kind: 'RECEIVING', code: idOnlyCode })
+      assert(normalizeAccountKey(idOnly.ownerCode) === normalizeAccountKey(idOnlyCode), 'ID-only person must keep the typed ID')
+      const idFarmer = await createFarmer({ name: `IdFilled ${stamp}`, code: idOnlyCode })
+      ids.idOnlyFarmerId = BigInt(idFarmer.id)
+      const idAttached = await getPartyLedger(idOnly.id)
+      assert(idAttached.linkedFarmerId === idFarmer.id, 'farmer must attach to the ID-only register person')
+      assert(idAttached.name === `IdFilled ${stamp}`, 'farmer name must fill the ID-only register person')
 
       const receivedAgain = await createEntry({
         kind: 'RECEIVING',
@@ -94,13 +125,6 @@ async function main() {
         notes: 'second receive',
       })
       ids.entryIds.push(BigInt(receivedMore.id))
-
-      const reused = await createParty({
-        kind: 'RECEIVING',
-        name: `Register Person ${stamp}`,
-        address: 'Lahore',
-      })
-      assert(reused.id === person.id, 'same person name must reuse the existing account')
 
       const addPersonName = `Add Person ${stamp}`
       const addCodeA = `RA${stamp.slice(-6)}`
@@ -613,7 +637,7 @@ async function main() {
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: ids.searchFarmerId } })
         await prisma.farmer.deleteMany({ where: { id: ids.searchFarmerId } })
       }
-      for (const farmerId of [ids.twinAId, ids.twinBId, ids.soloFarmerId]) {
+      for (const farmerId of [ids.twinAId, ids.twinBId, ids.soloFarmerId, ids.attachFarmerId, ids.idOnlyFarmerId]) {
         if (!farmerId) continue
         await prisma.registerEntry.deleteMany({ where: { party: { linkedFarmerId: farmerId } } })
         await prisma.registerParty.deleteMany({ where: { linkedFarmerId: farmerId } })

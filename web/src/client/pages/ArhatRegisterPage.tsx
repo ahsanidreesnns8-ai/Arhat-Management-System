@@ -406,33 +406,32 @@ export default function ArhatRegisterPage() {
   }
 
   const savePerson = async () => {
-    if (!person.code.trim()) {
-      toast.error('ID is required — enter the ID you assign')
-      return
-    }
-    if (!person.name.trim()) {
-      toast.error('Name is required')
+    if (!person.name.trim() && !person.code.trim()) {
+      toast.error('Enter a name or an ID')
       return
     }
     setSaving(true)
     try {
       const savedCode = person.code.trim()
       const savedName = person.name.trim()
-      await registerApi.addParty({
+      const res = await registerApi.addParty({
         kind: 'RECEIVING',
-        code: savedCode,
-        name: savedName,
+        ...(savedCode ? { code: savedCode } : {}),
+        ...(savedName ? { name: savedName } : {}),
         address: person.address.trim() || undefined,
         notes: person.notes.trim() || undefined,
       })
+      const assigned = res.data.data?.ownerCode || res.data.data?.farmerCode || savedCode
       toast.success(
         existingIdPerson
-          ? `Opened existing ID ${savedCode}`
-          : 'Person saved',
+          ? `Opened existing ID ${assigned || savedCode}`
+          : assigned
+            ? `Person saved · ID ${assigned}`
+            : 'Person saved',
       )
       setPerson({ code: '', name: '', address: '', notes: '' })
       setPersonOpen(false)
-      setSearch(savedCode)
+      setSearch(savedCode || savedName)
       void load()
     } catch (err: unknown) {
       toast.error(apiError(err, 'Could not add person'))
@@ -471,12 +470,8 @@ export default function ArhatRegisterPage() {
   }
 
   const saveEdit = async () => {
-    if (!editForm.code.trim()) {
-      toast.error('ID is required — enter the ID you assign')
-      return
-    }
-    if (!editForm.name.trim()) {
-      toast.error('Name is required')
+    if (!editForm.code.trim() && !editForm.name.trim()) {
+      toast.error('Enter a name or an ID')
       return
     }
     const liveLines = editForm.lines.filter((line) => !line.delete)
@@ -748,7 +743,7 @@ export default function ArhatRegisterPage() {
           </Button>
           </div>
           <p className="text-[12px] text-slate-500">
-            Each ID is its own account — received, given, product, payments, and balance never mix with another person of the same name.
+            Add a person with a name, an ID, or both. Later Add Farmer with the matching name or ID fills in the rest on this card.
           </p>
         </div>
       )}
@@ -1033,20 +1028,20 @@ export default function ArhatRegisterPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="ID *"
+              label="ID (optional)"
               autoFocus
               value={person.code}
               onChange={(e) => setPerson({ ...person, code: e.target.value })}
               placeholder="e.g. R74.A"
             />
             <Input
-              label="Name *"
+              label="Name (optional)"
               value={person.name}
               onChange={(e) => setPerson({ ...person, name: e.target.value })}
             />
           </div>
           <p className="text-[12px] text-slate-500">
-            Same name with a different ID is a different person. Use the Farmer/Buyer ID when this person already has one.
+            Enter a name, an ID, or both. When you Add Farmer with the matching name or ID, this card updates automatically.
           </p>
           {existingIdPerson ? (
             <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
@@ -1055,18 +1050,18 @@ export default function ArhatRegisterPage() {
           ) : null}
           {!existingIdPerson && sameNamePeople.length ? (
             <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
-              {sameNamePeople[0].name} already exists
+              {sameNamePeople[0].name} is already on the register
               {sameNamePeople
                 .map((row) => partyAccountCode(row))
                 .filter(Boolean)
                 .length
-                ? ` with ${sameNamePeople
+                ? ` (${sameNamePeople
                     .map((row) => partyAccountCode(row))
                     .filter(Boolean)
                     .map((code) => `ID ${code}`)
-                    .join(', ')}`
+                    .join(', ')})`
                 : ''}
-              . Keep this ID different so they stay separate.
+              . Use a different ID if this is another person.
             </p>
           ) : null}
           <Input label="Address (optional)" value={person.address} onChange={(e) => setPerson({ ...person, address: e.target.value })} />
@@ -1142,19 +1137,19 @@ export default function ArhatRegisterPage() {
           ) : null}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="ID *"
+              label="ID (optional)"
               value={editForm.code}
               onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
               placeholder="e.g. R74.A"
             />
             <Input
-              label="Name *"
+              label="Name (optional)"
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
             />
           </div>
           <p className="text-[12px] text-slate-500">
-            Changing the ID keeps this person separate from anyone else with the same name.
+            Name and ID can stay empty. Adding this person as a farmer with the matching name or ID fills in the rest.
           </p>
           <Input
             label="Address (optional)"

@@ -34,7 +34,7 @@ export default function PartyFields({
           label={`${idLabel} *`}
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          placeholder="ID you assign — same as Arhat Register if they already have one"
+          placeholder={`${idLabel} you assign. If they are already on Arhat Register, it attaches to that name.`}
         />
         <Input
           label="Name *"

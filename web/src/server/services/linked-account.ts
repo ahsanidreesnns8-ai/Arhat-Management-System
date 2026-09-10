@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { normalizeAccountKey } from '@/server/ids'
+import { isAutoRegisterCode, normalizeAccountKey } from '@/server/ids'
 
 export type TradeKind = 'PRODUCT' | 'SOLD' | 'FARMER_PAID' | 'BUYER_PAID'
 
@@ -391,14 +391,24 @@ function accountIdCodes(resolved: ResolvedAccount) {
   return codes
 }
 
+function canReceiveAssignedAccountId(row: {
+  ownerCode?: string | null
+  linkedFarmerId?: bigint | null
+  linkedBuyerId?: bigint | null
+}) {
+  if (row.linkedFarmerId != null || row.linkedBuyerId != null) return false
+  if (!row.ownerCode) return true
+  return isAutoRegisterCode(row.ownerCode)
+}
+
 function partyMatchesResolvedAccount(row: LiveMoneyParty, resolved: ResolvedAccount) {
   if (resolved.farmer && row.linkedFarmerId === resolved.farmer.id) return true
   if (resolved.buyer && row.linkedBuyerId === resolved.buyer.id) return true
   const codes = accountIdCodes(resolved)
   if (!codes.size) return false
   const owner = normalizeAccountKey(row.ownerCode)
-  if (owner) return codes.has(owner)
-  if (!partyHasNoAccountIdentity(row)) return false
+  if (owner && codes.has(owner)) return true
+  if (!canReceiveAssignedAccountId(row)) return false
   const nameAsId = normalizeAccountKey(row.name)
   if (nameAsId && codes.has(nameAsId)) return true
   return [...codes].some((code) => notesHoldAccountCode(row.notes, code))
@@ -423,7 +433,7 @@ async function findRegisterPartiesForAccount(resolved: ResolvedAccount) {
   if (resolved.farmer && !resolved.farmerNameUnique) return []
   if (resolved.buyer && !resolved.buyerNameUnique) return []
   const unlinked = parties.filter(
-    (row) => normalizeAccountKey(row.name) === label && partyHasNoAccountIdentity(row),
+    (row) => normalizeAccountKey(row.name) === label && canReceiveAssignedAccountId(row),
   )
   return unlinked.length === 1 ? unlinked : []
 }
@@ -679,15 +689,15 @@ export async function ensureRegisterPartyForAccount(
   if (parties.length) {
     const merged = await mergeRegisterParties(parties)
     if (merged) {
-      const current = normalizeAccountKey(merged.name)
-      const wantsRename =
-        Boolean(label) &&
-        current === normalizeAccountKey(name) &&
-        normalizeAccountKey(label) !== current
-      const row = wantsRename
+      const shouldRename =
+        Boolean(label) && normalizeAccountKey(label) !== normalizeAccountKey(merged.name)
+      const row = shouldRename || !merged.notes
         ? await prisma.registerParty.update({
             where: { id: merged.id },
-            data: { name: label, notes: merged.notes || notes },
+            data: {
+              ...(shouldRename ? { name: label } : {}),
+              notes: merged.notes || notes,
+            },
             include: moneyEntriesInclude,
           })
         : merged

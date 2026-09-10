@@ -11,6 +11,10 @@ export function nextCode(codes: string[], prefix: string, separator = '') {
   return `${prefix}${separator}${String(maximum + 1).padStart(5, '0')}`
 }
 
+export function isAutoRegisterCode(value: string | null | undefined) {
+  return /^RG\d+$/i.test(String(value ?? '').trim())
+}
+
 export async function nextFarmerCode() {
   const rows = await prisma.farmer.findMany({ select: { farmerId: true } })
   return nextCode(rows.map((row) => row.farmerId), 'FRM')
