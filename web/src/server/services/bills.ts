@@ -634,12 +634,19 @@ function partyDetailsCard(opts: {
  * whole man and leftover kg. Extra KG stock is not printed. Weights are exact;
  * only amounts are rounded.
  */
-export async function farmerBill(id: number | bigint, lang = 'en') {
+export async function farmerBill(
+  id: number | bigint,
+  lang = 'en',
+  dheriId?: number | bigint | null,
+) {
   const farmer = await prisma.farmer.findFirst({
     where: { id: BigInt(id), deleted: false },
     include: {
       dheris: {
-        where: { deleted: false },
+        where: {
+          deleted: false,
+          ...(dheriId != null ? { id: BigInt(dheriId) } : {}),
+        },
         include: { product: true },
         orderBy: { createdAt: 'asc' },
       },
@@ -649,6 +656,7 @@ export async function farmerBill(id: number | bigint, lang = 'en') {
     },
   })
   if (!farmer) throw new Error('Farmer not found')
+  if (dheriId != null && !farmer.dheris.length) throw new Error('Dheri not found for this farmer')
 
   const urdu = lang === 'ur'
   const w = bagWord(urdu)

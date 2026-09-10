@@ -10,6 +10,7 @@ type BagsExtraRowProps = {
   onBagKg?: (value: string) => void
   showBagKg?: boolean
   extraKgLabel?: string
+  bagsRequired?: boolean
 }
 
 /** Bags and Extra KG sit on the same row — Extra KG immediately beside bags. */
@@ -22,12 +23,13 @@ export default function BagsExtraRow({
   onBagKg,
   showBagKg = true,
   extraKgLabel,
+  bagsRequired = true,
 }: BagsExtraRowProps) {
   const { t } = useLanguage()
   return (
     <div className={`grid grid-cols-1 ${showBagKg ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
       <Input
-        label={`${t('noOfBags')} *`}
+        label={bagsRequired ? `${t('noOfBags')} *` : t('noOfBags')}
         type="number"
         min="0"
         value={bags}

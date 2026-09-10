@@ -265,8 +265,8 @@ export const farmerApi = {
   getPayments: (id: number) => api.get<ApiResponse<Payment[]>>(`/farmers/${id}/payments`),
   getDheris: (id: number) => api.get<ApiResponse<Dheri[]>>(`/farmers/${id}/dheris`),
   getTrucks: (id: number) => api.get<ApiResponse<Truck[]>>(`/farmers/${id}/trucks`),
-  getBillHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
-    billRequest(`/bills/farmer/${id}`, lang),
+  getBillHtml: (id: number, lang: 'en' | 'ur' = 'en', dheriId?: number) =>
+    billRequest(`/bills/farmer/${id}`, lang, dheriId ? { dheriId: String(dheriId) } : undefined),
   getBalanceHtml: (id: number, lang: 'en' | 'ur' = 'en') =>
     billRequest(`/bills/farmer/${id}/balance`, lang),
 }
@@ -650,6 +650,18 @@ export const dailyTradeApi = {
     }>>('/daily-trade/batch-sell', data),
   nextDheri: () =>
     api.get<ApiResponse<{ queueNumber: number; dheriCode: string }>>('/daily-trade/next-dheri'),
+  addToStock: (data: Record<string, unknown>) =>
+    api.post<ApiResponse<{
+      dheriId: number
+      dheriCode: string
+      farmerId: number
+      extraKg: number
+      farmerGross: number
+      commission: number
+      farmerNet: number
+      board: any
+      message: string
+    }>>('/daily-trade/add-to-stock', data),
   buyerSold: (buyerId: number) =>
     api.get<ApiResponse<{
       buyerId: number
