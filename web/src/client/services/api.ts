@@ -593,6 +593,9 @@ export const stockApi = {
   topUpLot: (data: Record<string, unknown>) =>
     api.post<ApiResponse<StockLot>>('/stock/lots/top-up', data),
   adjust: (data: Record<string, unknown>) => api.post<ApiResponse<StockItem>>('/stock/adjust', data),
+  deleteItem: (id: number) => api.delete<ApiResponse<{ id: number }>>(`/stock/${id}`),
+  deleteLot: (id: number) => api.delete<ApiResponse<{ id: number }>>(`/stock/lots/${id}`),
+  deleteHistory: (id: number) => api.delete<ApiResponse<{ id: number }>>(`/stock/history/${id}`),
 }
 
 export const dailyTradeApi = {
