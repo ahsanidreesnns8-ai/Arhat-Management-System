@@ -501,6 +501,13 @@ async function dispatch(
     if (path[1] === 'next-dheri' && method === 'GET') {
       return result(await dailyTrade.nextDeskDheriNumber())
     }
+    if (path[1] === 'add-to-stock' && method === 'POST') {
+      const data = await dailyTrade.addFarmerKgToStock(
+        payload as Parameters<typeof dailyTrade.addFarmerKgToStock>[0],
+        user?.id,
+      )
+      return result(data, data.message)
+    }
     if (path[1] === 'buyer-sold' && method === 'GET') {
       const buyerId = Number(url.searchParams.get('buyerId'))
       return result(
@@ -1027,7 +1034,15 @@ async function dispatch(
       return html(await bills.accountBalanceBillByFarmer(numericId(path[2]), lang))
     }
     if (path[1] === 'farmer' && path.length === 3) {
-      return html(await bills.farmerBill(numericId(path[2]), lang))
+      const dheriParam = url.searchParams.get('dheriId')
+      const dheriId = dheriParam ? Number(dheriParam) : null
+      return html(
+        await bills.farmerBill(
+          numericId(path[2]),
+          lang,
+          dheriId && Number.isSafeInteger(dheriId) && dheriId > 0 ? dheriId : null,
+        ),
+      )
     }
     if (path[1] === 'buyer' && path[3] === 'balance' && path.length === 4) {
       return html(await bills.accountBalanceBillByBuyer(numericId(path[2]), lang))

@@ -104,6 +104,7 @@ export default function DailyTradePage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selling, setSelling] = useState(false)
+  const [addingStock, setAddingStock] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [buyerSales, setBuyerSales] = useState<BoardSale[]>([])
   const [pickedItemIds, setPickedItemIds] = useState<number[]>([])
@@ -373,6 +374,48 @@ export default function DailyTradePage() {
       toast.error(msg || (editingSaleId ? 'Could not save edits' : 'Could not mark sold'))
     } finally {
       setSelling(false)
+    }
+  }
+
+  const handleAddToStock = async () => {
+    if (!farmerId) return toast.error('Choose a farmer')
+    if (!productId) return toast.error('Choose dheri type')
+    if (fExtra <= 0) return toast.error('Enter KG to add to stock')
+    if (fRate <= 0) return toast.error('Enter farmer rate / 40kg')
+    setAddingStock(true)
+    try {
+      const res = await dailyTradeApi.addToStock({
+        farmerId: Number(farmerId),
+        productId: Number(productId),
+        dheriCode: dheriNo.trim() || undefined,
+        extraKg: fExtra,
+        farmerRatePer40: fRate,
+        weightPerBag: fBagKg,
+        farmerBags: fBags,
+      })
+      toast.success(res.data.data.message || 'Added to stock')
+      setBoard(res.data.data.board as Board)
+      const dheriId = Number(res.data.data.dheriId)
+      try {
+        const bill = await farmerApi.getBillHtml(Number(farmerId), isUrdu ? 'ur' : 'en', dheriId)
+        openHtmlBill(typeof bill.data === 'string' ? bill.data : String(bill.data), 'Farmer stock bill')
+      } catch (err) {
+        toast.error(billErrorMessage(err, 'KG added to stock, but the farmer bill could not open'))
+      }
+      setExtraKg('0')
+      setFarmerBags('')
+      setFarmerRate('')
+      try {
+        const next = await dailyTradeApi.nextDheri()
+        setDheriNo(String(next.data.data.dheriCode || ''))
+      } catch {
+        setDheriNo('')
+      }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Could not add KG to stock')
+    } finally {
+      setAddingStock(false)
     }
   }
 
@@ -717,6 +760,8 @@ export default function DailyTradePage() {
               onBags={setFarmerBags}
               onExtraKg={setExtraKg}
               onBagKg={setBagKg}
+              bagsRequired={false}
+              extraKgLabel={`${t('extraKg')} → stock`}
             />
             <Select
               label="Dheri type *"
@@ -737,6 +782,9 @@ export default function DailyTradePage() {
             <Input label="Total price (includes Extra KG)" value={farmerGross ? formatCurrency(farmerGross) : '—'} readOnly />
             <Input label={`Commission (${COMMISSION_PCT}%)`} value={farmerCommission ? formatCurrency(farmerCommission) : '—'} readOnly />
             <Input label="Amount after commission" value={farmerNet ? formatCurrency(farmerNet) : '—'} readOnly />
+            <p className="text-xs text-slate-500">
+              Bags are optional. Enter KG and rate / 40kg, then Add to stock — it records the farmer bill and puts that KG in stock.
+            </p>
             <Link to="/farmers" className="text-sm text-primary underline">Add farmer</Link>
           </div>
         </div>
@@ -850,6 +898,14 @@ export default function DailyTradePage() {
           </Button>
         ) : null}
         <PrintBillButton onPrint={(lang) => void generateTodayBoardBill(lang)} />
+        <Button
+          variant="secondary"
+          onClick={() => void handleAddToStock()}
+          loading={addingStock}
+          disabled={selling}
+        >
+          <Warehouse className="h-4 w-4" /> Add to stock
+        </Button>
         <Button variant="secondary" onClick={() => void resetDesk()}>
           <CheckCircle2 className="h-4 w-4" /> OK — next dheri
         </Button>

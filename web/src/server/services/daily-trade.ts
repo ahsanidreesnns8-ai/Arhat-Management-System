@@ -620,6 +620,69 @@ export async function nextDeskDheriNumber() {
   return { queueNumber, dheriCode: String(queueNumber) }
 }
 
+export type AddFarmerKgToStockInput = {
+  farmerId: number
+  productId: number
+  dheriCode?: string | null
+  extraKg: number | string
+  farmerRatePer40: number | string
+  weightPerBag?: number | string
+  farmerBags?: number
+  notes?: string | null
+}
+
+/**
+ * Receive Extra KG from a farmer with bags optional. KG goes to stock at the
+ * farmer rate / 40kg and a farmer payable (bill) is recorded for that weight.
+ */
+export async function addFarmerKgToStock(input: AddFarmerKgToStockInput, userId?: bigint) {
+  if (input.farmerId == null) throw new Error('Choose a farmer')
+  if (input.productId == null) throw new Error('Choose dheri type')
+  const extraKg = Number(input.extraKg) || 0
+  if (extraKg <= 0) throw new Error('Enter KG to add to stock')
+  const farmerRate = Number(input.farmerRatePer40) || 0
+  if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
+  const farmerBags = Math.max(0, Number(input.farmerBags) || 0)
+  const bagKg = Number(input.weightPerBag) || 40
+  const dheriCode = String(input.dheriCode || '').trim()
+  const { settle } = await import('@/server/services/arhat')
+  const { getOrCreateReceivingBatch } = await import('@/server/services/day-batches')
+  const batch = await getOrCreateReceivingBatch()
+  const row = await settle(
+    {
+      settlementType: 'FARMER_PAYABLE',
+      farmerId: input.farmerId,
+      productId: input.productId,
+      dheriCode: dheriCode || undefined,
+      numberOfBags: farmerBags,
+      weightPerBag: bagKg,
+      partialBagWeight: extraKg,
+      marketRate: farmerRate,
+      paymentNow: 0,
+      dayBatchId: batch.id,
+      notes: input.notes ?? `Daily Trade Extra KG to stock @ PKR ${farmerRate}/40kg`,
+    },
+    userId,
+  )
+  if (row.dheriId == null) throw new Error('Could not add KG to stock')
+  if (!('dheriCode' in row) || !('stockLot' in row) || !('farmerPayable' in row)) {
+    throw new Error('Could not record farmer payable')
+  }
+  const board = await getDailyBoard()
+  return {
+    dheriId: Number(row.dheriId),
+    dheriCode: String(row.dheriCode || dheriCode),
+    farmerId: input.farmerId,
+    extraKg,
+    farmerGross: Number(row.totalAmount ?? 0),
+    commission: Number(row.commission ?? 0),
+    farmerNet: Number(row.farmerPayable ?? 0),
+    stockLot: row.stockLot,
+    board,
+    message: `${extraKg} kg added to stock. Farmer bill is ready.`,
+  }
+}
+
 export async function listBuyerSoldToday(buyerId: number, sessionDate?: string | null) {
   if (!buyerId) throw new Error('Buyer is required')
   const board = await getDailyBoard(sessionDate)
