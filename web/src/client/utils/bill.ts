@@ -53,22 +53,28 @@ export function openHtmlBill(html: string, title = 'Bill') {
   toast.success('Popup blocked — bill downloaded as HTML file')
 }
 
-export function billErrorMessage(err: unknown, fallback: string) {
-  if (err instanceof Error && err.message) return err.message
-  const axiosErr = err as { response?: { data?: unknown; status?: number }; message?: string }
-  const data = axiosErr?.response?.data
+export function messageFromApiBody(data: unknown): string | undefined {
   if (typeof data === 'string' && data.trim()) {
     try {
-      const parsed = JSON.parse(data) as { message?: string }
-      if (parsed?.message) return parsed.message
+      const parsed = JSON.parse(data) as { message?: unknown }
+      if (typeof parsed?.message === 'string' && parsed.message.trim()) return parsed.message
     } catch {
-      if (!data.includes('<html') && data.length < 200) return data
+      if (!data.includes('<html') && data.length < 240) return data
     }
+    return undefined
   }
   if (data && typeof data === 'object' && 'message' in data) {
-    const msg = (data as { message?: string }).message
-    if (msg) return msg
+    const msg = (data as { message?: unknown }).message
+    if (typeof msg === 'string' && msg.trim()) return msg
   }
-  if (axiosErr?.message && !axiosErr.message.startsWith('Request failed')) return axiosErr.message
+  return undefined
+}
+
+export function billErrorMessage(err: unknown, fallback: string) {
+  const axiosErr = err as { response?: { data?: unknown; status?: number }; message?: string }
+  const fromBody = messageFromApiBody(axiosErr?.response?.data)
+  if (fromBody) return fromBody
+  const msg = (err instanceof Error && err.message) || axiosErr?.message || ''
+  if (msg && !msg.startsWith('Request failed') && msg !== 'Network Error') return msg
   return fallback
 }

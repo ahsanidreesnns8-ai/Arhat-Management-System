@@ -1001,9 +1001,12 @@ export async function accountBalanceBillByBuyer(id: number | bigint, lang = 'en'
 
 export async function accountBalanceBillByParty(id: number | bigint, lang = 'en') {
   const ledger = await getPartyLedger(id)
-  const key = ledger.ownerCode || ledger.farmerCode || ledger.buyerCode
-  if (!key) throw new Error('This person has no ID')
-  return accountBalanceBillByKey(key, lang, ledger.name)
+  const key = String(ledger.ownerCode || ledger.farmerCode || ledger.buyerCode || '').trim()
+  if (key) return accountBalanceBillByKey(key, lang, ledger.name)
+  if (ledger.linkedFarmerId) return accountBalanceBillByFarmer(ledger.linkedFarmerId, lang)
+  if (ledger.linkedBuyerId) return accountBalanceBillByBuyer(ledger.linkedBuyerId, lang)
+  // Register-only people (no farmer/buyer ID) still get a printable slip.
+  return registerPartyBill(id, lang)
 }
 
 function renderAccountBalanceBill(

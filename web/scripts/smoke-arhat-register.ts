@@ -203,6 +203,10 @@ async function main() {
 
       const statement = await registerPartyBill(person.id, 'en')
       assert(statement.includes('Register Person'), 'statement missing person name')
+      const noIdBalance = await accountBalanceBillByParty(person.id, 'en')
+      assert(noIdBalance.includes('<html'), 'balance print must return HTML even without an account ID')
+      assert(noIdBalance.includes('Register Person'), 'balance print missing person name when ID is absent')
+      assert(!noIdBalance.includes('This person has no ID'), 'balance print must not fail for register-only people')
       assert(!statement.includes('first receive'), 'statement should not mix receive lines when given is larger')
       assert(!statement.includes('second receive'), 'statement should not mix receive lines when given is larger')
       assert(statement.includes('shop help'), 'statement missing given note')

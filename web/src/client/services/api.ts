@@ -118,9 +118,18 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // Prefer server message for toast consumers
-    const serverMsg = error?.response?.data?.message
-    if (serverMsg && typeof serverMsg === 'string') {
+    // Prefer server message for toast consumers (bill 400s often arrive as JSON text)
+    const data = error?.response?.data
+    let serverMsg = typeof data?.message === 'string' ? data.message : ''
+    if (!serverMsg && typeof data === 'string' && data.trim()) {
+      try {
+        const parsed = JSON.parse(data) as { message?: unknown }
+        if (typeof parsed?.message === 'string') serverMsg = parsed.message
+      } catch {
+        if (!data.includes('<') && data.length < 240) serverMsg = data
+      }
+    }
+    if (serverMsg) {
       error.message = serverMsg
     }
 
