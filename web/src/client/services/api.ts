@@ -334,7 +334,7 @@ export const registerApi = {
     api.get<ApiResponse<RegisterParty[]>>('/register/parties', { params: { kind } }),
   getParty: (id: number) =>
     api.get<ApiResponse<RegisterParty>>(`/register/parties/${id}`),
-  addParty: (data: { kind: string; name: string; code?: string; address?: string; notes?: string }) =>
+  addParty: (data: { kind: string; name?: string; code?: string; address?: string; notes?: string }) =>
     api.post<ApiResponse<RegisterParty>>('/register/parties', data),
   updateParty: (id: number, data: {
     name?: string

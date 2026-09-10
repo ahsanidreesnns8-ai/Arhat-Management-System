@@ -516,21 +516,22 @@ export async function createParty(input: {
   notes?: string | null
 }) {
   if (input.kind) parseKind(input.kind, ['GIVING', 'RECEIVING'])
-  const name = String(input.name ?? '').trim()
-  if (!name) throw new Error('Name is required')
+  const rawName = String(input.name ?? '').trim()
+  const code = normalizeOwnerCode(input.code ?? input.ownerCode)
   const address = String(input.address ?? '').trim() || null
   const notes = String(input.notes ?? '').trim() || null
-  const code = normalizeOwnerCode(input.code ?? input.ownerCode)
+  if (!rawName && !code) throw new Error('Enter a name or an ID')
 
   if (code) {
     const existing = await findPartyByOwnerCode(code)
-    const account = (await findExactAccountCode(code)) || { code, name }
-    const linked = existing || await ensureRegisterPartyForAccount(account.code, name, { reviveDeleted: true })
+    const account = (await findExactAccountCode(code)) || { code, name: rawName || code }
+    const label = rawName || account.name || code
+    const linked = existing || await ensureRegisterPartyForAccount(account.code, label, { reviveDeleted: true })
     if (!linked) throw new Error('Could not open this ID')
     const row = await prisma.registerParty.update({
       where: { id: linked.id },
       data: {
-        name,
+        name: rawName || linked.name || code,
         address: address ?? linked.address,
         notes: notes || linked.notes || `ID ${account.code}`,
         ownerCode: linked.ownerCode || account.code,
@@ -540,23 +541,7 @@ export async function createParty(input: {
     return withTrade(partyDto(row, true), true)
   }
 
-  const account = await findExactAccountCode(name)
-  if (account) {
-    const linked = await ensureRegisterPartyForAccount(account.code, account.name, { reviveDeleted: true })
-    if (linked) {
-      const row = await prisma.registerParty.update({
-        where: { id: linked.id },
-        data: {
-          address: address ?? linked.address,
-          notes: notes ?? linked.notes,
-        },
-        include: moneyEntryInclude(),
-      })
-      return withTrade(partyDto(row, true), true)
-    }
-  }
-
-  const live = await findPartyByExactName(name, false)
+  const live = await findPartyByExactName(rawName, false)
   if (live && partyHasNoAccountIdentity(live)) {
     const row = await prisma.registerParty.update({
       where: { id: live.id },
@@ -569,15 +554,16 @@ export async function createParty(input: {
     return withTrade(partyDto(row, true), true)
   }
 
-  const tombstone = await findPartyByExactName(name, true)
+  const tombstone = await findPartyByExactName(rawName, true)
   if (tombstone && partyHasNoAccountIdentity(tombstone)) {
     const row = await prisma.registerParty.update({
       where: { id: tombstone.id },
       data: {
         deleted: false,
-        name,
+        name: rawName,
         address: address ?? tombstone.address,
         notes: notes ?? tombstone.notes,
+        ownerCode: null,
       },
       include: moneyEntryInclude(),
     })
@@ -587,9 +573,10 @@ export async function createParty(input: {
   const row = await prisma.registerParty.create({
     data: {
       kind: 'PERSON',
-      name,
+      name: rawName,
       address,
       notes,
+      ownerCode: null,
     },
   })
   return withTrade(partyDto({ ...row, entries: [] }), true)
@@ -822,10 +809,11 @@ export async function updateParty(
 ) {
   const party = await liveMoneyParty(id)
   const name = input.name != null ? String(input.name).trim() : party.name
-  if (!name) throw new Error('Name is required')
   const code = input.code !== undefined || input.ownerCode !== undefined
     ? normalizeOwnerCode(input.code ?? input.ownerCode)
     : party.ownerCode
+  if (!name && !code) throw new Error('Enter a name or an ID')
+  const nextName = name || code || party.name
   const nameKey = normalizeAccountKey(name)
   const codeKey = normalizeAccountKey(code)
   if (nameKey || codeKey) {
@@ -845,7 +833,7 @@ export async function updateParty(
   await prisma.registerParty.update({
     where: { id: party.id },
     data: {
-      name,
+      name: nextName,
       address: input.address !== undefined ? (String(input.address ?? '').trim() || null) : undefined,
       notes: nextNotes || (code ? `ID ${code}` : null),
       ...(code ? { ownerCode: code } : {}),
@@ -853,7 +841,7 @@ export async function updateParty(
   })
   if (code) {
     try {
-      await ensureRegisterPartyForAccount(code, name)
+      await ensureRegisterPartyForAccount(code, nextName)
     } catch {
       /* person ID is already saved on the register card */
     }
