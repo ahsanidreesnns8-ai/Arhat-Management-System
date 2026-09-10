@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { copyrightText, creatorCreditHtml, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
@@ -233,6 +234,17 @@ th.product-over-rest{background:var(--navy)}
   font-size:11px;
   font-weight:700;
 }
+.stock-note{
+  margin-top:6px;
+  padding:5px 7px;
+  border:1px solid var(--gold);
+  background:#fbf8f1;
+  color:var(--navy);
+  font-weight:700;
+  font-size:8px;
+  line-height:1.35;
+  text-align:center;
+}
 .payment-box{margin-top:8px;border:1px solid var(--gold);overflow:hidden;background:#fff}
 .payment-box .head{
   background:var(--navy);
@@ -383,6 +395,87 @@ function bagWord(urdu: boolean) {
       ? ['پارٹی', 'بوریاں', 'کلو', 'ق.ٹ', 'کل وزن', 'ریٹ', 'رقم']
       : ['Party', 'Bags', 'KGs', 'Qt.', 'Total', 'Rate', 'Amount'],
   }
+}
+
+function isStockSource(sourceType?: string | null) {
+  return String(sourceType || '').toUpperCase() === 'BUSINESS_STOCK'
+}
+
+function stockBagsLabel(urdu: boolean) {
+  return urdu ? 'اسٹاک بوریاں' : 'Stock bags'
+}
+
+function invoiceWithStock(invoice: string, sourceType?: string | null, urdu = false) {
+  if (!isStockSource(sourceType)) return invoice
+  return `${invoice} · ${stockBagsLabel(urdu)}`
+}
+
+function partyWithStock(name: string, sourceType?: string | null, urdu = false) {
+  if (!isStockSource(sourceType)) return name
+  return `${stockBagsLabel(urdu)}${name ? ` · ${name}` : ''}`
+}
+
+function numValue(value: { toNumber(): number } | number | string) {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return Number(value) || 0
+  return value.toNumber()
+}
+
+function stockBagsNote(
+  items: Array<{
+    sourceType?: string | null
+    numberOfBags?: number
+    bags?: number
+    totalWeight?: { toNumber(): number } | number | string
+    weight?: number
+    amount: { toNumber(): number } | number | string
+  }>,
+  urdu: boolean,
+) {
+  const stock = items.filter((item) => isStockSource(item.sourceType))
+  if (!stock.length) return ''
+  const bags = sum(stock.map((item) => item.numberOfBags ?? item.bags ?? 0))
+  const weight = sum(
+    stock.map((item) =>
+      item.totalWeight != null ? numValue(item.totalWeight) : (item.weight ?? 0),
+    ),
+  )
+  const amount = sum(stock.map((item) => numValue(item.amount)))
+  const text = urdu
+    ? `اس بل میں اسٹاک بوریاں شامل ہیں — ${bags} ${bags === 1 ? 'بوری' : 'بوریاں'} · ${weightLabel(weight)} کلو · PKR ${money(amount)}`
+    : `This bill includes stock bags — ${bags} bag${bags === 1 ? '' : 's'} · ${weightLabel(weight)} kg · PKR ${money(amount)}`
+  return `<div class="stock-note">${escape(text)}</div>`
+}
+
+const saleItemBillInclude = {
+  product: true,
+  dheri: true,
+  farmer: true,
+  sale: true,
+} as const
+
+async function withStockBagsFromSameSales(
+  items: Array<Prisma.SaleItemGetPayload<{ include: typeof saleItemBillInclude }>>,
+) {
+  const saleIds = [...new Set(items.map((item) => item.saleId))]
+  if (!saleIds.length) return items
+  const have = new Set(items.map((item) => String(item.id)))
+  const extras = await prisma.saleItem.findMany({
+    where: {
+      saleId: { in: saleIds },
+      sourceType: 'BUSINESS_STOCK',
+    },
+    include: saleItemBillInclude,
+    orderBy: { id: 'asc' },
+  })
+  const merged = [...items]
+  for (const extra of extras) {
+    if (have.has(String(extra.id))) continue
+    merged.push(extra)
+    have.add(String(extra.id))
+  }
+  merged.sort((a, b) => Number(a.id) - Number(b.id))
+  return merged
 }
 
 /** Exact weight text — no rounding. Amounts still use money(). */
@@ -733,7 +826,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   const w = bagWord(urdu)
   const flat = buyer.sales.flatMap((sale) =>
     sale.items.map((item) => ({
-      invoice: sale.invoiceNumber,
+      invoice: invoiceWithStock(sale.invoiceNumber, item.sourceType, urdu),
+      sourceType: item.sourceType,
       product: item.product.name,
       bags: item.numberOfBags,
       extraKg: item.partialBagWeight,
@@ -816,7 +910,7 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
         colWidths: BUYER_COL_WIDTHS,
         overlabel: { text: uniqueProductNames(flat.map((item) => item.product)), span: 2 },
       },
-    ) + paymentBox,
+    ) + stockBagsNote(flat, urdu) + paymentBox,
     urdu,
   )
 }
@@ -841,26 +935,22 @@ export async function buyerBillSelected(
       id: { in: saleItemIds.map((id) => BigInt(id)) },
       sale: { buyerId: buyer.id, deleted: false },
     },
-    include: {
-      product: true,
-      dheri: true,
-      farmer: true,
-      sale: true,
-    },
+    include: saleItemBillInclude,
     orderBy: { id: 'asc' },
   })
   if (!items.length) throw new Error('No matching purchase lines found')
+  const billedItems = await withStockBagsFromSameSales(items)
 
   const chunkSize =
-    groupSize != null && groupSize > 0 ? groupSize : items.length
-  const chunks: typeof items[] = []
-  for (let i = 0; i < items.length; i += chunkSize) {
-    chunks.push(items.slice(i, i + chunkSize))
+    groupSize != null && groupSize > 0 ? groupSize : billedItems.length
+  const chunks: typeof billedItems[] = []
+  for (let i = 0; i < billedItems.length; i += chunkSize) {
+    chunks.push(billedItems.slice(i, i + chunkSize))
   }
 
   const sheets = chunks.map((chunk, index) => {
     const rows = chunk.map((item) => [
-      item.sale.invoiceNumber,
+      invoiceWithStock(item.sale.invoiceNumber, item.sourceType, urdu),
       digitStyle(item.numberOfBags, 3),
       extraStyle(item.partialBagWeight, 2, 3),
       digitStyle(item.weightPerBag.toNumber(), 2),
@@ -889,7 +979,7 @@ export async function buyerBillSelected(
           colWidths: BUYER_COL_WIDTHS,
           overlabel: { text: uniqueProductNames(chunk.map((item) => item.product.name)), span: 2 },
         },
-      )}`
+      )}${stockBagsNote(chunk, urdu)}`
   })
 
   return page(
@@ -953,7 +1043,9 @@ export async function saleBill(
     table(
       w.saleCols,
       items.map((item) => [
-        party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
+        party === 'buyer'
+          ? partyWithStock(sale.buyer.name, item.sourceType, urdu)
+          : (item.farmer?.name ?? ''),
         digitStyle(item.numberOfBags, 3),
         extraStyle(item.partialBagWeight, 2, 3),
         digitStyle(item.weightPerBag.toNumber(), 2),
@@ -968,7 +1060,7 @@ export async function saleBill(
         colWidths: SALE_COL_WIDTHS,
         overlabel: { text: uniqueProductNames(items.map((item) => item.product.name)), span: 2 },
       },
-    ),
+    ) + (party === 'buyer' ? stockBagsNote(items, urdu) : ''),
     urdu,
   )
 }

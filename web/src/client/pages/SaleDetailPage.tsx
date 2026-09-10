@@ -186,7 +186,7 @@ export default function SaleDetailPage() {
                     {item.farmerName ? ` · ${item.farmerName}` : ''}
                   </td>
                   <td className="px-4 py-2 font-medium">
-                    {item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—')}
+                    {item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'Stock bags' : '—')}
                   </td>
                   <td className="px-4 py-2">{item.productName}</td>
                   <td className="px-4 py-2">{item.numberOfBags}</td>

@@ -7,7 +7,8 @@ config({ path: '.env' })
 
 import { writeFileSync } from 'node:fs'
 import { prisma } from '../src/server/db'
-import { farmerBill, buyerBill } from '../src/server/services/bills'
+import { farmerBill, buyerBill, buyerBillSelected } from '../src/server/services/bills'
+import { createSale, deleteSale } from '../src/server/services/sales'
 import { createFarmer } from '../src/server/services/farmers'
 import { createBuyer } from '../src/server/services/buyers'
 import { settle } from '../src/server/services/arhat'
@@ -151,6 +152,42 @@ async function main() {
       assert(!buyerHtml.includes('Buyer Bill / Payment Receipt'), 'buyer bill still has module title')
       assert(!html.includes('Wheat Khata · Company'), 'farmer bill should not stamp Wheat Khata labels')
       assert(!buyerHtml.includes('Wheat Khata · Party'), 'buyer bill should not stamp Wheat Khata labels')
+
+      const sold = await createSale({
+        buyerId: buyer.id,
+        items: [
+          {
+            productId: Number(product.id),
+            sourceType: 'FARMER',
+            farmerId: farmer.id,
+            dheriId: settled.dheriId,
+            numberOfBags: 10,
+            weightPerBag: 40,
+            partialBagWeight: 0,
+            rate: 400,
+          },
+          {
+            productId: Number(product.id),
+            sourceType: 'BUSINESS_STOCK',
+            numberOfBags: 2,
+            weightPerBag: 48,
+            partialBagWeight: 0,
+            rate: 400,
+            skipStockDeduction: true,
+          },
+        ],
+      })
+      const farmerLine = sold.items.find((item) => item.sourceType === 'FARMER')
+      assert(farmerLine, 'sale farmer line missing')
+      const stockHtml = await buyerBillSelected(buyer.id, [farmerLine.id], 'en')
+      writeFileSync('/opt/cursor/artifacts/buyer_bill_stock_bags.html', stockHtml)
+      assert(stockHtml.includes('Stock bags'), 'buyer bill must mention Stock bags on the stock line')
+      assert(stockHtml.includes('This bill includes stock bags'), 'buyer bill missing collective stock bags note')
+      assert(stockHtml.includes('2 bags'), 'buyer bill should mention 2 stock bags')
+      assert(stockHtml.includes('96 kg') || stockHtml.includes('96'), 'buyer bill should include stock weight 96 kg')
+      const urduStock = await buyerBillSelected(buyer.id, [farmerLine.id], 'ur')
+      assert(urduStock.includes('اسٹاک بوریاں'), 'Urdu buyer bill must mention stock bags')
+      await deleteSale(sold.id)
 
       const dheriRow = await prisma.dheri.findFirst({ where: { id: { in: ids.dheriIds } } })
       assert(dheriRow, 'settled farmer product missing')

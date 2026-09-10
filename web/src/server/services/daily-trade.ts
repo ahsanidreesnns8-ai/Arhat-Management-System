@@ -273,6 +273,13 @@ export async function getDailyBoard(
       items: x.items
         .filter((item) => {
           if (scopedId == null) return true
+          if (item.sourceType === 'BUSINESS_STOCK') {
+            return x.items.some((other) => {
+              const otherBatch =
+                other.dheri?.dayBatchId == null ? null : Number(other.dheri.dayBatchId)
+              return otherBatch === scopedId
+            })
+          }
           const itemBatch =
             item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId)
           return itemBatch === scopedId
