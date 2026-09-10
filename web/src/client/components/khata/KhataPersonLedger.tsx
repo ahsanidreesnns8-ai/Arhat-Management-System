@@ -159,7 +159,7 @@ export default function KhataPersonLedger({
         </div>
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving from person</p>
-          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(receivingFromPerson)}</p>
+          <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatCurrency(receivingFromPerson)}</p>
         </div>
       </div>
 

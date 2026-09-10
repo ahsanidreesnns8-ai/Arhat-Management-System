@@ -12,7 +12,7 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  blue: 'bg-primary/10 text-primary dark:text-[#7BA3D4] shadow-[0_0_16px_rgba(0,45,98,0.18)]',
+  blue: 'bg-primary/10 text-primary dark:text-[#7BA3D4] shadow-[0_0_16px_rgba(31, 77, 50,0.18)]',
   green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.18)]',
   orange: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 shadow-[0_0_16px_rgba(249,115,22,0.18)]',
   teal: 'bg-accent/15 text-accent-600 dark:text-accent-500 shadow-[0_0_16px_rgba(197,160,89,0.2)]',

@@ -5,7 +5,7 @@ export const GHALLA_MANDI_UR = 'غلّہ منڈی ننکانہ صاحب'
 export function rtcMarkHtml() {
   return `<div class="rtc-mark" aria-label="RTC">
     <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RTC">
-      <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" stroke-width="3.5"/>
+      <circle cx="36" cy="36" r="33" fill="#1F4D32" stroke="#C5A059" stroke-width="3.5"/>
       <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" stroke-width="0.8" opacity="0.55"/>
       <text x="36" y="43" text-anchor="middle" fill="#C5A059" font-size="16" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1">RTC</text>
     </svg>
@@ -30,7 +30,7 @@ export function copyrightText(
 export function aiMarkHtml() {
   return `<span class="ai-mark" aria-label="AI">
     <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AI">
-      <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" stroke-width="3.5"/>
+      <circle cx="36" cy="36" r="33" fill="#1F4D32" stroke="#C5A059" stroke-width="3.5"/>
       <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" stroke-width="0.8" opacity="0.55"/>
       <text x="36" y="44" text-anchor="middle" fill="#C5A059" font-size="20" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1">AI</text>
     </svg>

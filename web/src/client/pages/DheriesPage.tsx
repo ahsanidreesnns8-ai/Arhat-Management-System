@@ -123,7 +123,7 @@ export default function DheriesPage() {
   const statusColor = (status: string) => {
     const map: Record<string, string> = {
       PENDING: 'bg-yellow-100 text-yellow-700',
-      IN_QUEUE: 'bg-blue-100 text-blue-700',
+      IN_QUEUE: 'bg-emerald-100 text-emerald-800',
       SELLING: 'bg-green-100 text-green-700',
       SOLD: 'bg-gray-100 text-gray-700',
       CANCELLED: 'bg-red-100 text-red-700',

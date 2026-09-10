@@ -3,7 +3,7 @@ import { CREATOR_CONTACT, CREATOR_LINE } from '@/lib/branding'
 function AiMark({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 72 72" className={className} role="img" aria-label="AI">
-      <circle cx="36" cy="36" r="33" fill="#002D62" stroke="#C5A059" strokeWidth="3.5" />
+      <circle cx="36" cy="36" r="33" fill="#1F4D32" stroke="#C5A059" strokeWidth="3.5" />
       <circle cx="36" cy="36" r="27" fill="none" stroke="#C5A059" strokeWidth="0.8" opacity="0.55" />
       <text
         x="36"
@@ -31,7 +31,7 @@ export default function CreatorCredit({ className = '', light = false }: Creator
     <div className={`text-center leading-tight ${className}`}>
       <p
         className={`flex items-center justify-center gap-1.5 font-semibold ${
-          light ? 'text-slate-200' : 'text-[#002D62] dark:text-slate-200'
+          light ? 'text-slate-200' : 'text-[#1F4D32] dark:text-slate-200'
         }`}
       >
         <AiMark className="h-3.5 w-3.5 shrink-0" />

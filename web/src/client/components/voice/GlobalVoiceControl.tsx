@@ -28,12 +28,12 @@ export default function GlobalVoiceControl() {
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             className={`max-w-[min(22rem,calc(100vw-5rem))] rounded-2xl border border-white/15 bg-slate-900/90 text-slate-100 shadow-glass backdrop-blur-md px-4 py-3 ${isUrdu ? 'font-urdu text-right' : ''}`}
           >
-            <div className="flex items-center gap-2 text-xs text-cyan-300 mb-1">
+            <div className="flex items-center gap-2 text-xs text-emerald-300 mb-1">
               <Sparkles className="h-3.5 w-3.5" />
               <span>{listening ? t('voiceListening') : t('voiceReady')}</span>
             </div>
             {listening && interim && (
-              <p className="text-sm text-cyan-200/90 italic">{interim}</p>
+              <p className="text-sm text-emerald-100/90 italic">{interim}</p>
             )}
             {!listening && lastHeard && (
               <p className="text-sm text-white/90">
@@ -55,7 +55,7 @@ export default function GlobalVoiceControl() {
           onClick={() => setSpeakEnabled(!speakEnabled)}
           className={`w-11 h-11 rounded-full border border-white/15 flex items-center justify-center ${
             speakEnabled
-              ? 'bg-slate-800/90 text-cyan-300'
+              ? 'bg-black/80 text-emerald-300'
               : 'bg-slate-800/70 text-slate-400'
           }`}
           title={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
@@ -72,7 +72,7 @@ export default function GlobalVoiceControl() {
           className={`relative w-16 h-16 rounded-full text-white flex items-center justify-center shadow-lg disabled:opacity-50 ${
             listening
               ? 'bg-gradient-to-br from-rose-500 to-orange-500'
-              : 'bg-gradient-to-br from-[#002D62] to-[#0B4F8A]'
+              : 'bg-gradient-to-br from-[#1F4D32] to-[#2E6B46]'
           }`}
           title={listening ? t('voiceStop') : t('voiceStart')}
           aria-label={listening ? t('voiceStop') : t('voiceStart')}

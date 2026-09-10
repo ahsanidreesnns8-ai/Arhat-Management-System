@@ -289,7 +289,7 @@ export default function DashboardPage() {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#002D62" stopOpacity={0.45} />
+                  <stop offset="5%" stopColor="#1F4D32" stopOpacity={0.45} />
                   <stop offset="95%" stopColor="#C5A059" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -307,7 +307,7 @@ export default function DashboardPage() {
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#3B6FA8"
+                stroke="#4A8F63"
                 fill="url(#salesGrad)"
                 strokeWidth={2.5}
                 isAnimationActive
@@ -334,7 +334,7 @@ export default function DashboardPage() {
               <defs>
                 <linearGradient id="stockGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#C5A059" />
-                  <stop offset="100%" stopColor="#0A3A75" />
+                  <stop offset="100%" stopColor="#2E6B46" />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />

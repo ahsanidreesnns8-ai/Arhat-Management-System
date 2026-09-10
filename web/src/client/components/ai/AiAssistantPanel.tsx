@@ -168,7 +168,7 @@ export default function AiAssistantPanel() {
   if (!open) return null
 
   const historyPanel = (
-    <div className="flex h-full w-[min(18rem,86vw)] shrink-0 flex-col bg-[#002D62] text-white md:w-56">
+    <div className="flex h-full w-[min(18rem,86vw)] shrink-0 flex-col bg-[#1F4D32] text-white md:w-56">
       <div className="border-b border-white/10 px-3 py-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#E8C87A]">{t('aiHistory')}</p>
@@ -183,7 +183,7 @@ export default function AiAssistantPanel() {
         </div>
         <button
           type="button"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C5A059] px-3 py-2.5 text-sm font-semibold text-[#002D62]"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C5A059] px-3 py-2.5 text-sm font-semibold text-[#1F4D32]"
           onClick={startNewChat}
         >
           <Plus className="h-3.5 w-3.5" />
@@ -240,7 +240,7 @@ export default function AiAssistantPanel() {
         onClick={() => setOpen(false)}
         aria-label={t('close')}
       />
-      <aside className="relative flex h-full w-full overflow-hidden bg-[#F7F4EC] shadow-[-28px_0_70px_rgba(0,45,98,0.35)] md:max-w-[56rem]">
+      <aside className="relative flex h-full w-full overflow-hidden bg-[#F7F4EC] shadow-[-28px_0_70px_rgba(31, 77, 50,0.35)] md:max-w-[56rem]">
         {/* Desktop history column */}
         {desktop && historyOpen ? historyPanel : null}
 
@@ -260,22 +260,22 @@ export default function AiAssistantPanel() {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-between gap-2 border-b border-[#002D62]/10 bg-white px-2 py-2.5 sm:px-4">
+          <div className="flex items-center justify-between gap-2 border-b border-[#1F4D32]/10 bg-white px-2 py-2.5 sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#002D62]/15 text-[#002D62]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#1F4D32]/15 text-[#1F4D32]"
                 onClick={() => setHistoryOpen((v) => !v)}
                 aria-label={historyOpen ? t('aiCloseHistory') : t('aiOpenHistory')}
                 title={t('aiHistory')}
               >
                 <History className="h-5 w-5" />
               </button>
-              <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#002D62] text-[#E8C87A] sm:flex">
+              <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1F4D32] text-[#E8C87A] sm:flex">
                 <Bot className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className={`truncate text-sm font-bold text-[#002D62] ${isUrdu ? 'font-urdu' : ''}`}>{t('aiTitle')}</p>
+                <p className={`truncate text-sm font-bold text-[#1F4D32] ${isUrdu ? 'font-urdu' : ''}`}>{t('aiTitle')}</p>
                 <p className={`hidden truncate text-[11px] text-slate-500 sm:block ${isUrdu ? 'font-urdu' : ''}`}>{t('aiHint')}</p>
               </div>
             </div>
@@ -295,7 +295,7 @@ export default function AiAssistantPanel() {
             {!active?.messages.length && (
               <div className="rounded-2xl border border-[#C5A059]/30 bg-white p-5">
                 <Sparkles className="h-6 w-6 text-[#C5A059]" />
-                <p className={`mt-3 text-base font-semibold text-[#002D62] ${isUrdu ? 'font-urdu' : ''}`}>
+                <p className={`mt-3 text-base font-semibold text-[#1F4D32] ${isUrdu ? 'font-urdu' : ''}`}>
                   {t('aiWelcome')}
                 </p>
                 <p className={`mt-2 text-sm leading-6 text-slate-500 ${isUrdu ? 'font-urdu' : ''}`}>{t('aiHint')}</p>
@@ -306,8 +306,8 @@ export default function AiAssistantPanel() {
                 <div
                   className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-6 ${
                     message.role === 'user'
-                      ? 'bg-[#002D62] text-white'
-                      : 'border border-[#002D62]/10 bg-white text-slate-800 shadow-sm'
+                      ? 'bg-[#1F4D32] text-white'
+                      : 'border border-[#1F4D32]/10 bg-white text-slate-800 shadow-sm'
                   } ${isUrdu ? 'font-urdu' : ''}`}
                 >
                   {message.role === 'assistant' && (
@@ -325,13 +325,13 @@ export default function AiAssistantPanel() {
           </div>
 
           <form
-            className="border-t border-[#002D62]/10 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="border-t border-[#1F4D32]/10 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
             onSubmit={(event) => {
               event.preventDefault()
               void send()
             }}
           >
-            <div className="flex items-end gap-2 rounded-2xl border border-[#002D62]/15 bg-[#F7F4EC] px-3 py-2">
+            <div className="flex items-end gap-2 rounded-2xl border border-[#1F4D32]/15 bg-[#F7F4EC] px-3 py-2">
               <textarea
                 ref={inputRef}
                 rows={2}

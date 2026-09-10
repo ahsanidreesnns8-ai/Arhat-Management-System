@@ -107,7 +107,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
     <>
       <IconBtn
         onClick={() => setSpeakEnabled(!speakEnabled)}
-        className={speakEnabled ? 'text-[#0B4F8A] dark:text-cyan-300' : 'text-slate-400'}
+        className={speakEnabled ? 'text-[#2E6B46] dark:text-emerald-300' : 'text-slate-400'}
         title={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
         aria-label={speakEnabled ? t('aiVoiceOff') : t('aiVoiceOn')}
       >
@@ -116,7 +116,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
       <IconBtn
         onClick={toggleListening}
         disabled={!supported}
-        className={listening ? 'text-rose-500' : 'text-[#002D62] dark:text-[#E8C87A]'}
+        className={listening ? 'text-rose-500' : 'text-[#1F4D32] dark:text-[#E8C87A]'}
         title={listening ? t('voiceStop') : t('voiceStart')}
         aria-label={listening ? t('voiceStop') : t('voiceStart')}
       >
@@ -129,7 +129,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
     <>
       <IconBtn
         onClick={refreshSystem}
-        className="text-[#002D62] dark:text-[#E8C87A]"
+        className="text-[#1F4D32] dark:text-[#E8C87A]"
         title={t('refreshSystem')}
         aria-label={t('refreshSystem')}
       >
@@ -158,7 +158,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
           </span>
         )}
         <div
-          className="w-8 h-8 rounded-full bg-gradient-to-br from-[#002D62]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center flex-shrink-0"
+          className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1F4D32]/20 to-[#C5A059]/25 border border-[#C5A059]/35 flex items-center justify-center flex-shrink-0"
           title={user?.isDemo ? `${user?.username || ''} · demo` : user?.username || ''}
         >
           <User className="h-4 w-4 text-[#C5A059]" />
@@ -181,7 +181,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
       <div className="hidden md:flex items-center gap-2 h-14 px-4">
         <IconBtn
           onClick={onToggleMenu}
-          className="text-[#002D62] dark:text-[#E8C87A] border border-[#002D62]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
+          className="text-[#1F4D32] dark:text-[#E8C87A] border border-[#1F4D32]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={menuOpen}
         >
@@ -190,7 +190,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         <IconBtn
           onClick={goBack}
           disabled={isHome}
-          className={isHome ? 'opacity-35 cursor-not-allowed' : 'text-[#002D62] dark:text-[#E8C87A]'}
+          className={isHome ? 'opacity-35 cursor-not-allowed' : 'text-[#1F4D32] dark:text-[#E8C87A]'}
           title={t('goBack')}
           aria-label={t('goBack')}
         >
@@ -218,7 +218,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
         <div className="flex items-center gap-2 h-12 px-2">
           <IconBtn
             onClick={onToggleMenu}
-            className="text-[#002D62] dark:text-[#E8C87A] border border-[#002D62]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
+            className="text-[#1F4D32] dark:text-[#E8C87A] border border-[#1F4D32]/15 dark:border-[#C5A059]/25 bg-white/50 dark:bg-white/5"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
           >
@@ -241,7 +241,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
             <IconBtn
               onClick={goBack}
               disabled={isHome}
-              className={isHome ? 'opacity-35 cursor-not-allowed' : 'text-[#002D62] dark:text-[#E8C87A]'}
+              className={isHome ? 'opacity-35 cursor-not-allowed' : 'text-[#1F4D32] dark:text-[#E8C87A]'}
               title={t('goBack')}
               aria-label={t('goBack')}
             >
@@ -265,7 +265,7 @@ export default function Navbar({ menuOpen, onToggleMenu }: NavbarProps) {
             exit={{ opacity: 0, y: -4 }}
             className={`mx-3 mb-2 text-[11px] text-center ${isUrdu ? 'font-urdu' : ''}`}
           >
-            <p className="font-medium text-[#002D62] dark:text-[#E8C87A]">
+            <p className="font-medium text-[#1F4D32] dark:text-[#E8C87A]">
               {listening ? t('voiceListening') : t('voiceReady')}
               {listening && interim ? ` — ${interim}` : ''}
               {!listening && lastHeard ? ` — ${t('voiceYouSaid')} ${lastHeard}` : ''}

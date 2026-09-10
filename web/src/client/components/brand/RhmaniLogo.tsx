@@ -30,7 +30,7 @@ export default function RhmaniLogo({
   const { companyName } = useBusiness()
   const s = sizeMap[size]
 
-  const nameColor = light ? '#FFFFFF' : '#002D62'
+  const nameColor = light ? '#FFFFFF' : '#1F4D32'
   const tagColor = light ? '#E8C87A' : '#C5A059'
   const displayName = companyName || (isUrdu ? 'رحمانی' : 'REHMANI')
 
@@ -73,7 +73,7 @@ export default function RhmaniLogo({
         style={{
           boxShadow: light
             ? '0 8px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)'
-            : '0 8px 20px rgba(0, 45, 98, 0.22), inset 0 1px 0 rgba(255,255,255,0.65)',
+            : '0 8px 20px rgba(31, 77, 50, 0.22), inset 0 1px 0 rgba(255,255,255,0.65)',
         }}
         whileHover={{ scale: 1.05, rotate: -2 }}
         whileTap={{ scale: 0.96 }}

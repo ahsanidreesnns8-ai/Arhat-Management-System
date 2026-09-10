@@ -202,7 +202,7 @@ export default function RecordsPage() {
       />
 
       <section className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
           <History className="h-4 w-4 text-[#C5A059]" />
           Daily Trade — saved days
         </div>
@@ -267,7 +267,7 @@ export default function RecordsPage() {
                       </table>
                     </div>
                     <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-white/10">
-                      <div className="px-3 py-2 text-sm font-semibold bg-[#002D62] text-white">
+                      <div className="px-3 py-2 text-sm font-semibold bg-[#1F4D32] text-white">
                         Selling · {day.saleCount} · {formatNumber(day.soldWeightKg)} kg
                       </div>
                       <table className="w-full text-sm">

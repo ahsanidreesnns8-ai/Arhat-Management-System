@@ -71,7 +71,7 @@ export default function CommissionHeadsPage() {
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold">History</div>
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold">History</div>
         {!head.history.length ? (
           <p className="p-5 text-sm text-slate-500">No history yet.</p>
         ) : (

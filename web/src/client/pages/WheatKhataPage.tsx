@@ -512,7 +512,7 @@ export default function WheatKhataPage({
         </div>
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Amount in bank</p>
-          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
+          <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
           <p className="text-[11px] text-slate-500 mt-1">Still this khata. Parked in a named bank frame</p>
         </div>
       </div>
@@ -524,7 +524,7 @@ export default function WheatKhataPage({
         </div>
         <div className="card-3d p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving from person</p>
-          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
+          <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
         </div>
       </div>
 
@@ -683,7 +683,7 @@ export default function WheatKhataPage({
             }}
           />
           <div className="card-3d overflow-hidden">
-            <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+            <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
               <Wallet className="h-4 w-4 text-[#C5A059]" />
               Money added
             </div>

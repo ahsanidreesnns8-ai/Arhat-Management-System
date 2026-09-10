@@ -72,9 +72,9 @@ type BillSlip = {
 
 function slipCss() {
   return `@page{size:5in 8in;margin:0.16in}
-:root{--navy:#002D62;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
+:root{--navy:#1F4D32;--gold:#C5A059;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--soft:#f8fafc}
 *{box-sizing:border-box}
-html,body{margin:0;background:#e8edf3}
+html,body{margin:0;background:#F7F1E4}
 body{
   padding:12px;
   color:var(--ink);
@@ -270,7 +270,7 @@ th.product-over-rest{background:var(--navy)}
   letter-spacing:.01em;
   line-height:1.35;
 }
-.creator-credit{margin-top:6px;text-align:center;color:#002D62}
+.creator-credit{margin-top:6px;text-align:center;color:#1F4D32}
 .creator-line{
   display:flex;
   align-items:center;

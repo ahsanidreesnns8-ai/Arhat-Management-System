@@ -18,7 +18,7 @@ export default function PageHeader({ title, description, action }: PageHeaderPro
     >
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <span className="hidden sm:block w-1.5 h-7 rounded-full bg-gradient-to-b from-[#C5A059] to-[#002D62]" />
+          <span className="hidden sm:block w-1.5 h-7 rounded-full bg-gradient-to-b from-[#C5A059] to-[#1F4D32]" />
           <h1 className="page-title">{title}</h1>
         </div>
         {description && (

@@ -144,9 +144,9 @@ export default function GlobalSearch() {
   }
 
   const typeColors: Record<string, string> = {
-    PAGE: 'bg-[#002D62]/10 text-[#002D62] dark:bg-[#C5A059]/15 dark:text-[#E8C87A]',
+    PAGE: 'bg-[#1F4D32]/10 text-[#1F4D32] dark:bg-[#C5A059]/15 dark:text-[#E8C87A]',
     FARMER: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-    BUYER: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+    BUYER: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
     TRUCK: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
     DHERI: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400',
     INVOICE: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
@@ -199,7 +199,7 @@ export default function GlobalSearch() {
                 key={`${r.type}-${r.id}-${i}`}
                 type="button"
                 onClick={() => handleSelect(r)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cyan-500/10 transition-colors text-left border-b border-white/5 last:border-0"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 transition-colors text-left border-b border-white/5 last:border-0"
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: Math.min(i, 8) * 0.03, duration: 0.2 }}

@@ -584,7 +584,7 @@ export default function DailyTradePage() {
         </div>
 
         <div className="card-3d overflow-hidden">
-          <div className="px-4 py-3 bg-[#002D62] text-white font-semibold">
+          <div className="px-4 py-3 bg-[#1F4D32] text-white font-semibold">
             {isUrdu ? 'آج فروخت' : 'Selling today'} · {soldBags} {t('bags')} · {formatNumber(board?.session.soldWeightKg || 0)} kg
             <span className={`ml-2 text-xs ${balanced ? 'text-emerald-300' : 'text-amber-300'}`}>
               {balanced
@@ -701,8 +701,8 @@ export default function DailyTradePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border-2 border-[#002D62]/25 overflow-hidden">
-          <div className="px-5 py-3 bg-[#002D62] text-white font-semibold">Buyer / seller details</div>
+        <div className="rounded-2xl border-2 border-[#1F4D32]/25 overflow-hidden">
+          <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold">Buyer / seller details</div>
           <div className="p-5 space-y-3 bg-white dark:bg-slate-900">
             <PartyCombobox
               label="Choose buyer"
@@ -731,7 +731,7 @@ export default function DailyTradePage() {
       </div>
 
       <div className="rounded-2xl border-2 border-[#C5A059]/50 overflow-hidden">
-        <div className="px-5 py-3 bg-gradient-to-r from-[#002D62] to-[#0a3a75] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-gradient-to-r from-[#1F4D32] to-[#2E6B46] text-white font-semibold flex items-center gap-2">
           <Warehouse className="h-4 w-4 text-[#C5A059]" /> Stock details
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-5 gap-3 bg-white dark:bg-slate-900">

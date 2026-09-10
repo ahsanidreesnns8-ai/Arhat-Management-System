@@ -157,7 +157,7 @@ export default function LoginPage() {
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#0A3A75] to-[#C5A059] flex items-center justify-center shadow-[0_0_36px_rgba(197,160,89,0.45)]"
+                className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#2E6B46] to-[#C5A059] flex items-center justify-center shadow-[0_0_36px_rgba(197,160,89,0.45)]"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 16 }}

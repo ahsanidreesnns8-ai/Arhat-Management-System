@@ -74,7 +74,7 @@ export default function PrintBillButton({
                     onClick={() => setKind(row.id)}
                     className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
                       kind === row.id
-                        ? 'border-[#C5A059] bg-[#C5A059]/15 text-[#002D62] dark:text-[#E8C87A]'
+                        ? 'border-[#C5A059] bg-[#C5A059]/15 text-[#1F4D32] dark:text-[#E8C87A]'
                         : 'border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
                     }`}
                   >
@@ -94,7 +94,7 @@ export default function PrintBillButton({
                 onClick={() => setLang('en')}
                 className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                   lang === 'en'
-                    ? 'border-[#002D62] bg-[#002D62] text-white'
+                    ? 'border-[#1F4D32] bg-[#1F4D32] text-white'
                     : 'border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
               >
@@ -105,7 +105,7 @@ export default function PrintBillButton({
                 onClick={() => setLang('ur')}
                 className={`rounded-xl border px-4 py-3 text-sm font-semibold font-urdu transition ${
                   lang === 'ur'
-                    ? 'border-[#C5A059] bg-[#C5A059] text-[#002D62]'
+                    ? 'border-[#C5A059] bg-[#C5A059] text-[#1F4D32]'
                     : 'border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
               >

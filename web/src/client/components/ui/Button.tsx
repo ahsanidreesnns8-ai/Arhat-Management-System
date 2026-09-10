@@ -24,7 +24,7 @@ export default function Button({
     primary: 'btn-primary',
     secondary: 'btn-secondary',
     danger: 'bg-gradient-to-r from-rose-600 to-red-500 text-white shadow-[0_8px_24px_rgba(244,63,94,0.35)] hover:brightness-110 transition-all',
-    ghost: 'bg-transparent hover:bg-sky-500/10 text-slate-700 dark:text-slate-200 transition-colors',
+    ghost: 'bg-transparent hover:bg-emerald-500/10 text-slate-700 dark:text-slate-200 transition-colors',
   }
 
   const sizes = {
