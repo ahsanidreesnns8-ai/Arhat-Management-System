@@ -17,13 +17,13 @@ const config: Config = {
       },
       colors: {
         primary: {
-          DEFAULT: '#002D62',
-          dark: '#3B6FA8',
-          50: '#EEF4FB',
-          100: '#D9E6F5',
-          500: '#0A3A75',
-          600: '#002D62',
-          700: '#001F45',
+          DEFAULT: '#1F4D32',
+          dark: '#4A8F63',
+          50: '#EEF6F0',
+          100: '#D5E8DC',
+          500: '#2E6B46',
+          600: '#1F4D32',
+          700: '#163826',
         },
         accent: {
           DEFAULT: '#C5A059',
@@ -32,13 +32,13 @@ const config: Config = {
           600: '#C5A059',
         },
         surface: {
-          light: '#F5F7FA',
-          dark: '#0B1220',
+          light: '#F7F1E4',
+          dark: '#0A0A0A',
         },
       },
       boxShadow: {
-        card: '0 10px 28px -14px rgb(0 45 98 / 0.2), 0 2px 10px -4px rgb(15 23 42 / 0.08)',
-        'card-hover': '0 18px 40px -16px rgb(0 45 98 / 0.28), 0 8px 18px -8px rgb(197 160 89 / 0.16)',
+        card: '0 10px 28px -14px rgb(31 77 50 / 0.2), 0 2px 10px -4px rgb(15 23 42 / 0.08)',
+        'card-hover': '0 18px 40px -16px rgb(31 77 50 / 0.28), 0 8px 18px -8px rgb(197 160 89 / 0.16)',
         '3d': '0 16px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.12)',
         glass: '0 24px 56px rgba(0, 0, 0, 0.35), 0 0 28px rgba(197, 160, 89, 0.08)',
       },

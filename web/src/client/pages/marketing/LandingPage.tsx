@@ -9,7 +9,7 @@ import { GHALLA_MANDI_EN, GHALLA_MANDI_UR } from '@/lib/branding'
 const FEATURES = [
   {
     icon: Scale,
-    tone: 'bg-sky-100 text-sky-700',
+    tone: 'bg-emerald-100 text-emerald-800',
     en: 'Daily Trade',
     ur: 'روزانہ تجارت',
     dEn: 'Receive dheris, sell bags, and keep Extra KG stock in one desk.',
@@ -111,9 +111,9 @@ export default function LandingPage() {
             </p>
             <h1 className={`text-[2.15rem] sm:text-[2.75rem] font-extrabold leading-[1.15] text-[#0f172a] ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu ? (
-                <>وصول کریں۔ تجارت کریں۔ <span className="text-[#002D62]">حساب چکا دیں۔</span></>
+                <>وصول کریں۔ تجارت کریں۔ <span className="text-[#1F4D32]">حساب چکا دیں۔</span></>
               ) : (
-                <>Receive. Trade. <span className="text-[#002D62]">Settle.</span></>
+                <>Receive. Trade. <span className="text-[#1F4D32]">Settle.</span></>
               )}
             </h1>
             <p className={`mt-4 text-[15px] leading-relaxed text-slate-600 max-w-md ${isUrdu ? 'font-urdu' : ''}`}>
@@ -124,14 +124,14 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 to="/login"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold text-white bg-[#002D62] hover:bg-[#0a3a75]"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold text-white bg-[#1F4D32] hover:bg-[#2E6B46]"
               >
                 {isUrdu ? 'ایپ کھولیں' : 'Open App'}
                 <ArrowRight className={`h-4 w-4 ${isUrdu ? 'rotate-180' : ''}`} />
               </Link>
               <Link
                 to="/how-it-works"
-                className="inline-flex items-center px-5 py-2.5 rounded-md text-sm font-semibold text-[#002D62] border border-[#002D62] hover:bg-[#002D62]/5"
+                className="inline-flex items-center px-5 py-2.5 rounded-md text-sm font-semibold text-[#1F4D32] border border-[#1F4D32] hover:bg-[#1F4D32]/5"
               >
                 {isUrdu ? 'طریقہ دیکھیں' : 'How it works'}
               </Link>
@@ -176,7 +176,7 @@ export default function LandingPage() {
             <h2 className={`text-[1.45rem] font-extrabold text-[#0f172a] ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu ? 'سسٹم کے ماڈیولز' : 'Shop modules'}
             </h2>
-            <Link to="/features" className={`text-[13px] font-semibold text-[#002D62] hover:underline ${isUrdu ? 'font-urdu' : ''}`}>
+            <Link to="/features" className={`text-[13px] font-semibold text-[#1F4D32] hover:underline ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu ? 'تمام فیچرز' : 'View all features'}
             </Link>
           </div>
@@ -186,10 +186,10 @@ export default function LandingPage() {
                 <div className="relative h-36">
                   <img src="/ghalla-mandi.jpg" alt="" className="h-full w-full object-cover" />
                   <div className="absolute bottom-2 left-2 flex gap-1.5">
-                    <span className="rounded-full bg-[#002D62] px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="rounded-full bg-[#1F4D32] px-2 py-0.5 text-[10px] font-semibold text-white">
                       {isUrdu ? item.tagUr : item.tagEn}
                     </span>
-                    <span className="rounded-full bg-[#C5A059] px-2 py-0.5 text-[10px] font-semibold text-[#002D62]">
+                    <span className="rounded-full bg-[#C5A059] px-2 py-0.5 text-[10px] font-semibold text-[#1F4D32]">
                       {isUrdu ? item.tag2Ur : item.tag2En}
                     </span>
                   </div>
@@ -207,7 +207,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to={item.to}
-                  className="mx-4 mb-4 inline-flex justify-center rounded-md bg-[#002D62] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#0a3a75]"
+                  className="mx-4 mb-4 inline-flex justify-center rounded-md bg-[#1F4D32] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#2E6B46]"
                 >
                   {isUrdu ? 'مزید دیکھیں' : 'Learn More'}
                 </Link>

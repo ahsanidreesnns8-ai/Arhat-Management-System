@@ -94,7 +94,7 @@ export default function QueuePage() {
                       </button>
                     )}
                     {e.status === 'ACTIVE' && (
-                      <button onClick={() => handleAction(e.id, 'complete')} className="p-2 rounded-lg hover:bg-blue-50 text-blue-600" title="Complete">
+                      <button onClick={() => handleAction(e.id, 'complete')} className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-700" title="Complete">
                         <CheckCircle className="h-4 w-4" />
                       </button>
                     )}

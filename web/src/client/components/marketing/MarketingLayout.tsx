@@ -29,7 +29,7 @@ export default function MarketingLayout() {
         <div className="mkt-container flex items-center justify-between h-[68px] gap-4">
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <RtcMark className="w-9 h-9" />
-            <span className={`text-[15px] font-bold text-[#002D62] leading-tight ${isUrdu ? 'font-urdu' : ''}`}>
+            <span className={`text-[15px] font-bold text-[#1F4D32] leading-tight ${isUrdu ? 'font-urdu' : ''}`}>
               {isUrdu ? 'آرھٹ سسٹم' : 'Arhat System'}
             </span>
           </Link>
@@ -43,8 +43,8 @@ export default function MarketingLayout() {
                 className={({ isActive }) =>
                   `text-[14px] font-medium transition-colors ${isUrdu ? 'font-urdu' : ''} ${
                     isActive || (item.to === '/' && pathname === '/')
-                      ? 'text-[#002D62]'
-                      : 'text-slate-600 hover:text-[#002D62]'
+                      ? 'text-[#1F4D32]'
+                      : 'text-slate-600 hover:text-[#1F4D32]'
                   }`
                 }
               >
@@ -61,7 +61,7 @@ export default function MarketingLayout() {
                   type="button"
                   onClick={() => setLang(code)}
                   className={`px-2 py-1 rounded text-[11px] font-semibold ${
-                    lang === code ? 'bg-[#002D62] text-white' : 'text-slate-500'
+                    lang === code ? 'bg-[#1F4D32] text-white' : 'text-slate-500'
                   } ${code === 'ur' ? 'font-urdu' : ''}`}
                 >
                   {code === 'en' ? 'EN' : 'اردو'}
@@ -70,13 +70,13 @@ export default function MarketingLayout() {
             </div>
             <Link
               to="/login"
-              className="hidden sm:inline-flex items-center px-3.5 py-1.5 rounded-md text-[13px] font-semibold text-[#002D62] border border-[#002D62] hover:bg-[#002D62]/5"
+              className="hidden sm:inline-flex items-center px-3.5 py-1.5 rounded-md text-[13px] font-semibold text-[#1F4D32] border border-[#1F4D32] hover:bg-[#1F4D32]/5"
             >
               {isUrdu ? 'لاگ اِن' : 'Login'}
             </Link>
             <Link
               to="/login"
-              className="inline-flex items-center px-3.5 py-1.5 rounded-md text-[13px] font-semibold text-white bg-[#002D62] hover:bg-[#0a3a75]"
+              className="inline-flex items-center px-3.5 py-1.5 rounded-md text-[13px] font-semibold text-white bg-[#1F4D32] hover:bg-[#2E6B46]"
             >
               {isUrdu ? 'ایپ کھولیں' : 'Open App'}
             </Link>
@@ -88,7 +88,7 @@ export default function MarketingLayout() {
         <Outlet />
       </main>
 
-      <footer className="bg-[#001a3d] text-slate-200">
+      <footer className="bg-[#122418] text-slate-200">
         <div className="mkt-container py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 text-[13px]">
           <div>
             <p className={`font-semibold text-white mb-3 ${isUrdu ? 'font-urdu' : ''}`}>

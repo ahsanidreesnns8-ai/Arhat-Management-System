@@ -672,7 +672,7 @@ export default function PaddyKhataPage() {
         </button>
         <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
           <p className="text-xs uppercase tracking-wide text-slate-500">Amount in bank</p>
-          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
+          <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatCurrency(totals.bankTotal || 0)}</p>
         </button>
       </div>
 
@@ -694,7 +694,7 @@ export default function PaddyKhataPage() {
         </button>
         <button type="button" onClick={() => setSection('AMOUNTS')} className="card-3d p-5 text-left">
           <p className="text-xs uppercase tracking-wide text-slate-500">Receiving from person</p>
-          <p className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
+          <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">{formatCurrency(totals.receivingFromPerson || 0)}</p>
         </button>
       </div>
 
@@ -1282,7 +1282,7 @@ function RiceSellFrame({
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="card-3d overflow-hidden">
-      <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center justify-between gap-2">
+      <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center justify-between gap-2">
         <span className="flex items-center gap-2"><History className="h-4 w-4 text-[#C5A059]" /> {title}</span>
         {action}
       </div>

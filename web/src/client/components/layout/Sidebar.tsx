@@ -67,7 +67,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         >
           <div className="sidebar-3d-inner h-full flex flex-col">
             <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-white/10 relative">
-              <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#C5A059]/50 to-transparent" />
               <RhmaniLogo size="sm" showText light />
               <button
                 type="button"

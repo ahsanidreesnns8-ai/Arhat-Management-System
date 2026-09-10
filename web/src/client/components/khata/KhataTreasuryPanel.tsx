@@ -207,7 +207,7 @@ export default function KhataTreasuryPanel({
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
           <Landmark className="h-4 w-4 text-[#C5A059]" />
           Money in bank
         </div>
@@ -253,7 +253,7 @@ export default function KhataTreasuryPanel({
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
           <Receipt className="h-4 w-4 text-[#C5A059]" />
           Other expenses
         </div>
@@ -286,7 +286,7 @@ export default function KhataTreasuryPanel({
       </div>
 
       <div className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
           <Send className="h-4 w-4 text-[#C5A059]" />
           Borrowed between khatas
         </div>

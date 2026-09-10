@@ -71,7 +71,7 @@ export default function VoiceFieldMic({ onText, className = '', title }: Props) 
       className={`inline-flex items-center justify-center rounded-lg p-1.5 transition-colors ${
         listening
           ? 'bg-rose-500 text-white'
-          : 'text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-300'
+          : 'text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300'
       } ${className}`}
       title={title || (listening ? t('voiceStop') : t('voiceDictateField'))}
       aria-label={title || t('voiceDictateField')}

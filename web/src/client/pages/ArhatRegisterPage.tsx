@@ -633,7 +633,7 @@ export default function ArhatRegisterPage() {
         <div>
           <p className="font-semibold truncate">{p.name}</p>
           {partyAccountCode(p) ? (
-            <p className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate whitespace-nowrap">ID {partyAccountCode(p)}</p>
+            <p className="text-[11px] font-medium text-[#1F4D32] dark:text-[#C5A059] truncate whitespace-nowrap">ID {partyAccountCode(p)}</p>
           ) : null}
           {partyPlaceLine(p) ? (
             <p className="text-[11px] text-slate-500 truncate">{partyPlaceLine(p)}</p>
@@ -815,7 +815,7 @@ export default function ArhatRegisterPage() {
                     <span className="min-w-0">
                       <span className="font-medium truncate block">{p.name}</span>
                       {partyAccountCode(p) ? (
-                        <span className="text-[11px] font-medium text-[#002D62] dark:text-[#C5A059] truncate block">ID {partyAccountCode(p)}</span>
+                        <span className="text-[11px] font-medium text-[#1F4D32] dark:text-[#C5A059] truncate block">ID {partyAccountCode(p)}</span>
                       ) : null}
                       {p.farmerName ? (
                         <span className="text-[11px] text-slate-500 truncate block">Farmer {p.farmerName}</span>
@@ -908,7 +908,7 @@ export default function ArhatRegisterPage() {
           <p className="card-3d p-5 text-sm text-slate-500">No people in this ledger.</p>
         ) : (
           <div className="card-3d overflow-hidden">
-            <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+            <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-[#C5A059]" />
               Ledger
             </div>
@@ -958,7 +958,7 @@ export default function ArhatRegisterPage() {
 
       {section !== 'LEDGER' && (
       <div className="card-3d overflow-hidden">
-        <div className="px-5 py-3 bg-[#002D62] text-white font-semibold flex items-center gap-2">
+        <div className="px-5 py-3 bg-[#1F4D32] text-white font-semibold flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-[#C5A059]" />
           History
         </div>
