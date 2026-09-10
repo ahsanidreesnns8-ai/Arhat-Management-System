@@ -201,7 +201,6 @@ function byIdThenName(a: RegisterParty, b: RegisterParty) {
   else if (!ac && bc) return 1
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
 }
-const byNameThenAmount = byIdThenName
 
 function AccountBreakdown({ party }: { party: RegisterParty }) {
   const side = partyFrame(party)
