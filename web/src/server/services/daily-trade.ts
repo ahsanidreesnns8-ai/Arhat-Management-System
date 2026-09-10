@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { d, round2, totalWeight } from '@/server/money'
+import { availableStockKg, d, round2, totalWeight } from '@/server/money'
 import { createSale } from '@/server/services/sales'
 import { consumeStockLotsToBags, listStockLots } from '@/server/services/stock-lots'
 
@@ -98,9 +98,10 @@ export async function getDailyBoard(
   // Batches/sales from before this open session belong to an archived day.
   const liveCutoff = new Date(session.createdAt)
 
-  const [lots, batchInfo] = await Promise.all([
+  const [lots, batchInfo, stockRows] = await Promise.all([
     listStockLots(),
     import('@/server/services/day-batches').then((m) => m.listDayBatches(sessionDate)),
+    prisma.stock.findMany(),
   ])
   const liveBatches =
     scopedId != null
@@ -171,7 +172,26 @@ export async function getDailyBoard(
     (max, x) => Math.max(max, x.marketRate.toNumber()),
     session.highestRate || 0,
   )
-  const stockKg = lots.reduce((s, x) => s + x.remainingKg, 0)
+  const lotKgByProduct = new Map<number, number>()
+  for (const lot of lots) {
+    lotKgByProduct.set(lot.productId, (lotKgByProduct.get(lot.productId) || 0) + lot.remainingKg)
+  }
+  const stockByProduct = stockRows.map((row) => {
+    const productId = Number(row.productId)
+    const quantityKg = row.quantity.toNumber()
+    const lotKg = lotKgByProduct.get(productId) || 0
+    return {
+      productId,
+      quantityKg,
+      lotKg,
+      availableKg: availableStockKg(quantityKg, lotKg).toNumber(),
+    }
+  })
+  for (const [productId, lotKg] of lotKgByProduct) {
+    if (stockByProduct.some((row) => row.productId === productId)) continue
+    stockByProduct.push({ productId, quantityKg: 0, lotKg, availableKg: lotKg })
+  }
+  const stockKg = stockByProduct.reduce((sum, row) => sum + row.availableKg, 0)
 
   // Never overwrite day-level session counters from a single-batch query
   let sessionRow = await prisma.dailyTradeSession.findUnique({
@@ -219,6 +239,7 @@ export async function getDailyBoard(
     session: sessionDto(sessionRow!),
     stockLots: lots,
     stockKgAvailable: stockKg,
+    stockByProduct,
     farmerBags,
     stockBagsSold,
     receives: dheris.map((x) => ({
@@ -649,6 +670,11 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
   const stockBags = Math.max(0, Number(input.stockBags) || 0)
   const stockBagKg = Number(input.stockWeightPerBag) || bagKg
   const stockRate = Number(input.stockRatePer40) || buyerRate
+  const stockToSell = extraBags + stockBags
+  if (stockToSell > 0) {
+    const { assertStockCoversBags } = await import('@/server/services/stock-lots')
+    await assertStockCoversBags(input.productId, stockToSell, stockBagKg)
+  }
 
   const { settle } = await import('@/server/services/arhat')
   const existing = await prisma.dheri.findFirst({
@@ -695,7 +721,6 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
     farmerNet = Number(row.farmerPayable ?? 0)
   }
 
-  const stockToSell = extraBags + stockBags
   let formed = { bagsFromStock: 0, kgUsed: 0, amount: 0, ratePer40Kg: stockRate }
   if (stockToSell > 0) {
     const { consumeStockLotsToBags } = await import('@/server/services/stock-lots')

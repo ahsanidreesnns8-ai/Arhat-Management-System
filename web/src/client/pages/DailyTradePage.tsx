@@ -81,7 +81,16 @@ type Board = {
   receives: BoardReceive[]
   sales: BoardSale[]
   stockKgAvailable?: number
-  stockLots?: Array<{ productId: number; remainingKg: number }>
+  stockByProduct?: Array<{ productId: number; availableKg: number; lotKg: number; quantityKg: number }>
+  stockLots?: Array<{
+    productId: number
+    remainingKg: number
+    farmerName?: string | null
+    farmerCode?: string | null
+    farmerFatherName?: string | null
+    farmerCity?: string | null
+    dheriCode?: string | null
+  }>
 }
 
 const COMMISSION_PCT = 4
@@ -200,19 +209,36 @@ export default function DailyTradePage() {
   const sBags = parseInt(stockBags, 10) || 0
   const sBagKg = parseFloat(stockBagKg) || 40
   const sRate = parseFloat(stockRate) || bRate
-  const stockWeight = sBags * sBagKg
+  const stockWeight = Math.round(sBags * sBagKg * 100) / 100
   const stockAmount = moneyFromWeight(stockWeight, sRate)
   const stockFilled = sBags > 0
-  const stockBagsNeeded = sBags + bExtraBags
-  const stockRequiredKg = Math.round(stockBagsNeeded * sBagKg * 100) / 100
+  const extraStockBags = bExtraBags
+  const extraStockWeight = Math.round(extraStockBags * sBagKg * 100) / 100
+  const stockBagsNeeded = sBags + extraStockBags
+  const stockRequiredKg = Math.round((stockWeight + extraStockWeight) * 100) / 100
   const allStockKg = board?.stockKgAvailable ?? board?.session.stockInKg ?? 0
   const productStockKg = (() => {
     const pid = Number(productId)
+    const byProduct = board?.stockByProduct || []
+    if (pid) {
+      const row = byProduct.find((item) => item.productId === pid)
+      if (row) return row.availableKg
+    }
+    if (byProduct.length) {
+      return byProduct.reduce((sum, row) => sum + (row.availableKg || 0), 0)
+    }
     const lots = board?.stockLots || []
-    if (!pid || !lots.length) return allStockKg
-    return lots
-      .filter((lot) => lot.productId === pid)
-      .reduce((sum, lot) => sum + (lot.remainingKg || 0), 0)
+    const lotKg = pid
+      ? lots.filter((lot) => lot.productId === pid).reduce((sum, lot) => sum + (lot.remainingKg || 0), 0)
+      : lots.reduce((sum, lot) => sum + (lot.remainingKg || 0), 0)
+    if (lotKg > 0) return lotKg
+    return allStockKg
+  })()
+  const productStockLots = (() => {
+    const pid = Number(productId)
+    const lots = board?.stockLots || []
+    if (!pid) return lots
+    return lots.filter((lot) => lot.productId === pid)
   })()
   const stockEnough = stockBagsNeeded <= 0 || stockRequiredKg <= productStockKg + 0.011
   const buyerLineTotal = buyerAmount + moneyFromWeight(extraBagWeight, bRate)
@@ -221,6 +247,10 @@ export default function DailyTradePage() {
   useEffect(() => {
     if (farmerBags && !buyerBags) setBuyerBags(farmerBags)
   }, [farmerBags, buyerBags])
+
+  useEffect(() => {
+    if (!stockBags) setStockBagKg(bagKg || '40')
+  }, [bagKg, stockBags])
 
   const loadBuyerSales = useCallback(async (id: string) => {
     if (!id) {
@@ -743,17 +773,40 @@ export default function DailyTradePage() {
         </div>
         {stockBagsNeeded > 0 ? (
           <p className={`px-5 pb-2 text-sm font-medium ${stockEnough ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
-            {stockBagsNeeded} bag{stockBagsNeeded === 1 ? '' : 's'} × {formatNumber(sBagKg)} kg = {formatNumber(stockRequiredKg)} kg
-            {bExtraBags > 0 ? ` (stock ${sBags || 0} + extra ${bExtraBags})` : ''}
-            {' · '}
-            available {formatNumber(productStockKg)} kg
+            {sBags > 0 ? `${sBags} bag${sBags === 1 ? '' : 's'} × ${formatNumber(sBagKg)} kg = ${formatNumber(stockWeight)} kg` : '0 kg'}
+            {bExtraBags > 0 ? ` · extra ${bExtraBags} bag${bExtraBags === 1 ? '' : 's'} × ${formatNumber(sBagKg)} kg` : ''}
+            {' · need '}
+            {formatNumber(stockRequiredKg)} kg
+            {' · available '}
+            {formatNumber(productStockKg)} kg
             {stockEnough ? ' — stock is enough' : ' — stock is not enough'}
           </p>
         ) : (
           <p className="px-5 pb-2 text-sm text-slate-500">
-            Available Extra KG for {product?.name || 'this type'}: {formatNumber(productStockKg)} kg. Bags × bag weight is checked against this stock.
+            Available for {product?.name || 'this type'}: {formatNumber(productStockKg)} kg. Enter bags and weight per bag — total weight is checked against this stock.
           </p>
         )}
+        {productStockLots.length ? (
+          <div className="px-5 pb-4 space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Farmer stock in this type</p>
+            {productStockLots.map((lot, index) => {
+              const place = [lot.farmerCity].filter(Boolean).join(', ')
+              return (
+              <p key={`${lot.farmerCode || 'lot'}-${index}`} className="text-sm text-slate-700 dark:text-slate-200">
+                <span className="font-medium text-[#1F4D32] dark:text-[#C5A059]">
+                  {lot.farmerCode ? `ID ${lot.farmerCode}` : 'Top-up'}
+                </span>
+                {lot.farmerName ? ` · ${lot.farmerName}` : ''}
+                {lot.farmerFatherName ? ` · s/o ${lot.farmerFatherName}` : ''}
+                {place ? ` · ${place}` : ''}
+                {lot.dheriCode ? ` · ${lot.dheriCode}` : ''}
+                {' · '}
+                {formatNumber(lot.remainingKg)} kg
+              </p>
+              )
+            })}
+          </div>
+        ) : null}
         <div className="px-5 pb-5 text-sm">
           Payable now:{' '}
           <span className="font-semibold">

@@ -1,6 +1,8 @@
 import { prisma } from '@/server/db'
-import { amountFromWeight, d, round2, stockCoversRequestedKg, totalWeight } from '@/server/money'
+import { amountFromWeight, availableStockKg, d, round2, stockCoversRequestedKg, totalWeight } from '@/server/money'
 import { getWorkspace } from '@/server/workspace'
+
+type WorkspaceTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 export type IntakeStockLotInput = {
   productId: number
@@ -27,7 +29,14 @@ export function stockLotDto(row: {
   intakeDate: Date
   notes: string | null
   product?: { name: string; productCode: string }
-  farmer?: { name: string; farmerId: string } | null
+  farmer?: {
+    name: string
+    farmerId: string
+    fatherName?: string | null
+    city?: string | null
+    phone?: string | null
+    address?: string | null
+  } | null
   dheri?: { dheriId: string } | null
 }) {
   return {
@@ -38,6 +47,10 @@ export function stockLotDto(row: {
     farmerId: row.farmerId == null ? null : Number(row.farmerId),
     farmerName: row.farmer?.name ?? null,
     farmerCode: row.farmer?.farmerId ?? null,
+    farmerFatherName: row.farmer?.fatherName ?? null,
+    farmerCity: row.farmer?.city ?? null,
+    farmerPhone: row.farmer?.phone ?? null,
+    farmerAddress: row.farmer?.address ?? null,
     dheriId: row.dheriId == null ? null : Number(row.dheriId),
     dheriCode: row.dheri?.dheriId ?? null,
     remainingKg: row.remainingKg.toNumber(),
@@ -100,6 +113,85 @@ export async function deleteStockLot(id: number) {
     }
     await tx.stockLot.delete({ where: { id: lot.id } })
     return { id: Number(lot.id) }
+  })
+}
+
+async function subtractLotKgFromStock(
+  tx: WorkspaceTx,
+  productId: bigint,
+  removeKg: ReturnType<typeof d>,
+) {
+  if (removeKg.lte(0)) return
+  const stock = await tx.stock.findFirst({ where: { productId } })
+  if (!stock) return
+  const settings = await tx.businessSettings.findFirst()
+  const previous = d(stock.quantity.toString())
+  const next = previous.sub(removeKg)
+  const qty = next.lt(0) ? d(0) : next
+  await tx.stock.update({
+    where: { id: stock.id },
+    data: {
+      quantity: qty.toFixed(2),
+      lowStockAlert: qty.lt(d(settings?.lowStockThreshold?.toString() ?? 100)),
+    },
+  })
+}
+
+/** Remove every Extra KG lot and stock qty tied to a farmer. */
+export async function purgeStockForFarmer(farmerId: number | bigint) {
+  const fid = BigInt(farmerId)
+  const dheris = await prisma.dheri.findMany({
+    where: { farmerId: fid },
+    select: { id: true },
+  })
+  const dheriIds = dheris.map((row) => row.id)
+  const lots = await prisma.stockLot.findMany({
+    where: {
+      OR: [
+        { farmerId: fid },
+        ...(dheriIds.length ? [{ dheriId: { in: dheriIds } }] : []),
+      ],
+    },
+  })
+  const lotIds = lots.map((lot) => lot.id)
+  await prisma.$transaction(async (tx) => {
+    const byProduct = new Map<string, ReturnType<typeof d>>()
+    for (const lot of lots) {
+      const key = String(lot.productId)
+      byProduct.set(key, (byProduct.get(key) || d(0)).add(d(lot.remainingKg.toString())))
+    }
+    for (const [productId, removeKg] of byProduct) {
+      await subtractLotKgFromStock(tx, BigInt(productId), removeKg)
+    }
+    if (lotIds.length) {
+      await tx.stockLot.deleteMany({ where: { id: { in: lotIds } } })
+    }
+    await tx.stockTransaction.deleteMany({
+      where: {
+        OR: [
+          { farmerId: fid },
+          ...(dheriIds.length ? [{ dheriId: { in: dheriIds } }] : []),
+        ],
+      },
+    })
+  })
+}
+
+/** Remove Extra KG lots created from a dheri / farmer product. */
+export async function purgeStockForDheri(dheriId: number | bigint) {
+  const did = BigInt(dheriId)
+  const lots = await prisma.stockLot.findMany({ where: { dheriId: did } })
+  await prisma.$transaction(async (tx) => {
+    const byProduct = new Map<string, ReturnType<typeof d>>()
+    for (const lot of lots) {
+      const key = String(lot.productId)
+      byProduct.set(key, (byProduct.get(key) || d(0)).add(d(lot.remainingKg.toString())))
+    }
+    for (const [productId, removeKg] of byProduct) {
+      await subtractLotKgFromStock(tx, BigInt(productId), removeKg)
+    }
+    await tx.stockLot.deleteMany({ where: { dheriId: did } })
+    await tx.stockTransaction.deleteMany({ where: { dheriId: did } })
   })
 }
 
@@ -263,24 +355,20 @@ export async function consumeStockLotsToBags(input: {
     where: { productId: BigInt(input.productId) },
   })
   const qtyAvailable = stockRow ? d(stockRow.quantity.toString()) : d(0)
-  const totalAvailable = lotAvailable.gte(qtyAvailable) ? lotAvailable : qtyAvailable
+  const totalAvailable = availableStockKg(qtyAvailable, lotAvailable)
   const requestedBags =
     input.maxBags != null && input.maxBags >= 0 ? Math.floor(input.maxBags) : null
   let bagsFromStock: number
   let kgNeeded: ReturnType<typeof d>
   if (requestedBags != null) {
     kgNeeded = totalWeight(requestedBags, bagWeight, 0)
-    const lotCover = stockCoversRequestedKg(lotAvailable.toString(), requestedBags, bagWeight)
-    const qtyCover = stockCoversRequestedKg(qtyAvailable.toString(), requestedBags, bagWeight)
-    if (lotCover.covers || qtyCover.covers) {
-      bagsFromStock = requestedBags
-    } else {
-      bagsFromStock = Math.min(
-        requestedBags,
-        Math.max(lotCover.bagsPossible, qtyCover.bagsPossible),
+    const cover = stockCoversRequestedKg(totalAvailable.toString(), requestedBags, bagWeight)
+    if (!cover.covers) {
+      throw new Error(
+        `Not enough stock: need ${cover.neededKg.toFixed(2)} kg (${requestedBags} bag(s) × ${bagWeight.toFixed(2)} kg). Available ${cover.availableKg.toFixed(2)} kg.`,
       )
-      kgNeeded = totalWeight(bagsFromStock, bagWeight, 0)
     }
+    bagsFromStock = requestedBags
   } else {
     bagsFromStock = Math.max(0, totalAvailable.div(bagWeight).floor().toNumber())
     kgNeeded = totalWeight(bagsFromStock, bagWeight, 0)
@@ -289,7 +377,7 @@ export async function consumeStockLotsToBags(input: {
     return {
       bagsFromStock: 0,
       kgUsed: 0,
-      leftoverKg: lotAvailable.toNumber(),
+      leftoverKg: totalAvailable.toNumber(),
       ratePer40Kg: round2(input.highestRateHint ?? 0).toNumber(),
       amount: 0,
       bagWeightKg: bagWeight.toNumber(),
@@ -321,8 +409,8 @@ export async function consumeStockLotsToBags(input: {
     })
     const previous = d(stock.quantity.toString())
     const nextRaw = previous.sub(kgNeeded)
-    const lotsCover = lotAvailable.add(d('0.01')).gte(round2(kgNeeded))
-    if (nextRaw.lt(0) && !lotsCover) {
+    const cover = stockCoversRequestedKg(totalAvailable.toString(), bagsFromStock, bagWeight)
+    if (!cover.covers) {
       throw new Error(
         `Not enough stock: need ${kgNeeded.toFixed(2)} kg (${bagsFromStock} bag(s) × ${bagWeight.toFixed(2)} kg). Available ${round2(totalAvailable).toFixed(2)} kg.`,
       )
@@ -458,6 +546,29 @@ export function bagsFromWeight(kg: number, bagWeight: number) {
     wholeBags: Math.floor(kg / bw),
     usedKg: Math.floor(kg / bw) * bw,
     remainderKg: kg - Math.floor(kg / bw) * bw,
+  }
+}
+
+export async function assertStockCoversBags(
+  productId: number,
+  bags: number,
+  bagWeightKg: number | string,
+) {
+  if (bags <= 0) return
+  const lots = await prisma.stockLot.findMany({
+    where: { productId: BigInt(productId), remainingKg: { gt: 0 } },
+  })
+  const lotKg = lots.reduce((sum, lot) => sum.add(d(lot.remainingKg.toString())), d(0))
+  const stockRow = await prisma.stock.findFirst({
+    where: { productId: BigInt(productId) },
+  })
+  const qty = stockRow ? d(stockRow.quantity.toString()) : d(0)
+  const available = availableStockKg(qty, lotKg)
+  const cover = stockCoversRequestedKg(available.toString(), bags, bagWeightKg)
+  if (!cover.covers) {
+    throw new Error(
+      `Not enough stock: need ${cover.neededKg.toFixed(2)} kg (${bags} bag(s) × ${round2(bagWeightKg).toFixed(2)} kg). Available ${cover.availableKg.toFixed(2)} kg.`,
+    )
   }
 }
 

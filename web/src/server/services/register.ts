@@ -866,6 +866,8 @@ export async function updateParty(
 }
 
 export async function hideAccountsForFarmer(farmerId: number | bigint, name?: string | null, code?: string | null) {
+  const { purgeStockForFarmer } = await import('@/server/services/stock-lots')
+  await purgeStockForFarmer(farmerId)
   await retireMatchingRegisterParties({
     farmerId: BigInt(farmerId),
     name,
@@ -939,6 +941,8 @@ async function retireMatchingRegisterParties(input: {
 export async function deleteParty(id: number | bigint) {
   const party = await liveMoneyParty(id)
   if (party.linkedFarmerId) {
+    const { purgeStockForFarmer } = await import('@/server/services/stock-lots')
+    await purgeStockForFarmer(party.linkedFarmerId)
     await prisma.dheri.updateMany({
       where: { farmerId: party.linkedFarmerId, deleted: false },
       data: { deleted: true },

@@ -143,11 +143,35 @@ export default function StockPage() {
             ) : stock.map((item) => {
               const productLots = lotsByProduct.get(item.productId) || []
               const extraKg = productLots.reduce((s, l) => s + l.remainingKg, 0)
+              const farmers = new Map<string, {
+                code: string
+                name: string
+                fatherName: string
+                city: string
+                phone: string
+                kg: number
+                dheris: string[]
+              }>()
+              for (const lot of productLots) {
+                const key = lot.farmerCode || lot.farmerName || 'top-up'
+                const current = farmers.get(key) || {
+                  code: lot.farmerCode || '',
+                  name: lot.farmerName || 'Top-up',
+                  fatherName: lot.farmerFatherName || '',
+                  city: lot.farmerCity || '',
+                  phone: lot.farmerPhone || '',
+                  kg: 0,
+                  dheris: [],
+                }
+                current.kg += lot.remainingKg
+                if (lot.dheriCode && !current.dheris.includes(lot.dheriCode)) current.dheris.push(lot.dheriCode)
+                farmers.set(key, current)
+              }
               return (
                 <div key={item.id} className="flex flex-col gap-2">
                   <div className={`stat-card ${item.lowStockAlert ? 'ring-2 ring-red-400' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0 w-full">
                         <p className="text-sm text-gray-500">{item.productName}</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
                           {formatNumber(item.quantity)} kg
@@ -158,9 +182,34 @@ export default function StockPage() {
                             Extra KG batches: {formatNumber(extraKg)} kg · {productLots.length} batch{productLots.length === 1 ? '' : 'es'}
                           </p>
                         )}
+                        {[...farmers.values()].length ? (
+                          <div className="mt-3 space-y-2 border-t border-slate-200/80 dark:border-white/10 pt-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Farmer stock</p>
+                            {[...farmers.values()].map((farmer) => (
+                              <div key={`${farmer.code}-${farmer.name}`} className="rounded-lg bg-slate-50 dark:bg-white/5 px-2.5 py-2">
+                                <p className="text-xs font-semibold text-[#1F4D32] dark:text-[#C5A059]">
+                                  {farmer.code ? `ID ${farmer.code}` : 'Top-up'}
+                                  {farmer.name ? ` · ${farmer.name}` : ''}
+                                </p>
+                                {farmer.fatherName ? (
+                                  <p className="text-[11px] text-slate-500">s/o {farmer.fatherName}</p>
+                                ) : null}
+                                {farmer.city || farmer.phone ? (
+                                  <p className="text-[11px] text-slate-500 truncate">
+                                    {[farmer.city, farmer.phone].filter(Boolean).join(' · ')}
+                                  </p>
+                                ) : null}
+                                <p className="text-[11px] text-slate-700 dark:text-slate-200 mt-0.5">
+                                  {formatNumber(farmer.kg)} kg
+                                  {farmer.dheris.length ? ` · ${farmer.dheris.join(', ')}` : ''}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                       {item.lowStockAlert && (
-                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                        <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
                       )}
                     </div>
                   </div>
@@ -193,7 +242,7 @@ export default function StockPage() {
                   <Package className="h-4 w-4 text-primary" /> Extra KG batches (separate)
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Each farmer Extra KG stays in its own batch with date, rate, and dheri — not mixed into one pile.
+                  Each farmer Extra KG stays on its own batch with farmer ID, name, date, rate, and dheri.
                 </p>
               </div>
               <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
@@ -206,13 +255,15 @@ export default function StockPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[800px]">
+                <table className="w-full text-sm min-w-[920px]">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-left">
                       <th className="p-3 font-semibold text-gray-600">Batch #</th>
                       <th className="p-3 font-semibold text-gray-600">Date</th>
                       <th className="p-3 font-semibold text-gray-600">Product</th>
+                      <th className="p-3 font-semibold text-gray-600">Farmer ID</th>
                       <th className="p-3 font-semibold text-gray-600">Farmer</th>
+                      <th className="p-3 font-semibold text-gray-600">Father / place</th>
                       <th className="p-3 font-semibold text-gray-600">Dheri</th>
                       <th className="p-3 font-semibold text-gray-600">Original kg</th>
                       <th className="p-3 font-semibold text-gray-600">Remaining kg</th>
@@ -232,7 +283,13 @@ export default function StockPage() {
                         </td>
                         <td className="p-3 whitespace-nowrap">{lot.intakeDate}</td>
                         <td className="p-3 font-medium">{lot.productName}</td>
+                        <td className="p-3 font-semibold text-[#1F4D32] dark:text-[#C5A059] whitespace-nowrap">
+                          {lot.farmerCode || '—'}
+                        </td>
                         <td className="p-3">{lot.farmerName || 'Top-up'}</td>
+                        <td className="p-3 text-slate-500">
+                          {[lot.farmerFatherName ? `s/o ${lot.farmerFatherName}` : '', lot.farmerCity].filter(Boolean).join(' · ') || '—'}
+                        </td>
                         <td className="p-3">{lot.dheriCode || '—'}</td>
                         <td className="p-3">{formatNumber(lot.originalKg)}</td>
                         <td className="p-3 font-semibold text-amber-700 dark:text-amber-300">{formatNumber(lot.remainingKg)}</td>
