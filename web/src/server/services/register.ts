@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { normalizeAccountKey, normalizeOwnerCode } from '@/server/ids'
+import { normalizeAccountKey, normalizeOwnerCode, nextRegisterPersonCode } from '@/server/ids'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 import { logAudit } from '@/server/services/audit'
@@ -448,18 +448,6 @@ function partyHasNoAccountIdentity(row: {
   return !row.ownerCode && row.linkedFarmerId == null && row.linkedBuyerId == null
 }
 
-async function findPartyByExactName(name: string, deleted: boolean) {
-  const norm = normalizeAccountKey(name)
-  if (!norm) return null
-  const rows = await prisma.registerParty.findMany({
-    where: { deleted, kind: { in: [...MONEY_PARTY_KINDS] } },
-    include: moneyEntryInclude(),
-    orderBy: { updatedAt: 'desc' },
-  })
-  const matches = rows.filter((row) => normalizeAccountKey(row.name) === norm)
-  return matches.length === 1 ? matches[0] : null
-}
-
 async function findPartyByOwnerCode(code: string, deleted = false) {
   const key = normalizeAccountKey(code)
   if (!key) return null
@@ -540,56 +528,14 @@ export async function createParty(input: {
     return withTrade(partyDto(row, true), true)
   }
 
-  const account = await findExactAccountCode(name)
-  if (account) {
-    const linked = await ensureRegisterPartyForAccount(account.code, account.name, { reviveDeleted: true })
-    if (linked) {
-      const row = await prisma.registerParty.update({
-        where: { id: linked.id },
-        data: {
-          address: address ?? linked.address,
-          notes: notes ?? linked.notes,
-        },
-        include: moneyEntryInclude(),
-      })
-      return withTrade(partyDto(row, true), true)
-    }
-  }
-
-  const live = await findPartyByExactName(name, false)
-  if (live && partyHasNoAccountIdentity(live)) {
-    const row = await prisma.registerParty.update({
-      where: { id: live.id },
-      data: {
-        address: address ?? live.address,
-        notes: notes ?? live.notes,
-      },
-      include: moneyEntryInclude(),
-    })
-    return withTrade(partyDto(row, true), true)
-  }
-
-  const tombstone = await findPartyByExactName(name, true)
-  if (tombstone && partyHasNoAccountIdentity(tombstone)) {
-    const row = await prisma.registerParty.update({
-      where: { id: tombstone.id },
-      data: {
-        deleted: false,
-        name,
-        address: address ?? tombstone.address,
-        notes: notes ?? tombstone.notes,
-      },
-      include: moneyEntryInclude(),
-    })
-    return withTrade(partyDto(row, true), true)
-  }
-
+  const generated = await nextRegisterPersonCode()
   const row = await prisma.registerParty.create({
     data: {
       kind: 'PERSON',
       name,
       address,
-      notes,
+      notes: notes || `ID ${generated}`,
+      ownerCode: generated,
     },
   })
   return withTrade(partyDto({ ...row, entries: [] }), true)

@@ -31,6 +31,21 @@ export async function nextDheriCode() {
   return nextCode(rows.map((row) => row.dheriId), 'DHR')
 }
 
+/** Auto ID for Arhat Register people. Farmer/buyer IDs stay user-assigned. */
+export async function nextRegisterPersonCode() {
+  const [parties, farmers, buyers] = await Promise.all([
+    prisma.registerParty.findMany({ select: { ownerCode: true } }),
+    prisma.farmer.findMany({ select: { farmerId: true } }),
+    prisma.buyer.findMany({ select: { buyerId: true } }),
+  ])
+  const codes = [
+    ...parties.map((row) => row.ownerCode || ''),
+    ...farmers.map((row) => row.farmerId),
+    ...buyers.map((row) => row.buyerId),
+  ].filter(Boolean)
+  return nextCode(codes, 'REG')
+}
+
 export function normalizeOwnerCode(value: string | null | undefined) {
   return String(value ?? '').trim()
 }

@@ -70,6 +70,7 @@ async function main() {
         notes: '',
       })
       ids.partyId = BigInt(person.id)
+      assert(person.ownerCode && /^REG\d+$/.test(person.ownerCode), `Add Person must auto-create an ID, got ${person.ownerCode}`)
       const given = await createEntry({
         kind: 'GIVING',
         partyId: person.id,
@@ -100,7 +101,12 @@ async function main() {
         name: `Register Person ${stamp}`,
         address: 'Lahore',
       })
-      assert(reused.id === person.id, 'same person name must reuse the existing account')
+      assert(reused.id !== person.id, 'same name without a typed ID must create a new person')
+      assert(reused.ownerCode && /^REG\d+$/.test(reused.ownerCode), `second Add Person must auto-create an ID, got ${reused.ownerCode}`)
+      assert(
+        normalizeAccountKey(reused.ownerCode) !== normalizeAccountKey(person.ownerCode),
+        'auto IDs must be unique for each Add Person',
+      )
 
       const addPersonName = `Add Person ${stamp}`
       const addCodeA = `RA${stamp.slice(-6)}`
@@ -473,7 +479,7 @@ async function main() {
       )
 
       const linkedCode = `R${stamp.slice(-6)}`
-      const linkedParty = await createParty({ kind: 'GIVING', name: linkedCode })
+      const linkedParty = await createParty({ kind: 'GIVING', name: `Cash holder ${stamp}`, code: linkedCode })
       ids.linkedPartyId = BigInt(linkedParty.id)
       const givenToId = await createEntry({
         kind: 'GIVING',
