@@ -1011,11 +1011,14 @@ async function dispatch(
     if (path[1] === 'register' && path[2] === 'book' && path.length === 3) {
       return html(await bills.registerBookBill(lang))
     }
-    if (path[1] === 'register' && path[2] === 'party' && path[4] === 'balance' && path.length === 5) {
-      return html(await bills.accountBalanceBillByParty(numericId(path[3]), lang))
-    }
-    if (path[1] === 'register' && path[2] === 'party' && path.length === 4) {
-      return html(await bills.registerPartyBill(numericId(path[3]), lang))
+    if (path[1] === 'register' && path[2] === 'party') {
+      if (path[4] === 'balance' && path.length === 5) {
+        return html(await bills.accountBalanceBillByParty(numericId(path[3]), lang))
+      }
+      if (path.length === 4) {
+        return html(await bills.registerPartyBill(numericId(path[3]), lang))
+      }
+      throw new Error('Person ID is required to print')
     }
     if (path[1] === 'register' && path.length === 3) {
       return html(await bills.registerEntryBill(numericId(path[2]), lang))

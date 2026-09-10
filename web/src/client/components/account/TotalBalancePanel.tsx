@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Wallet } from 'lucide-react'
+import { ArrowDownToLine, Scale, Wallet } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
 import PrintBillButton from '../bills/PrintBillButton'
@@ -71,7 +71,7 @@ export default function TotalBalancePanel({
     <Modal open={open} onClose={onClose} title={title} size="lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-500">
-          This is the whole account: money already given or received on Arhat Register, plus product / sales history. The product bill stays product-only.
+          Whole account: Arhat Register cash plus product history. Product Print stays product-only.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <MoneyCard label="Already given" value={summary.alreadyGiven} tone={summary.alreadyGiven > 0 ? 'warn' : 'neutral'} />
@@ -108,19 +108,23 @@ export default function TotalBalancePanel({
         ) : (
           <p className="text-sm text-slate-500">No register or product lines yet for this person.</p>
         )}
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
-          {onGive ? (
-            <Button variant="secondary" onClick={onGive}>
-              <Wallet className="h-4 w-4" /> {giveLabel}
-            </Button>
-          ) : null}
-          {onReceive ? (
-            <Button variant="secondary" onClick={onReceive}>
-              <ArrowDownToLine className="h-4 w-4" /> {receiveLabel}
-            </Button>
-          ) : null}
-          <Button variant="secondary" onClick={onClose}>Close</Button>
-          <PrintBillButton variant="primary" onPrint={(lang) => onPrint(lang)} />
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-white/10">
+          <div className="flex flex-wrap gap-2">
+            {onGive ? (
+              <Button variant="secondary" onClick={onGive}>
+                <Wallet className="h-4 w-4" /> {giveLabel}
+              </Button>
+            ) : null}
+            {onReceive ? (
+              <Button variant="secondary" onClick={onReceive}>
+                <ArrowDownToLine className="h-4 w-4" /> {receiveLabel}
+              </Button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <Button variant="secondary" onClick={onClose}>Close</Button>
+            <PrintBillButton variant="primary" onPrint={(lang) => onPrint(lang)} />
+          </div>
         </div>
       </div>
     </Modal>
@@ -141,11 +145,16 @@ export function TotalBalancePreview({
       onClick={onOpen}
       className="card-3d p-5 space-y-3 w-full text-left hover:ring-2 hover:ring-primary/30 transition"
     >
-      <div>
-        <p className="text-sm font-semibold">Total balance</p>
-        <p className="text-sm text-slate-500 mt-1">
-          Tap to see money already given or received, plus complete history. Generate the total-balance bill from there. Product bill stays product-only.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Total balance</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Register cash plus product history for this ID.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 shrink-0 rounded-xl bg-[#1F4D32] px-3 py-1.5 text-sm font-medium text-white">
+          <Scale className="h-4 w-4" /> View
+        </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <MoneyCard label="Already given" value={summary.alreadyGiven} tone={summary.alreadyGiven > 0 ? 'warn' : 'neutral'} />

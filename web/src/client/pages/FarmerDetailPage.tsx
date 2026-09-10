@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Scale, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Pencil, Trash2, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
@@ -116,9 +116,6 @@ export default function FarmerDetailPage() {
                 {settled ? 'Paid' : 'Pay / Settle remaining'}
               </Button>
               <PrintBillButton label={t('print')} onPrint={(lang) => void openBill(lang)} />
-              <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
-                <Scale className="h-4 w-4" /> Total balance
-              </Button>
             </div>
           }
         />
@@ -135,28 +132,6 @@ export default function FarmerDetailPage() {
       </div>
 
       <TotalBalancePreview statement={statement} onOpen={() => setBalanceOpen(true)} />
-      <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => {
-            setIdCashForm({ amount: remainingToGive > 0 ? String(remainingToGive) : '', notes: '' })
-            setIdCashOpen('GIVING')
-          }}
-        >
-          <Wallet className="h-4 w-4" /> Give on this ID
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setIdCashForm({ amount: remainingToReceive > 0 ? String(remainingToReceive) : '', notes: '' })
-            setIdCashOpen('RECEIVING')
-          }}
-        >
-          Receive on this ID
-        </Button>
-        <Button variant="secondary" onClick={() => setBalanceOpen(true)}>
-          <FileText className="h-4 w-4" /> Open total balance
-        </Button>
-      </div>
 
       <div className="card-3d p-5">
         <p className="text-sm text-gray-500">Father / address</p>

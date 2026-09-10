@@ -596,10 +596,21 @@ export default function ArhatRegisterPage() {
   }
 
   const openPartyBill = async (id: number, lang: 'en' | 'ur', kind?: string) => {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      toast.error('This person cannot be printed')
+      return
+    }
     try {
-      const res = kind === 'balance'
-        ? await billApi.registerBalance(id, lang)
-        : await billApi.registerParty(id, lang)
+      if (kind === 'balance') {
+        try {
+          const res = await billApi.registerBalance(id, lang)
+          openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Balance')
+          return
+        } catch {
+          // Fall back to the register slip so Print never 400s for ID-less people.
+        }
+      }
+      const res = await billApi.registerParty(id, lang)
       openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), kind === 'balance' ? 'Balance' : 'Bill')
     } catch (err) {
       toast.error(billErrorMessage(err, 'Could not generate bill'))
@@ -607,12 +618,7 @@ export default function ArhatRegisterPage() {
   }
 
   const openBalanceBill = async (id: number, lang: 'en' | 'ur') => {
-    try {
-      const res = await billApi.registerBalance(id, lang)
-      openHtmlBill(typeof res.data === 'string' ? res.data : String(res.data), 'Balance')
-    } catch (err) {
-      toast.error(billErrorMessage(err, 'Could not generate balance'))
-    }
+    await openPartyBill(id, lang, 'balance')
   }
 
   const openLedgerBill = async (lang: 'en' | 'ur') => {
@@ -694,11 +700,7 @@ export default function ArhatRegisterPage() {
           </Button>
           <PrintBillButton
             size="sm"
-            kinds={[
-              { id: 'statement', label: 'Statement' },
-              { id: 'balance', label: 'Balance' },
-            ]}
-            onPrint={(lang, kind) => void openPartyBill(p.id, lang, kind)}
+            onPrint={(lang) => void openPartyBill(p.id, lang)}
           />
         </div>
       </div>
