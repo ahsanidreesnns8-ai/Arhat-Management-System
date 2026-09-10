@@ -260,6 +260,10 @@ export interface StockLot {
   farmerId?: number | null
   farmerName?: string | null
   farmerCode?: string | null
+  farmerFatherName?: string | null
+  farmerCity?: string | null
+  farmerPhone?: string | null
+  farmerAddress?: string | null
   dheriId?: number | null
   dheriCode?: string | null
   remainingKg: number

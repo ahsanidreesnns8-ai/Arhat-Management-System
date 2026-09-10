@@ -191,10 +191,15 @@ function partyFrame(party: Pick<RegisterParty, 'receivedTotal' | 'givenTotal' | 
   return side
 }
 
-function byNameThenAmount(a: RegisterParty, b: RegisterParty) {
-  const name = a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
-  if (name !== 0) return name
-  return partyFrame(a).amount - partyFrame(b).amount
+function byIdThenName(a: RegisterParty, b: RegisterParty) {
+  const ac = partyAccountCode(a)
+  const bc = partyAccountCode(b)
+  if (ac && bc) {
+    const code = ac.localeCompare(bc, undefined, { numeric: true, sensitivity: 'base' })
+    if (code !== 0) return code
+  } else if (ac && !bc) return -1
+  else if (!ac && bc) return 1
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
 }
 
 function AccountBreakdown({ party }: { party: RegisterParty }) {
@@ -332,7 +337,7 @@ export default function ArhatRegisterPage() {
 
   const query = search.trim().toLowerCase()
   const visibleParties = useMemo(
-    () => [...parties].filter((p) => matchesSearch(p, query)).sort(byNameThenAmount),
+    () => [...parties].filter((p) => matchesSearch(p, query)).sort(byIdThenName),
     [parties, query],
   )
 
@@ -354,7 +359,7 @@ export default function ArhatRegisterPage() {
     [parties, personNameKey, personIdKey],
   )
   const ledgerPeople = useMemo(
-    () => [...parties].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })),
+    () => [...parties].sort(byIdThenName),
     [parties],
   )
   const receivedPeople = visibleParties.filter((p) => partyFrame(p).kind === 'RECEIVING')
@@ -630,21 +635,23 @@ export default function ArhatRegisterPage() {
   const renderFrame = (p: RegisterParty) => {
     const side = partyFrame(p)
     return (
-      <div key={`party-${p.id}`} className="card-3d p-4 space-y-3">
-        <div>
-          <p className="font-semibold truncate">{p.name}</p>
-          {partyAccountCode(p) ? (
-            <p className="text-[11px] font-medium text-[#1F4D32] dark:text-[#C5A059] truncate whitespace-nowrap">ID {partyAccountCode(p)}</p>
-          ) : null}
-          {partyPlaceLine(p) ? (
-            <p className="text-[11px] text-slate-500 truncate">{partyPlaceLine(p)}</p>
-          ) : null}
-          {p.farmerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}</p>
-          ) : null}
-          {p.buyerName ? (
-            <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName}</p>
-          ) : null}
+      <div key={`party-${p.id}`} className="card-3d p-4 space-y-3 h-full">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{p.name}</p>
+            {partyAccountCode(p) ? (
+              <p className="text-[11px] font-medium text-[#1F4D32] dark:text-[#C5A059] truncate whitespace-nowrap">ID {partyAccountCode(p)}</p>
+            ) : null}
+            {partyPlaceLine(p) ? (
+              <p className="text-[11px] text-slate-500 truncate">{partyPlaceLine(p)}</p>
+            ) : null}
+            {p.farmerName ? (
+              <p className="text-[11px] text-slate-500 truncate">Farmer {p.farmerName}</p>
+            ) : null}
+            {p.buyerName ? (
+              <p className="text-[11px] text-slate-500 truncate">Buyer {p.buyerName}</p>
+            ) : null}
+          </div>
         </div>
         <div className={`rounded-lg px-3 py-2 text-[11px] ${
           side.kind === 'RECEIVING'
@@ -857,40 +864,67 @@ export default function ArhatRegisterPage() {
           <p className="card-3d p-5 text-sm text-slate-500">No person matches this search.</p>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-3">
+            <div className="flex gap-3">
+              <div className="hidden lg:block w-7 shrink-0" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
                 <div className="px-1 flex items-end justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Received</h3>
-                    <p className="text-[11px] text-slate-500">Left side · names A to Z</p>
+                    <p className="text-[11px] text-slate-500">Left · sorted by ID 1, 2, 3…</p>
                   </div>
                   <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{formatCurrency(receivedTotal)}</p>
                 </div>
-                {receivedPeople.length ? receivedPeople.map(renderFrame) : (
-                  <p className="card-3d p-4 text-sm text-slate-500">No received names on this side.</p>
-                )}
-              </div>
-              <div className="space-y-3">
                 <div className="px-1 flex items-end justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300">Given</h3>
-                    <p className="text-[11px] text-slate-500">Right side · names A to Z</p>
+                    <p className="text-[11px] text-slate-500">Right · sorted by ID 1, 2, 3…</p>
                   </div>
                   <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">{formatCurrency(givenTotal)}</p>
                 </div>
-                {givenPeople.length ? givenPeople.map(renderFrame) : (
-                  <p className="card-3d p-4 text-sm text-slate-500">No given names on this side.</p>
-                )}
               </div>
             </div>
+            {Array.from({ length: Math.max(receivedPeople.length, givenPeople.length, 1) }, (_, index) => (
+              <div key={`row-${index}`} className="flex gap-3 items-stretch">
+                <div className="pt-4 shrink-0">
+                  <span className="inline-flex min-w-[1.75rem] justify-center rounded-lg bg-[#1F4D32] text-white text-xs font-bold px-2 py-1">
+                    {index + 1}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 items-stretch">
+                  {receivedPeople[index]
+                    ? renderFrame(receivedPeople[index])
+                    : (
+                      <p className={`card-3d p-4 text-sm text-slate-400 ${index === 0 && !receivedPeople.length ? '' : 'hidden lg:block lg:invisible'}`}>
+                        {index === 0 && !receivedPeople.length ? 'No received names on this side.' : ''}
+                      </p>
+                    )}
+                  {givenPeople[index]
+                    ? renderFrame(givenPeople[index])
+                    : (
+                      <p className={`card-3d p-4 text-sm text-slate-400 ${index === 0 && !givenPeople.length ? '' : 'hidden lg:block lg:invisible'}`}>
+                        {index === 0 && !givenPeople.length ? 'No given names on this side.' : ''}
+                      </p>
+                    )}
+                </div>
+              </div>
+            ))}
             {settledPeople.length ? (
               <div className="space-y-3">
                 <div className="px-1">
                   <h3 className="text-sm font-semibold">Settled</h3>
-                  <p className="text-[11px] text-slate-500">These names are even, so neither word is shown.</p>
+                  <p className="text-[11px] text-slate-500">These names are even, so neither word is shown. Listed in ID order 1, 2, 3…</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {settledPeople.map(renderFrame)}
+                  {settledPeople.map((party, index) => (
+                    <div key={`settled-${party.id}`} className="grid grid-cols-[auto_1fr] gap-3 items-stretch">
+                      <div className="pt-4">
+                        <span className="inline-flex min-w-[1.75rem] justify-center rounded-lg bg-slate-600 text-white text-xs font-bold px-2 py-1">
+                          {index + 1}
+                        </span>
+                      </div>
+                      {renderFrame(party)}
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : null}

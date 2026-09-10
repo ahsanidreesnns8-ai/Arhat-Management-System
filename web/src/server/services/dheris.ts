@@ -247,6 +247,8 @@ export async function updateDheri(id: number | bigint, input: DheriInput) {
 
 export async function deleteDheri(id: number | bigint) {
   const existing = await getDheri(id)
+  const { purgeStockForDheri } = await import('@/server/services/stock-lots')
+  await purgeStockForDheri(existing.id)
   await prisma.$transaction(async (tx) => {
     const dheri = await tx.dheri.findFirst({
       where: { id: BigInt(existing.id), deleted: false },

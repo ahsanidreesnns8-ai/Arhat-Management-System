@@ -28,6 +28,13 @@ export function totalWeight(
   return round2(d(bags ?? 0).mul(d(weightPerBag ?? 40)).add(d(partialBagWeight)))
 }
 
+/** Sellable KG for a product: Extra KG lots and Stock.quantity can drift, so use the larger. */
+export function availableStockKg(quantityKg: DecimalInput, lotKg: DecimalInput) {
+  const qty = round2(quantityKg)
+  const lots = round2(lotKg)
+  return qty.gte(lots) ? qty : lots
+}
+
 /** True when available KG can cover bags × bag weight (0.01 kg rounding slack). */
 export function stockCoversRequestedKg(
   availableKg: DecimalInput,

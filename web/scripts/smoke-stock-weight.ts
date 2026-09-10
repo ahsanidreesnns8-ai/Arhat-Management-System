@@ -2,7 +2,7 @@
  * Stock sell check: bags × bag weight vs Extra KG.
  * Usage: cd web && npx tsx scripts/smoke-stock-weight.ts
  */
-import { d, round2, stockCoversRequestedKg, totalWeight } from '../src/server/money'
+import { availableStockKg, d, round2, stockCoversRequestedKg, totalWeight } from '../src/server/money'
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message)
@@ -24,5 +24,17 @@ assert(short.bagsPossible === 1, `98.9 kg should form 1 bag of 49.5, got ${short
 const slack = stockCoversRequestedKg(98.995, 2, 49.5)
 assert(slack.covers, '0.01 kg rounding slack should allow 98.995 kg to cover 99 kg')
 
-console.log('stock weight OK', exact)
+const bags48 = stockCoversRequestedKg(99, 2, 48)
+assert(bags48.covers, '99 kg must be enough for 2 bags of 48 kg (96 kg)')
+assert(bags48.neededKg === 96, `needed kg expected 96 got ${bags48.neededKg}`)
+assert(bags48.bagsPossible === 2, `possible bags expected 2 got ${bags48.bagsPossible}`)
+
+const qtyWins = availableStockKg(99, 0)
+assert(qtyWins.toFixed(2) === '99.00', `stock quantity 99 with empty lots must sell, got ${qtyWins.toFixed(2)}`)
+const lotWins = availableStockKg(50, 99)
+assert(lotWins.toFixed(2) === '99.00', `lots 99 with quantity 50 must use 99, got ${lotWins.toFixed(2)}`)
+const fromQty = stockCoversRequestedKg(qtyWins, 2, 48)
+assert(fromQty.covers, '99 kg Extra KG with empty lots must cover 2 × 48 kg')
+
+console.log('stock weight OK', exact, bags48)
 console.log('SMOKE PASS')
