@@ -498,8 +498,18 @@ export default function DailyTradePage() {
       toast.error('Select at least one sold dheri')
       return
     }
+    const billedIds = new Set(itemIds)
+    for (const id of itemIds) {
+      const row = saleItemRows.find((item) => item.id === id)
+      if (!row) continue
+      for (const other of saleItemRows) {
+        if (other.saleId === row.saleId && other.sourceType === 'BUSINESS_STOCK') {
+          billedIds.add(other.id)
+        }
+      }
+    }
     try {
-      const res = await buyerApi.getSelectedBillHtml(Number(buyerId), itemIds, lang)
+      const res = await buyerApi.getSelectedBillHtml(Number(buyerId), [...billedIds], lang)
       openHtmlBill(
         typeof res.data === 'string' ? res.data : String(res.data),
         lang === 'ur' ? 'Seller bill (Urdu)' : 'Seller bill',
@@ -648,7 +658,7 @@ export default function DailyTradePage() {
                     <td className="px-3 py-2">
                       <Link className="text-primary" to={`/buyers/${s.buyerId}`}>{s.buyerName}</Link>
                     </td>
-                    <td className="px-3 py-2">{s.items.map((i) => i.dheriCode || i.sourceType).join(', ')}</td>
+                    <td className="px-3 py-2">{s.items.map((i) => i.dheriCode || (i.sourceType === 'BUSINESS_STOCK' ? 'Stock bags' : '—')).join(', ')}</td>
                     <td className="px-3 py-2">{s.bags}</td>
                     <td className="px-3 py-2">{formatCurrency(s.amount)}</td>
                     <td className="px-3 py-2">
@@ -897,7 +907,7 @@ export default function DailyTradePage() {
                       />
                     </td>
                     <td className="px-3 py-2">{row.invoice}</td>
-                    <td className="px-3 py-2">{row.dheriCode || row.sourceType}</td>
+                    <td className="px-3 py-2">{row.dheriCode || (row.sourceType === 'BUSINESS_STOCK' ? 'Stock bags' : '—')}</td>
                     <td className="px-3 py-2">{row.farmerName || '—'}</td>
                     <td className="px-3 py-2">{row.bags}</td>
                     <td className="px-3 py-2">{formatCurrency(row.amount)}</td>

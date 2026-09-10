@@ -119,7 +119,7 @@ export default function BuyerDetailPage() {
       saleId: sale.id,
       saleDate: sale.saleDate,
       product: item.productName || `Product #${item.productId}`,
-      dheri: item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'STOCK' : '—'),
+      dheri: item.dheriCode || (item.sourceType === 'BUSINESS_STOCK' ? 'Stock bags' : '—'),
       farmer: item.farmerName || '—',
       bags: item.numberOfBags,
       weight: item.totalWeight ?? (item.numberOfBags * item.weightPerBag + (item.partialBagWeight || 0)),

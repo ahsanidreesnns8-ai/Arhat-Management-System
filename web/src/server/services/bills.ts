@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
 import { copyrightText, creatorCreditHtml, rtcMarkHtml } from '@/lib/branding'
 import { hijriInfo, safeTimeZone } from '@/lib/hijri'
@@ -385,6 +386,55 @@ function bagWord(urdu: boolean) {
   }
 }
 
+function isStockSource(sourceType?: string | null) {
+  return String(sourceType || '').toUpperCase() === 'BUSINESS_STOCK'
+}
+
+function stockBagsLabel(urdu: boolean) {
+  return urdu ? 'اسٹاک بوریاں' : 'Stock bags'
+}
+
+function invoiceWithStock(invoice: string, sourceType?: string | null, urdu = false) {
+  if (!isStockSource(sourceType)) return invoice
+  return `${invoice} · ${stockBagsLabel(urdu)}`
+}
+
+function partyWithStock(name: string, sourceType?: string | null, urdu = false) {
+  if (!isStockSource(sourceType)) return name
+  return `${stockBagsLabel(urdu)}${name ? ` · ${name}` : ''}`
+}
+
+const saleItemBillInclude = {
+  product: true,
+  dheri: true,
+  farmer: true,
+  sale: true,
+} as const
+
+async function withStockBagsFromSameSales(
+  items: Array<Prisma.SaleItemGetPayload<{ include: typeof saleItemBillInclude }>>,
+) {
+  const saleIds = [...new Set(items.map((item) => item.saleId))]
+  if (!saleIds.length) return items
+  const have = new Set(items.map((item) => String(item.id)))
+  const extras = await prisma.saleItem.findMany({
+    where: {
+      saleId: { in: saleIds },
+      sourceType: 'BUSINESS_STOCK',
+    },
+    include: saleItemBillInclude,
+    orderBy: { id: 'asc' },
+  })
+  const merged = [...items]
+  for (const extra of extras) {
+    if (have.has(String(extra.id))) continue
+    merged.push(extra)
+    have.add(String(extra.id))
+  }
+  merged.sort((a, b) => Number(a.id) - Number(b.id))
+  return merged
+}
+
 /** Exact weight text — no rounding. Amounts still use money(). */
 function weightLabel(value: DecimalInput) {
   const x = d(value)
@@ -733,7 +783,8 @@ export async function buyerBill(id: number | bigint, lang = 'en') {
   const w = bagWord(urdu)
   const flat = buyer.sales.flatMap((sale) =>
     sale.items.map((item) => ({
-      invoice: sale.invoiceNumber,
+      invoice: invoiceWithStock(sale.invoiceNumber, item.sourceType, urdu),
+      sourceType: item.sourceType,
       product: item.product.name,
       bags: item.numberOfBags,
       extraKg: item.partialBagWeight,
@@ -841,26 +892,22 @@ export async function buyerBillSelected(
       id: { in: saleItemIds.map((id) => BigInt(id)) },
       sale: { buyerId: buyer.id, deleted: false },
     },
-    include: {
-      product: true,
-      dheri: true,
-      farmer: true,
-      sale: true,
-    },
+    include: saleItemBillInclude,
     orderBy: { id: 'asc' },
   })
   if (!items.length) throw new Error('No matching purchase lines found')
+  const billedItems = await withStockBagsFromSameSales(items)
 
   const chunkSize =
-    groupSize != null && groupSize > 0 ? groupSize : items.length
-  const chunks: typeof items[] = []
-  for (let i = 0; i < items.length; i += chunkSize) {
-    chunks.push(items.slice(i, i + chunkSize))
+    groupSize != null && groupSize > 0 ? groupSize : billedItems.length
+  const chunks: typeof billedItems[] = []
+  for (let i = 0; i < billedItems.length; i += chunkSize) {
+    chunks.push(billedItems.slice(i, i + chunkSize))
   }
 
   const sheets = chunks.map((chunk, index) => {
     const rows = chunk.map((item) => [
-      item.sale.invoiceNumber,
+      invoiceWithStock(item.sale.invoiceNumber, item.sourceType, urdu),
       digitStyle(item.numberOfBags, 3),
       extraStyle(item.partialBagWeight, 2, 3),
       digitStyle(item.weightPerBag.toNumber(), 2),
@@ -953,7 +1000,9 @@ export async function saleBill(
     table(
       w.saleCols,
       items.map((item) => [
-        party === 'buyer' ? sale.buyer.name : (item.farmer?.name ?? ''),
+        party === 'buyer'
+          ? partyWithStock(sale.buyer.name, item.sourceType, urdu)
+          : (item.farmer?.name ?? ''),
         digitStyle(item.numberOfBags, 3),
         extraStyle(item.partialBagWeight, 2, 3),
         digitStyle(item.weightPerBag.toNumber(), 2),
