@@ -43,6 +43,7 @@ export default function FarmerProductPage() {
   const [numberOfBags, setNumberOfBags] = useState('0')
   const [weightPerBag, setWeightPerBag] = useState('40')
   const [partialBagWeight, setPartialBagWeight] = useState('0')
+  const [kgs, setKgs] = useState('0')
   const [marketRate, setMarketRate] = useState('0')
   const [paymentNow, setPaymentNow] = useState('0')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
@@ -92,12 +93,16 @@ export default function FarmerProductPage() {
     [dheris, farmerId, nameSearch],
   )
 
+  const extraKgValue = parseFloat(partialBagWeight) || 0
+  const kgsValue = parseFloat(kgs) || 0
+  const billedKg = extraKgValue + kgsValue
   const payload = useMemo(() => ({
     numberOfBags: parseInt(numberOfBags) || 0,
     weightPerBag: parseFloat(weightPerBag) || 40,
-    partialBagWeight: parseFloat(partialBagWeight) || 0,
+    partialBagWeight: billedKg,
+    stockExtraKg: billedKg,
     marketRate: parseFloat(marketRate) || 0,
-  }), [numberOfBags, weightPerBag, partialBagWeight, marketRate])
+  }), [numberOfBags, weightPerBag, billedKg, marketRate])
 
   const runCalculation = useCallback(async () => {
     try {
@@ -117,6 +122,7 @@ export default function FarmerProductPage() {
     setNumberOfBags('0')
     setWeightPerBag('40')
     setPartialBagWeight('0')
+    setKgs('0')
     setMarketRate('0')
     setPaymentNow('0')
     setNotes('')
@@ -139,8 +145,8 @@ export default function FarmerProductPage() {
       toast.error('Enter the dheri number you assign (first in sells first)')
       return
     }
-    if ((parseInt(numberOfBags) || 0) <= 0) {
-      toast.error('Number of bags must be greater than zero')
+    if ((parseInt(numberOfBags) || 0) <= 0 && billedKg <= 0) {
+      toast.error('Enter bags, Extra KG, or KGs')
       return
     }
     if ((parseFloat(marketRate) || 0) < 0) {
@@ -308,6 +314,7 @@ export default function FarmerProductPage() {
                         setNumberOfBags(String(d.numberOfBags || 0))
                         setWeightPerBag(String(d.weightPerBag || 40))
                         setPartialBagWeight(String(d.partialBagWeight || 0))
+                        setKgs('0')
                         setMarketRate(String(d.marketRate || 0))
                         setNotes(d.notes || '')
                         setDheriCode(d.dheriId || '')
@@ -367,11 +374,18 @@ export default function FarmerProductPage() {
             <BagsExtraRow
               bags={numberOfBags}
               extraKg={partialBagWeight}
+              kgs={kgs}
               bagKg={weightPerBag}
               onBags={setNumberOfBags}
               onExtraKg={setPartialBagWeight}
+              onKgs={setKgs}
               onBagKg={setWeightPerBag}
+              bagsRequired={false}
+              extraKgLabel={`${t('extraKg')} → stock`}
             />
+            <p className="text-xs text-gray-500">
+              Bags are optional. Extra KG and KGs both save the farmer product, commission, and stock the same way as bags.
+            </p>
             <Input label="Market Rate / 40kg (optional — set at auction sell)" type="number" step="0.01" value={marketRate} onChange={(e) => setMarketRate(e.target.value)} />
             <Input label="Date" type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} />
             <Input label="Pay now (optional)" type="number" step="0.01" value={paymentNow} onChange={(e) => setPaymentNow(e.target.value)} />

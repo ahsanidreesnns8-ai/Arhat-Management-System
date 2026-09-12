@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { normalizeOwnerCode } from '@/server/ids'
+import { freeBuyerCode, normalizeOwnerCode, retireBuyerRecord } from '@/server/ids'
 import type { PartyInput } from '@/server/services/farmers'
 import { listPaymentsByBuyer } from '@/server/services/payments'
 import { listSalesByBuyer } from '@/server/services/sales'
@@ -133,6 +133,7 @@ export async function createBuyer(input: PartyInput) {
   if (!buyerId) throw new Error('Buyer ID is required — enter the ID you assign')
   const taken = await prisma.buyer.findFirst({ where: { buyerId, deleted: false } })
   if (taken) throw new Error(`Buyer ID ${buyerId} is already used`)
+  await freeBuyerCode(buyerId)
   const row = await prisma.buyer.create({
     data: {
       buyerId,
@@ -172,6 +173,7 @@ export async function updateBuyer(id: number | bigint, input: PartyInput) {
       where: { buyerId, deleted: false, id: { not: BigInt(id) } },
     })
     if (taken) throw new Error(`Buyer ID ${buyerId} is already used`)
+    await freeBuyerCode(buyerId)
     data.buyerId = buyerId
   }
   const row = await prisma.buyer.update({
@@ -187,10 +189,7 @@ export async function deleteBuyer(id: number | bigint) {
   const buyer = await getBuyer(id)
   const { hideAccountsForBuyer } = await import('@/server/services/register')
   await hideAccountsForBuyer(buyer.id, buyer.name, buyer.buyerId)
-  await prisma.buyer.update({
-    where: { id: BigInt(id) },
-    data: { deleted: true },
-  })
+  await retireBuyerRecord(id)
 }
 
 export async function getBuyerLedger(id: number | bigint) {

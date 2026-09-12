@@ -123,6 +123,7 @@ export const translations = {
     weightPerBag: 'Weight per bag (kg)',
     qtyOfOneBag: 'Qty of one bag (kg)',
     extraKg: 'Extra KG',
+    kgs: 'KGs',
   },
   ur: {
     brandName: 'رحمانی',
@@ -246,6 +247,7 @@ export const translations = {
     weightPerBag: 'ایک بوری کا وزن (کلو)',
     qtyOfOneBag: 'ایک بوری کا وزن (کلو)',
     extraKg: 'اضافی کلو',
+    kgs: 'کلو',
   },
 } as const
 

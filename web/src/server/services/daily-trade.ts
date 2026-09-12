@@ -297,6 +297,7 @@ export async function getDailyBoard(
         dheriCode: item.dheri?.dheriId,
         farmerId: item.farmerId == null ? null : Number(item.farmerId),
         weightPerBag: item.weightPerBag.toNumber(),
+        extraKg: item.partialBagWeight.toNumber(),
         dayBatchId: item.dheri?.dayBatchId == null ? null : Number(item.dheri.dayBatchId),
         batchNumber: item.dheri?.dayBatch?.batchNumber ?? null,
       })),
@@ -624,7 +625,8 @@ export type AddFarmerKgToStockInput = {
   farmerId: number
   productId: number
   dheriCode?: string | null
-  extraKg: number | string
+  extraKg?: number | string
+  farmerKgs?: number | string
   farmerRatePer40: number | string
   weightPerBag?: number | string
   farmerBags?: number
@@ -638,7 +640,7 @@ export type AddFarmerKgToStockInput = {
 export async function addFarmerKgToStock(input: AddFarmerKgToStockInput, userId?: bigint) {
   if (input.farmerId == null) throw new Error('Choose a farmer')
   if (input.productId == null) throw new Error('Choose dheri type')
-  const extraKg = Number(input.extraKg) || 0
+  const extraKg = (Number(input.extraKg) || 0) + (Number(input.farmerKgs) || 0)
   if (extraKg <= 0) throw new Error('Enter KG to add to stock')
   const farmerRate = Number(input.farmerRatePer40) || 0
   if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
@@ -703,10 +705,12 @@ export type DeskSoldInput = {
   farmerBags: number
   weightPerBag?: number | string
   extraKg?: number | string
+  farmerKgs?: number | string
   farmerRatePer40: number | string
   buyerId: number
   buyerBags: number
   extraBags?: number
+  buyerKgs?: number | string
   buyerRatePer40: number | string
   stockBags?: number
   stockWeightPerBag?: number | string
@@ -725,10 +729,8 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
   if (input.productId == null) throw new Error('Choose dheri type')
   const dheriCode = String(input.dheriCode || '').trim()
   if (!dheriCode) throw new Error('Enter the dheri number you assigned at entrance')
-  const farmerBags = Number(input.farmerBags) || 0
-  const buyerBags = Number(input.buyerBags) || 0
-  if (farmerBags <= 0) throw new Error('Farmer bags must be greater than zero')
-  if (buyerBags <= 0) throw new Error('Buyer bags must be greater than zero')
+  const farmerBags = Math.max(0, Number(input.farmerBags) || 0)
+  const buyerBags = Math.max(0, Number(input.buyerBags) || 0)
   const farmerRate = Number(input.farmerRatePer40) || 0
   const buyerRate = Number(input.buyerRatePer40) || 0
   if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
@@ -736,11 +738,20 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
 
   const bagKg = Number(input.weightPerBag) || 40
   const extraKg = Number(input.extraKg) || 0
+  const farmerKgs = Number(input.farmerKgs) || 0
+  const buyerKgs = Number(input.buyerKgs) || 0
+  const farmerLooseKg = extraKg + farmerKgs
+  if (farmerBags <= 0 && farmerLooseKg <= 0) {
+    throw new Error('Enter farmer bags, Extra KG, or KGs')
+  }
   const extraBags = Math.max(0, Number(input.extraBags) || 0)
   const stockBags = Math.max(0, Number(input.stockBags) || 0)
   const stockBagKg = Number(input.stockWeightPerBag) || bagKg
   const stockRate = Number(input.stockRatePer40) || buyerRate
   const stockToSell = extraBags + stockBags
+  if (buyerBags <= 0 && buyerKgs <= 0 && stockToSell <= 0) {
+    throw new Error('Enter buyer bags, Extra bag, or KGs')
+  }
   if (stockToSell > 0) {
     const { assertStockCoversBags } = await import('@/server/services/stock-lots')
     await assertStockCoversBags(input.productId, stockToSell, stockBagKg)
@@ -777,7 +788,8 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
         dheriCode,
         numberOfBags: farmerBags,
         weightPerBag: bagKg,
-        partialBagWeight: extraKg,
+        partialBagWeight: farmerLooseKg,
+        stockExtraKg: extraKg,
         marketRate: farmerRate,
         paymentNow: 0,
         notes: input.notes ?? undefined,
@@ -816,16 +828,20 @@ export async function markDeskSold(input: DeskSoldInput, userId?: bigint) {
         input.notes ||
         `Daily Trade sold dheri ${dheriCode} to buyer`,
       items: [
-        {
-          productId: input.productId,
-          sourceType: 'FARMER',
-          farmerId: input.farmerId,
-          dheriId,
-          numberOfBags: buyerBags,
-          weightPerBag: bagKg,
-          partialBagWeight: 0,
-          rate: buyerRate,
-        },
+        ...(buyerBags > 0 || buyerKgs > 0
+          ? [
+              {
+                productId: input.productId,
+                sourceType: 'FARMER' as const,
+                farmerId: input.farmerId,
+                dheriId,
+                numberOfBags: buyerBags,
+                weightPerBag: bagKg,
+                partialBagWeight: buyerKgs,
+                rate: buyerRate,
+              },
+            ]
+          : []),
         ...(formed.bagsFromStock > 0
           ? [
               {
@@ -888,21 +904,28 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
   if (input.productId == null) throw new Error('Choose dheri type')
   const dheriCode = String(input.dheriCode || '').trim()
   if (!dheriCode) throw new Error('Enter the dheri number you assigned at entrance')
-  const farmerBags = Number(input.farmerBags) || 0
-  const buyerBags = Number(input.buyerBags) || 0
-  if (farmerBags <= 0) throw new Error('Farmer bags must be greater than zero')
-  if (buyerBags <= 0) throw new Error('Buyer bags must be greater than zero')
+  const farmerBags = Math.max(0, Number(input.farmerBags) || 0)
+  const buyerBags = Math.max(0, Number(input.buyerBags) || 0)
   const farmerRate = Number(input.farmerRatePer40) || 0
   const buyerRate = Number(input.buyerRatePer40) || 0
   if (farmerRate <= 0) throw new Error('Enter farmer rate per 40kg')
   if (buyerRate <= 0) throw new Error('Enter buyer rate per 40kg')
   const bagKg = Number(input.weightPerBag) || 40
   const extraKg = Number(input.extraKg) || 0
+  const farmerKgs = Number(input.farmerKgs) || 0
+  const buyerKgs = Number(input.buyerKgs) || 0
+  const farmerLooseKg = extraKg + farmerKgs
+  if (farmerBags <= 0 && farmerLooseKg <= 0) {
+    throw new Error('Enter farmer bags, Extra KG, or KGs')
+  }
   const extraBags = Math.max(0, Number(input.extraBags) || 0)
   const stockBags = Math.max(0, Number(input.stockBags) || 0)
   const stockBagKg = Number(input.stockWeightPerBag) || bagKg
   const stockRate = Number(input.stockRatePer40) || buyerRate
   const stockToSell = extraBags + stockBags
+  if (buyerBags <= 0 && buyerKgs <= 0 && stockToSell <= 0) {
+    throw new Error('Enter buyer bags, Extra bag, or KGs')
+  }
 
   const sale = await prisma.sale.findFirst({
     where: { id: BigInt(saleId), deleted: false },
@@ -922,14 +945,15 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
   })
   if (clash) throw new Error(`Dheri ${dheriCode} is already used`)
 
-  const extraDiffPreview = round2(extraKg).sub(d(dheri.partialBagWeight.toString()))
-  if (extraDiffPreview.lt(0)) {
-    const lot = await prisma.stockLot.findFirst({ where: { dheriId: dheri.id } })
-    if (lot && d(lot.remainingKg.toString()).lt(extraDiffPreview.abs())) {
-      throw new Error(
-        'Cannot reduce Extra KG below what was already sold from stock. Restore stock bags first.',
-      )
-    }
+  const extraLotPreview = await prisma.stockLot.findFirst({ where: { dheriId: dheri.id } })
+  const oldStockExtraPreview = extraLotPreview
+    ? d(extraLotPreview.originalKg.toString())
+    : d(0)
+  const extraDiffPreview = round2(extraKg).sub(oldStockExtraPreview)
+  if (extraDiffPreview.lt(0) && extraLotPreview && d(extraLotPreview.remainingKg.toString()).lt(extraDiffPreview.abs())) {
+    throw new Error(
+      'Cannot reduce Extra KG below what was already sold from stock. Restore stock bags first.',
+    )
   }
 
   const { saveCalculation, calculatePrice } = await import('@/server/services/calculator')
@@ -942,7 +966,6 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
   const oldBuyerId = Number(sale.buyerId)
   const oldPayable = d(dheri.farmerReceivable.toString())
   const oldUnpaid = d(sale.totalAmount.toString()).sub(d(sale.paidAmount.toString()))
-  const oldExtra = d(dheri.partialBagWeight.toString())
   const stockItems = sale.items.filter((item) => item.sourceType === 'BUSINESS_STOCK')
   const oldStockKg = stockItems.reduce((sum, item) => sum + item.totalWeight.toNumber(), 0)
   const oldStockProductId = stockItems[0] ? Number(stockItems[0].productId) : Number(dheri.productId)
@@ -962,7 +985,7 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
   const calculation = await calculatePrice({
     numberOfBags: farmerBags,
     weightPerBag: bagKg,
-    partialBagWeight: extraKg,
+    partialBagWeight: farmerLooseKg,
     marketRate: farmerRate,
   })
 
@@ -992,15 +1015,15 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
   await saveCalculation(dheri.id, {
     numberOfBags: farmerBags,
     weightPerBag: bagKg,
-    partialBagWeight: extraKg,
+    partialBagWeight: farmerLooseKg,
     marketRate: farmerRate,
   })
 
-  const extraDiff = round2(extraKg).sub(oldExtra)
   const extraLot = await prisma.stockLot.findFirst({
     where: { dheriId: dheri.id },
     orderBy: { id: 'asc' },
   })
+  const extraDiff = round2(extraKg).sub(extraLot ? d(extraLot.originalKg.toString()) : d(0))
   if (extraDiff.gt(0)) {
     if (extraLot) {
       await prisma.stockLot.update({
@@ -1096,7 +1119,7 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
     }
   }
 
-  const farmerWeight = totalWeight(buyerBags, bagKg, 0)
+  const farmerWeight = totalWeight(buyerBags, bagKg, buyerKgs)
   const farmerAmount = amountFromWeight(farmerWeight, buyerRate)
   const stockWeight = totalWeight(formed.bagsFromStock, formed.bagWeightKg || stockBagKg, 0)
   const stockAmount = amountFromWeight(stockWeight, formed.ratePer40Kg)
@@ -1109,21 +1132,23 @@ export async function updateDeskSold(input: DeskSoldEditInput, userId?: bigint) 
 
   await prisma.$transaction(async (tx) => {
     await tx.saleItem.deleteMany({ where: { saleId: sale.id } })
-    await tx.saleItem.create({
-      data: {
-        saleId: sale.id,
-        productId: BigInt(input.productId),
-        sourceType: 'FARMER',
-        farmerId: BigInt(input.farmerId),
-        dheriId: dheri.id,
-        numberOfBags: buyerBags,
-        weightPerBag: String(bagKg),
-        partialBagWeight: '0',
-        totalWeight: farmerWeight.toFixed(2),
-        rate: String(buyerRate),
-        amount: farmerAmount.toFixed(2),
-      },
-    })
+    if (buyerBags > 0 || buyerKgs > 0) {
+      await tx.saleItem.create({
+        data: {
+          saleId: sale.id,
+          productId: BigInt(input.productId),
+          sourceType: 'FARMER',
+          farmerId: BigInt(input.farmerId),
+          dheriId: dheri.id,
+          numberOfBags: buyerBags,
+          weightPerBag: String(bagKg),
+          partialBagWeight: String(buyerKgs),
+          totalWeight: farmerWeight.toFixed(2),
+          rate: String(buyerRate),
+          amount: farmerAmount.toFixed(2),
+        },
+      })
+    }
     if (formed.bagsFromStock > 0) {
       await tx.saleItem.create({
         data: {
