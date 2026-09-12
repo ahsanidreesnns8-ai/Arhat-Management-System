@@ -104,6 +104,30 @@ export default function FarmerProductPage() {
     marketRate: parseFloat(marketRate) || 0,
   }), [numberOfBags, weightPerBag, billedKg, marketRate])
 
+  const localResult = useMemo(() => {
+    const bags = parseInt(numberOfBags, 10) || 0
+    const bagKg = parseFloat(weightPerBag) || 40
+    const rate = parseFloat(marketRate) || 0
+    const weight = Math.round((bags * bagKg + billedKg) * 100) / 100
+    const totalAmount = weight > 0 && rate > 0 ? Math.round((weight / 40) * rate + Number.EPSILON) : 0
+    const arhatShare = Math.round(totalAmount * 0.03 + Number.EPSILON)
+    const munshiNigranShare = Math.round(totalAmount * 0.007 + Number.EPSILON)
+    const workersShare = Math.round(totalAmount * 0.003 + Number.EPSILON)
+    const commission = arhatShare + munshiNigranShare + workersShare
+    return {
+      ...emptyResult,
+      totalWeight: weight,
+      totalAmount,
+      commission,
+      farmerFinalBalance: totalAmount - commission,
+      arhatShare,
+      munshiNigranShare,
+      workersShare,
+    }
+  }, [numberOfBags, weightPerBag, billedKg, marketRate])
+
+  const summary = result.totalAmount > 0 ? result : localResult
+
   const runCalculation = useCallback(async () => {
     try {
       const res = await calculatorApi.calculate(payload)
@@ -222,13 +246,13 @@ export default function FarmerProductPage() {
   }
 
   const resultRows = [
-    { label: 'Total Weight', value: `${formatNumber(result.totalWeight)} kg` },
-    { label: 'Total Amount', value: formatCurrency(result.totalAmount), highlight: true },
-    { label: 'Commission (4%)', value: formatCurrency(result.commission), accent: true },
-    { label: 'Arhat Head (3%)', value: formatCurrency(result.arhatShare) },
-    { label: 'Paledari Head (0.70%)', value: formatCurrency(result.munshiNigranShare) },
-    { label: 'Tolai Head (0.30%)', value: formatCurrency(result.workersShare) },
-    { label: 'Farmer Payable', value: formatCurrency(result.farmerFinalBalance), highlight: true },
+    { label: 'Total Weight', value: `${formatNumber(summary.totalWeight)} kg` },
+    { label: 'Total Amount', value: formatCurrency(summary.totalAmount), highlight: true },
+    { label: 'Commission (4%)', value: formatCurrency(summary.commission), accent: true },
+    { label: 'Arhat Head (3%)', value: formatCurrency(summary.arhatShare) },
+    { label: 'Paledari Head (0.70%)', value: formatCurrency(summary.munshiNigranShare) },
+    { label: 'Tolai Head (0.30%)', value: formatCurrency(summary.workersShare) },
+    { label: 'Farmer Payable', value: formatCurrency(summary.farmerFinalBalance), highlight: true },
   ]
 
   useVoicePageActions({
