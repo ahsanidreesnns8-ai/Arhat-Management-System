@@ -125,8 +125,9 @@ export default function BuyersPage() {
       toast.success('Buyer deleted')
       setDeleteId(null)
       load()
-    } catch {
-      toast.error('Failed to delete buyer')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Failed to delete buyer')
     }
   }
 

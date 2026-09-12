@@ -129,8 +129,9 @@ export default function FarmersPage() {
       toast.success('Farmer deleted')
       setDeleteId(null)
       load()
-    } catch {
-      toast.error('Failed to delete farmer')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(msg || 'Failed to delete farmer')
     }
   }
 
