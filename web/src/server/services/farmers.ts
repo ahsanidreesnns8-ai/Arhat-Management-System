@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db'
-import { normalizeOwnerCode } from '@/server/ids'
+import { freeFarmerCode, normalizeOwnerCode, retireFarmerRecord } from '@/server/ids'
 import { listDherisByFarmer } from '@/server/services/dheris'
 import { listPaymentsByFarmer } from '@/server/services/payments'
 import { listTrucksByFarmer } from '@/server/services/trucks'
@@ -161,6 +161,7 @@ export async function createFarmer(input: PartyInput) {
     where: { farmerId, deleted: false },
   })
   if (taken) throw new Error(`Farmer ID ${farmerId} is already used`)
+  await freeFarmerCode(farmerId)
   const row = await prisma.farmer.create({
     data: {
       farmerId,
@@ -200,6 +201,7 @@ export async function updateFarmer(id: number | bigint, input: PartyInput) {
       where: { farmerId, deleted: false, id: { not: BigInt(id) } },
     })
     if (taken) throw new Error(`Farmer ID ${farmerId} is already used`)
+    await freeFarmerCode(farmerId)
     data.farmerId = farmerId
   }
   const row = await prisma.farmer.update({
@@ -215,10 +217,7 @@ export async function deleteFarmer(id: number | bigint) {
   const farmer = await getFarmer(id)
   const { hideAccountsForFarmer } = await import('@/server/services/register')
   await hideAccountsForFarmer(farmer.id, farmer.name, farmer.farmerId)
-  await prisma.farmer.update({
-    where: { id: BigInt(id) },
-    data: { deleted: true },
-  })
+  await retireFarmerRecord(id)
 }
 
 export async function getFarmerLedger(id: number | bigint) {

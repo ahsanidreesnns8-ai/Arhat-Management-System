@@ -13,6 +13,7 @@ import { compactSearchText, normalizeAccountKey } from '@/lib/account-key'
 import { billErrorMessage, openHtmlBill } from '../utils/bill'
 import { formatCurrency } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
+import { loadRegisterDraft, saveRegisterDraft } from '../utils/register-draft'
 import { isOwnerFinanceRole } from '../../lib/roles'
 import { Navigate, Link, useSearchParams } from 'react-router-dom'
 import type { Farmer, RegisterEntry, RegisterParty, ZakatSummary } from '../types'
@@ -253,7 +254,11 @@ export default function ArhatRegisterPage() {
   const { user } = useAuth()
   const isOwner = isOwnerFinanceRole(user?.role)
   const [searchParams] = useSearchParams()
-  const [section, setSection] = useState<Section>('PEOPLE')
+  const savedDraft = useMemo(
+    () => loadRegisterDraft(user?.workspace, user?.username),
+    [user?.workspace, user?.username],
+  )
+  const [section, setSection] = useState<Section>(savedDraft?.section || 'PEOPLE')
   const [parties, setParties] = useState<RegisterParty[]>([])
   const [entries, setEntries] = useState<RegisterEntry[]>([])
   const [zakat, setZakat] = useState<ZakatSummary | null>(null)
@@ -261,20 +266,20 @@ export default function ArhatRegisterPage() {
   const [buyers, setBuyers] = useState<Array<{ id: number; buyerId: string; name: string; address?: string | null }>>([])
   const [loading, setLoading] = useState(true)
 
-  const [personOpen, setPersonOpen] = useState(false)
-  const [giveOpen, setGiveOpen] = useState(false)
-  const [zakatOpen, setZakatOpen] = useState(false)
-  const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [personOpen, setPersonOpen] = useState(Boolean(savedDraft?.personOpen))
+  const [giveOpen, setGiveOpen] = useState(Boolean(savedDraft?.giveOpen))
+  const [zakatOpen, setZakatOpen] = useState(Boolean(savedDraft?.zakatOpen))
+  const [advanceOpen, setAdvanceOpen] = useState(Boolean(savedDraft?.advanceOpen))
   const [saving, setSaving] = useState(false)
 
-  const [person, setPerson] = useState({ code: '', name: '', address: '', notes: '' })
-  const [money, setMoney] = useState({ partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
-  const [zakatForm, setZakatForm] = useState({ amount: '', notes: '' })
-  const [advance, setAdvance] = useState({ farmerId: '', amount: '', notes: '' })
-  const [search, setSearch] = useState(() => searchParams.get('q') || '')
-  const [editOpen, setEditOpen] = useState(false)
+  const [person, setPerson] = useState(savedDraft?.person || { code: '', name: '', address: '', notes: '' })
+  const [money, setMoney] = useState(savedDraft?.money || { partyId: '', amount: '', notes: '', kind: 'GIVING' as MoneyKind })
+  const [zakatForm, setZakatForm] = useState(savedDraft?.zakatForm || { amount: '', notes: '' })
+  const [advance, setAdvance] = useState(savedDraft?.advance || { farmerId: '', amount: '', notes: '' })
+  const [search, setSearch] = useState(() => searchParams.get('q') || savedDraft?.search || '')
+  const [editOpen, setEditOpen] = useState(Boolean(savedDraft?.editOpen && savedDraft?.editForm?.id))
   const [editLedger, setEditLedger] = useState<RegisterParty | null>(null)
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState(savedDraft?.editForm || {
     id: 0,
     code: '',
     name: '',
@@ -330,6 +335,51 @@ export default function ArhatRegisterPage() {
 
   useEffect(() => { void load() }, [load])
 
+  useEffect(() => {
+    saveRegisterDraft(
+      {
+        section,
+        search,
+        personOpen,
+        giveOpen,
+        zakatOpen,
+        advanceOpen,
+        editOpen,
+        person,
+        money,
+        zakatForm,
+        advance,
+        editForm,
+      },
+      user?.workspace,
+      user?.username,
+    )
+  }, [
+    section,
+    search,
+    personOpen,
+    giveOpen,
+    zakatOpen,
+    advanceOpen,
+    editOpen,
+    person,
+    money,
+    zakatForm,
+    advance,
+    editForm,
+    user?.workspace,
+    user?.username,
+  ])
+
+  useEffect(() => {
+    if (!editOpen || !editForm.id || editLedger) return
+    void registerApi.getParty(editForm.id).then((res) => {
+      setEditLedger(res.data.data || null)
+    }).catch(() => {
+      setEditOpen(false)
+    })
+  }, [editOpen, editForm.id, editLedger])
+
   const selectedParty = useMemo(
     () => parties.find((p) => String(p.id) === money.partyId) || null,
     [parties, money.partyId],
@@ -381,7 +431,12 @@ export default function ArhatRegisterPage() {
   if (!isOwner) return <Navigate to="/dashboard" replace />
 
   const openMoney = (kind: MoneyKind, partyId = '') => {
-    setMoney({ partyId, amount: '', notes: '', kind })
+    setMoney((prev) => ({
+      partyId: partyId || prev.partyId,
+      amount: prev.amount,
+      notes: prev.notes,
+      kind,
+    }))
     setGiveOpen(true)
   }
 
@@ -739,7 +794,7 @@ export default function ArhatRegisterPage() {
       {section === 'PEOPLE' && (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
-          <Button onClick={() => { setPerson({ code: '', name: '', address: '', notes: '' }); setPersonOpen(true) }}>
+          <Button onClick={() => setPersonOpen(true)}>
             <Plus className="h-4 w-4" /> Add Person
           </Button>
           <Button variant="secondary" onClick={() => openMoney('RECEIVING')}>
@@ -763,7 +818,7 @@ export default function ArhatRegisterPage() {
 
       {section === 'ZAKAT' && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => { setZakatForm({ amount: '', notes: '' }); setZakatOpen(true) }}>
+          <Button onClick={() => setZakatOpen(true)}>
             <Landmark className="h-4 w-4" /> Give Zakat
           </Button>
         </div>
@@ -771,7 +826,7 @@ export default function ArhatRegisterPage() {
 
       {section === 'ADVANCE' && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => { setAdvance({ farmerId: '', amount: '', notes: '' }); setAdvanceOpen(true) }}>
+          <Button onClick={() => setAdvanceOpen(true)}>
             <Sprout className="h-4 w-4" /> Give advance
           </Button>
         </div>

@@ -64,6 +64,7 @@ type BoardSale = {
     sourceType: string
     dheriId?: number | null
     weightPerBag?: number
+    extraKg?: number
   }>
 }
 
@@ -114,12 +115,14 @@ export default function DailyTradePage() {
   const [farmerBags, setFarmerBags] = useState('')
   const [bagKg, setBagKg] = useState('40')
   const [extraKg, setExtraKg] = useState('0')
+  const [farmerKgs, setFarmerKgs] = useState('0')
   const [dheriNo, setDheriNo] = useState('')
   const [farmerRate, setFarmerRate] = useState('')
 
   const [buyerId, setBuyerId] = useState('')
   const [buyerBags, setBuyerBags] = useState('')
   const [extraBags, setExtraBags] = useState('0')
+  const [buyerKgs, setBuyerKgs] = useState('0')
   const [buyerRate, setBuyerRate] = useState('')
 
   const [stockBags, setStockBags] = useState('')
@@ -194,16 +197,18 @@ export default function DailyTradePage() {
   const fBags = parseInt(farmerBags, 10) || 0
   const fBagKg = parseFloat(bagKg) || 40
   const fExtra = parseFloat(extraKg) || 0
+  const fKgs = parseFloat(farmerKgs) || 0
   const fRate = parseFloat(farmerRate) || 0
-  const farmerWeight = fBags * fBagKg + fExtra
+  const farmerWeight = fBags * fBagKg + fExtra + fKgs
   const farmerGross = moneyFromWeight(farmerWeight, fRate)
   const farmerCommission = roundRupee(farmerGross * (COMMISSION_PCT / 100))
   const farmerNet = roundRupee(farmerGross - farmerCommission)
 
   const bBags = parseInt(buyerBags, 10) || 0
   const bExtraBags = parseInt(extraBags, 10) || 0
+  const bKgs = parseFloat(buyerKgs) || 0
   const bRate = parseFloat(buyerRate) || 0
-  const buyerWeight = bBags * fBagKg
+  const buyerWeight = bBags * fBagKg + bKgs
   const extraBagWeight = bExtraBags * (parseFloat(stockBagKg) || fBagKg)
   const buyerAmount = moneyFromWeight(buyerWeight, bRate)
 
@@ -284,9 +289,11 @@ export default function DailyTradePage() {
       setBuyerId('')
       setFarmerBags('')
       setExtraKg('0')
+      setFarmerKgs('0')
       setFarmerRate('')
       setBuyerBags('')
       setExtraBags('0')
+      setBuyerKgs('0')
       setBuyerRate('')
       setStockBags('')
       setStockRate('')
@@ -313,9 +320,11 @@ export default function DailyTradePage() {
   const resetDesk = async () => {
     setFarmerBags('')
     setExtraKg('0')
+    setFarmerKgs('0')
     setFarmerRate('')
     setBuyerBags('')
     setExtraBags('0')
+    setBuyerKgs('0')
     setBuyerRate('')
     setStockBags('')
     setStockRate('')
@@ -334,10 +343,12 @@ export default function DailyTradePage() {
     farmerBags: fBags,
     weightPerBag: fBagKg,
     extraKg: fExtra,
+    farmerKgs: fKgs,
     farmerRatePer40: fRate,
     buyerId: Number(buyerId),
     buyerBags: bBags,
     extraBags: bExtraBags,
+    buyerKgs: bKgs,
     buyerRatePer40: bRate,
     stockBags: sBags,
     stockWeightPerBag: sBagKg,
@@ -349,8 +360,8 @@ export default function DailyTradePage() {
     if (!buyerId) return toast.error('Choose a buyer')
     if (!productId) return toast.error('Choose dheri type')
     if (!dheriNo.trim()) return toast.error('Enter the dheri number you assigned')
-    if (fBags <= 0) return toast.error('Enter farmer bags')
-    if (bBags <= 0) return toast.error('Enter buyer bags')
+    if (fBags <= 0 && fExtra <= 0 && fKgs <= 0) return toast.error('Enter farmer bags, Extra KG, or KGs')
+    if (bBags <= 0 && bExtraBags <= 0 && bKgs <= 0 && sBags <= 0) return toast.error('Enter buyer bags, Extra bag, or KGs')
     if (fRate <= 0) return toast.error('Enter farmer rate / 40kg')
     if (bRate <= 0) return toast.error('Enter buyer rate / 40kg')
     if (stockBagsNeeded > 0 && stockRequiredKg > productStockKg + 0.011) {
@@ -380,7 +391,7 @@ export default function DailyTradePage() {
   const handleAddToStock = async () => {
     if (!farmerId) return toast.error('Choose a farmer')
     if (!productId) return toast.error('Choose dheri type')
-    if (fExtra <= 0) return toast.error('Enter KG to add to stock')
+    if (fExtra <= 0 && fKgs <= 0) return toast.error('Enter Extra KG or KGs to add to stock')
     if (fRate <= 0) return toast.error('Enter farmer rate / 40kg')
     setAddingStock(true)
     try {
@@ -389,6 +400,7 @@ export default function DailyTradePage() {
         productId: Number(productId),
         dheriCode: dheriNo.trim() || undefined,
         extraKg: fExtra,
+        farmerKgs: fKgs,
         farmerRatePer40: fRate,
         weightPerBag: fBagKg,
         farmerBags: fBags,
@@ -403,6 +415,7 @@ export default function DailyTradePage() {
         toast.error(billErrorMessage(err, 'KG added to stock, but the farmer bill could not open'))
       }
       setExtraKg('0')
+      setFarmerKgs('0')
       setFarmerBags('')
       setFarmerRate('')
       try {
@@ -430,11 +443,13 @@ export default function DailyTradePage() {
     setFarmerBags(String(receive?.bags || farmerItem?.bags || ''))
     setBagKg(String(receive?.weightPerBag || farmerItem?.weightPerBag || bagKg))
     setExtraKg(String(receive?.partialBagWeight ?? '0'))
+    setFarmerKgs('0')
     setDheriNo(String(farmerItem?.dheriCode || receive?.dheriId || ''))
     setFarmerRate(String(receive?.rate || ''))
     setBuyerId(String(sale.buyerId))
-    setBuyerBags(String(farmerItem?.bags || sale.bags || ''))
+    setBuyerBags(String(farmerItem?.bags || (stockItem ? '0' : sale.bags) || ''))
     setBuyerRate(String(farmerItem?.rate || ''))
+    setBuyerKgs(String(farmerItem?.extraKg || 0))
     setExtraBags(String(stockItem?.bags || 0))
     setStockBags('0')
     setStockBagKg(String(stockItem?.weightPerBag || bagKg))
@@ -456,6 +471,7 @@ export default function DailyTradePage() {
     setFarmerBags(String(row.bags || ''))
     setBagKg(String(row.weightPerBag || bagKg))
     setExtraKg(String(row.partialBagWeight ?? '0'))
+    setFarmerKgs('0')
     setDheriNo(row.dheriId)
     setFarmerRate(String(row.rate || ''))
     toast.success('Loaded for edit')
@@ -466,7 +482,7 @@ export default function DailyTradePage() {
     if (!farmerId) return toast.error('Choose a farmer')
     if (!productId) return toast.error('Choose dheri type')
     if (!dheriNo.trim()) return toast.error('Enter the dheri number you assigned')
-    if (fBags <= 0) return toast.error('Enter farmer bags')
+    if (fBags <= 0 && fExtra <= 0 && fKgs <= 0) return toast.error('Enter farmer bags, Extra KG, or KGs')
     setSelling(true)
     try {
       await dheriApi.update(editingDheriId, {
@@ -475,7 +491,7 @@ export default function DailyTradePage() {
         dheriCode: dheriNo.trim(),
         numberOfBags: fBags,
         weightPerBag: fBagKg,
-        partialBagWeight: fExtra,
+        partialBagWeight: fExtra + fKgs,
         marketRate: fRate,
       })
       toast.success('Dheri updated')
@@ -756,9 +772,11 @@ export default function DailyTradePage() {
             <BagsExtraRow
               bags={farmerBags}
               extraKg={extraKg}
+              kgs={farmerKgs}
               bagKg={bagKg}
               onBags={setFarmerBags}
               onExtraKg={setExtraKg}
+              onKgs={setFarmerKgs}
               onBagKg={setBagKg}
               bagsRequired={false}
               extraKgLabel={`${t('extraKg')} → stock`}
@@ -783,7 +801,7 @@ export default function DailyTradePage() {
             <Input label={`Commission (${COMMISSION_PCT}%)`} value={farmerCommission ? formatCurrency(farmerCommission) : '—'} readOnly />
             <Input label="Amount after commission" value={farmerNet ? formatCurrency(farmerNet) : '—'} readOnly />
             <p className="text-xs text-slate-500">
-              Bags are optional. Enter KG and rate / 40kg, then Add to stock — it records the farmer bill and puts that KG in stock.
+              Bags are optional. Extra KG goes to stock. KGs are billed as loose kilograms. Enter Extra KG or KGs and rate / 40kg, then Add to stock or Mark sold.
             </p>
             <Link to="/farmers" className="text-sm text-primary underline">Add farmer</Link>
           </div>
@@ -802,9 +820,10 @@ export default function DailyTradePage() {
             />
             <Input label="Address" value={buyer ? [buyer.address, buyer.city].filter(Boolean).join(', ') : ''} readOnly />
             <Input label="Buyer ID" value={buyer?.buyerId || ''} readOnly />
-            <div className="grid grid-cols-2 gap-3">
-              <Input label={`${t('noOfBags')} *`} type="number" value={buyerBags} onChange={(e) => setBuyerBags(e.target.value)} />
-              <Input label={t('extraBag')} type="number" value={extraBags} onChange={(e) => setExtraBags(e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input label={t('noOfBags')} type="number" min="0" value={buyerBags} onChange={(e) => setBuyerBags(e.target.value)} />
+              <Input label={t('extraBag')} type="number" min="0" value={extraBags} onChange={(e) => setExtraBags(e.target.value)} />
+              <Input label={t('kgs')} type="number" step="0.01" min="0" value={buyerKgs} onChange={(e) => setBuyerKgs(e.target.value)} />
             </div>
             <Input
               label="Total weight"
@@ -813,6 +832,9 @@ export default function DailyTradePage() {
             />
             <Input label="Rate / 40kg *" type="number" step="0.01" value={buyerRate} onChange={(e) => setBuyerRate(e.target.value)} />
             <Input label="Total price" value={buyerLineTotal ? formatCurrency(buyerLineTotal) : '—'} readOnly />
+            <p className="text-xs text-slate-500">
+              Bags are optional. Extra bag takes formed bags from stock. KGs sell loose kilograms without bags.
+            </p>
             <Link to="/buyers" className="text-sm text-primary underline">Add buyer</Link>
           </div>
         </div>

@@ -39,6 +39,62 @@ export function normalizeOwnerCode(value: string | null | undefined) {
   return String(value ?? '').trim()
 }
 
+/** Move a soft-deleted owner ID aside so a new person can reuse the same ID. */
+export function retireOwnerCode(original: string, id: bigint, maxLen = 20) {
+  const suffix = `#${id.toString()}`
+  if (suffix.length >= maxLen) return id.toString().slice(-maxLen)
+  const base = original.replace(/#\d+$/, '').slice(0, maxLen - suffix.length)
+  return `${base}${suffix}`
+}
+
+export async function freeFarmerCode(farmerId: string) {
+  const code = normalizeOwnerCode(farmerId)
+  if (!code) return
+  const ghost = await prisma.farmer.findFirst({
+    where: { farmerId: code, deleted: true },
+  })
+  if (!ghost) return
+  await prisma.farmer.update({
+    where: { id: ghost.id },
+    data: { farmerId: retireOwnerCode(code, ghost.id) },
+  })
+}
+
+export async function freeBuyerCode(buyerId: string) {
+  const code = normalizeOwnerCode(buyerId)
+  if (!code) return
+  const ghost = await prisma.buyer.findFirst({
+    where: { buyerId: code, deleted: true },
+  })
+  if (!ghost) return
+  await prisma.buyer.update({
+    where: { id: ghost.id },
+    data: { buyerId: retireOwnerCode(code, ghost.id) },
+  })
+}
+
+export async function retireFarmerRecord(id: number | bigint) {
+  const row = await prisma.farmer.findFirst({ where: { id: BigInt(id) } })
+  if (!row) return
+  if (row.deleted && row.farmerId.includes('#')) return
+  await freeFarmerCode(row.farmerId)
+  await prisma.farmer.update({
+    where: { id: row.id },
+    data: { deleted: true, farmerId: retireOwnerCode(row.farmerId, row.id) },
+  })
+}
+
+export async function retireBuyerRecord(id: number | bigint) {
+  const row = await prisma.buyer.findFirst({ where: { id: BigInt(id) } })
+  if (!row) return
+  if (row.deleted && row.buyerId.includes('#')) return
+  await freeBuyerCode(row.buyerId)
+  await prisma.buyer.update({
+    where: { id: row.id },
+    data: { deleted: true, buyerId: retireOwnerCode(row.buyerId, row.id) },
+  })
+}
+
 export async function nextDheriQueueNumber() {
   const last = await prisma.dheri.findFirst({
     where: { deleted: false, queueNumber: { not: null } },

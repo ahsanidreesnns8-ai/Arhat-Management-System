@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db'
-import { normalizeAccountKey, normalizeOwnerCode } from '@/server/ids'
+import { normalizeAccountKey, normalizeOwnerCode, retireBuyerRecord, retireFarmerRecord } from '@/server/ids'
 import { d, round2 } from '@/server/money'
 import { recordPayment } from '@/server/services/payments'
 import { logAudit } from '@/server/services/audit'
@@ -947,16 +947,10 @@ export async function deleteParty(id: number | bigint) {
       where: { farmerId: party.linkedFarmerId, deleted: false },
       data: { deleted: true },
     })
-    await prisma.farmer.updateMany({
-      where: { id: party.linkedFarmerId, deleted: false },
-      data: { deleted: true },
-    })
+    await retireFarmerRecord(party.linkedFarmerId)
   }
   if (party.linkedBuyerId) {
-    await prisma.buyer.updateMany({
-      where: { id: party.linkedBuyerId, deleted: false },
-      data: { deleted: true },
-    })
+    await retireBuyerRecord(party.linkedBuyerId)
   }
   await retireMatchingRegisterParties({
     partyId: party.id,
@@ -984,15 +978,11 @@ export async function removePeopleFromShop(names: string[] = SHOP_PURGE_NAMES) {
   const hitBuyers = buyers.filter((row) => matchesName(row.name))
   for (const farmer of hitFarmers) {
     await hideAccountsForFarmer(farmer.id, farmer.name, farmer.farmerId)
-    if (!farmer.deleted) {
-      await prisma.farmer.update({ where: { id: farmer.id }, data: { deleted: true } })
-    }
+    await retireFarmerRecord(farmer.id)
   }
   for (const buyer of hitBuyers) {
     await hideAccountsForBuyer(buyer.id, buyer.name, buyer.buyerId)
-    if (!buyer.deleted) {
-      await prisma.buyer.update({ where: { id: buyer.id }, data: { deleted: true } })
-    }
+    await retireBuyerRecord(buyer.id)
   }
   const leftover = parties.filter((row) => matchesName(row.name) && !row.deleted)
   for (const party of leftover) {
